@@ -9,10 +9,10 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+	"testing/fstest"
 
 	"github.com/SoufianoDev/OhMyFreeAI/internal/domain/config"
 	"github.com/SoufianoDev/OhMyFreeAI/migrations"
-	"testing/fstest"
 )
 
 func TestOpenMigratesAndPersistsConfig(t *testing.T) {
