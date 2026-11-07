@@ -608,3 +608,11 @@
 - Export and Inspect do not require replacing the live DB and can be delivered first. Restore remains intentionally blocked until the lifecycle is implemented and tested.
 - Pinned Wails v3.0.0 native file dialogs are available via application.Get().Dialog.SaveFile() / OpenFile(), with SetFilename, AddFilter, and PromptForSingleSelection; verified from the exact v3.0.0 source/tutorial. Do not use browser file-path inputs for backup selection.
 - This preserves the .omfaibackup contract: archive contains app metadata/config DB only; no model weights, engine binaries, credentials or runtime process state.
+
+
+## Ubuntu 22.04 GTK3 smoke regression/flakiness observed — 2026-11-07T20:18Z
+
+- Distro run `42409848051`, commit `7c5352a`, had one failure: Ubuntu 22.04 / GTK3-WebKit2GTK 4.1 built successfully, then `Launch twice and verify the live WebView-to-Go bridge` timed out after 30 seconds waiting for GetSnapshot. Captured application output was empty.
+- The same Ubuntu 22.04 lane had passed in the earlier full matrix run `42405827037`, so this is intermittent or environment-sensitive; the evidence does not identify a root cause. It is not a compiler or dependency-install failure.
+- The current smoke script uses a fixed Xvfb display :97 and a 500 ms startup delay. These are hypotheses to inspect only if the current rerun reproduces; do not change GTK/WebKit code based on this one failure.
+- Latest full CLI-enabled distro rerun `42410214638` is testing the current revision and will provide the next comparison. All other completed jobs in `42409848051` passed; Debian 12 was still running at inspection.
