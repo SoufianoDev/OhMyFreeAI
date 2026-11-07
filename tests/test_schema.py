@@ -44,6 +44,36 @@ class InitialSchemaTests(unittest.TestCase):
                 "VALUES('a','m','gguf','x.gguf',1,'short','verified','now')"
             )
 
+    def test_supported_assessment_requires_all_execution_evidence(self):
+        self.db.execute(
+            "INSERT INTO model_revisions(id,family,source_repository,revision,architecture,created_at) "
+            "VALUES('m','Qwen','org/model','rev1','qwen','now')"
+        )
+        self.db.execute(
+            "INSERT INTO artifacts(id,model_revision_id,format,file_name,size_bytes,sha256,integrity_state,created_at) "
+            "VALUES('a','m','gguf','x.gguf',1,?,'verified','now')", ("a" * 64,)
+        )
+        self.db.execute(
+            "INSERT INTO engine_installations(id,version,target_os,target_arch,backend,asset_sha256,install_path,state,created_at) "
+            "VALUES('e','v1','linux','amd64','cpu',?,'/tmp/engine','installed','now')", ("b" * 64,)
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "INSERT INTO compatibility_assessments(id,model_revision_id,artifact_id,engine_installation_id,backend,runtime_fingerprint,status,artifact_integrity_verified,engine_load_succeeded,health_check_passed,inference_succeeded,tested_at) "
+                "VALUES('c','m','a','e','cpu','cpu-test','supported',1,1,1,0,'now')"
+            )
+
+    def test_hash_columns_reject_non_hex_values(self):
+        self.db.execute(
+            "INSERT INTO model_revisions(id,family,source_repository,revision,architecture,created_at) "
+            "VALUES('m','Qwen','org/model','rev1','qwen','now')"
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "INSERT INTO artifacts(id,model_revision_id,format,file_name,size_bytes,sha256,integrity_state,created_at) "
+                "VALUES('a','m','gguf','x.gguf',1,?,'verified','now')", ("z" * 64,)
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
