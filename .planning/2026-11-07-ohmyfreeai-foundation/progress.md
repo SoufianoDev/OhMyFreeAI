@@ -731,3 +731,10 @@
 - Current revision workflows: root CI `42427135468`, SQLite driver evaluation `42427135523`, Wails `42427135536`, Linux distribution matrix `42427135457`. At the time of this entry, jobs were pending/queued; no success is claimed.
 - Older workflow runs for superseded commits were still queued/in progress and are not authoritative. Await the current revision results.
 - Next: inspect CI/race output; add a deterministic backup lease-drain integration test if a stable test seam is available; then implement durable restore journal and startup recovery only after the controller suite is green. Restore remains disabled.
+
+## Test correction: initialize schema in controller repository test — 2026-11-07T23:52Z
+
+- Root CI run `42427135468` exposed a test-fixture error in `TestStoreControllerConfigRepositoryRoundTrip`: the test opened a fresh SQLite file but attempted `Save` before applying migrations, so SQLite correctly reported `no such table: app_settings`.
+- This was a test setup defect, not a StoreController implementation failure. Updated the fixture to apply the committed production migrations before exercising controller `Save`/`Load`.
+- Fix commit: `5405998c0dbee5b7c184925c49031bd7650b6738`. The corrected test still requires a fresh root CI run; no green claim yet.
+- Race detector did not run in the failed Ubuntu job because ordinary `go test ./...` failed first. Await the new revision's Ubuntu run for both normal and race tests.
