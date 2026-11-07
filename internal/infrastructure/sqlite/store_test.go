@@ -190,3 +190,30 @@ func TestOpenRejectsInMemoryPath(t *testing.T) {
 		t.Fatalf("expected invalid database path error, got %v", err)
 	}
 }
+
+
+func TestMigrationHistoryGapIsRejected(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "history-gap.db"))
+	if err != nil {
+		t.Fatalf("open SQLite store: %v", err)
+	}
+	defer store.Close()
+
+	_, err = store.DB().ExecContext(ctx, `
+		CREATE TABLE schema_migrations (
+			version INTEGER PRIMARY KEY,
+			description TEXT NOT NULL,
+			applied_at TEXT NOT NULL
+		);
+		INSERT INTO schema_migrations(version, description, applied_at)
+		VALUES (1, 'first', '2026-11-07T00:00:00Z'), (3, 'third', '2026-11-07T00:00:00Z');
+	`)
+	if err != nil {
+		t.Fatalf("create corrupt migration history fixture: %v", err)
+	}
+
+	if err := store.Migrate(ctx, migrations.Files, "."); !errors.Is(err, ErrMigrationHistoryCorrupt) {
+		t.Fatalf("expected corrupt migration history error, got %v", err)
+	}
+}
