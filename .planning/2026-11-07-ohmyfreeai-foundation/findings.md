@@ -520,3 +520,20 @@
 - Fedora 44 legacy GTK3 / WebKit2GTK 4.1 also passed the full build and two-stage smoke in the same run.
 - Both emitted `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, and `WEBVIEW_REOPEN_PASS`.
 - This validates the legacy GTK3 lane on both Ubuntu 22.04 and Fedora 44, including the refactored bridge bootstrap. Debian 12 legacy GTK3 is the only remaining job in this run.
+
+
+## All eight Linux distro/stack lanes passed — 2026-11-07T19:36Z
+
+- Run `42405729874` completed with conclusion SUCCESS. All eight matrix jobs passed dependency bootstrap, pkg-config validation, pinned Wails CLI installation, full desktop application build, two-stage WebView-to-Go smoke, and SQLite reopen:
+  1. Ubuntu 24.04 — GTK4/WebKitGTK 6.0
+  2. Debian 13 — GTK4/WebKitGTK 6.0
+  3. Fedora 44 — GTK4/WebKitGTK 6.0
+  4. Arch Linux rolling — GTK4/WebKitGTK 6.0
+  5. openSUSE Tumbleweed — GTK4/WebKitGTK 6.0
+  6. Ubuntu 22.04 — GTK3/WebKit2GTK 4.1
+  7. Debian 12 — GTK3/WebKit2GTK 4.1
+  8. Fedora 44 legacy lane — GTK3/WebKit2GTK 4.1
+- Every job emitted `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, and `WEBVIEW_REOPEN_PASS`.
+- The run passed without the later extra PATH restoration for openSUSE, showing that removing setup-python was the material shell-resolution fix. The guard in the newest workflow revision is redundant but benign.
+- Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405729874
+- Scope: these are distribution-container userland builds and Xvfb WebView smoke tests on GitHub-hosted runners. They do not certify every bare-metal GPU, compositor, desktop session, installer/uninstaller or the production WebKit sandbox. The sandbox is explicitly not bypassed in product builds; its host-level verification remains open.
