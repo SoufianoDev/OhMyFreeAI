@@ -38,3 +38,23 @@ The frontend invokes the generated GetSnapshot binding and only marks the local 
 The GitHub Actions Wails v3.0.0 application build passed on Ubuntu 24.04 and Windows. It generated one service, two methods and seven models, built the Vite production bundle and verified the native executable.
 
 This is a native compile/build and binding-generation proof. It does not yet launch the built WebView and assert a live call, certify graceful shutdown or process ownership, package installers, validate clean uninstall, or establish compatibility with older Linux distributions. macOS remains deferred.
+
+
+## Linux distribution verification matrix
+
+The pinned Wails v3.0.0 proof now has a separate distro-container matrix. The matrix builds the actual application and runs the executable twice under Xvfb; the frontend must call the generated `GetSnapshot` method and produce an explicit smoke marker on each launch.
+
+| Distribution | Web stack | Build mode | CI scope |
+|---|---|---|---|
+| Ubuntu 24.04 | GTK4 + WebKitGTK 6.0 | Default | Build + WebView bridge + reopen |
+| Debian 13 | GTK4 + WebKitGTK 6.0 | Default | Build + WebView bridge + reopen |
+| Fedora 44 | GTK4 + WebKitGTK 6.0 | Default | Build + WebView bridge + reopen |
+| Arch Linux rolling | GTK4 + WebKitGTK 6.0 | Default | Build + WebView bridge + reopen |
+| openSUSE Tumbleweed | GTK4 + WebKitGTK 6.0 | Default | Build + WebView bridge + reopen |
+| Ubuntu 22.04 | GTK3 + WebKit2GTK 4.1 | `gtk3` tag | Build + WebView bridge + reopen |
+| Debian 12 | GTK3 + WebKit2GTK 4.1 | `gtk3` tag | Build + WebView bridge + reopen |
+| Rocky Linux 9 | GTK3 + WebKit2GTK 4.1 | `gtk3` tag | Build + WebView bridge + reopen |
+
+The GTK3 compatibility lane is specific to Wails v3.0.x; upstream schedules removal of the legacy stack in v3.1. These jobs run in distribution containers on GitHub-hosted Linux runners. They validate distro userland package availability, compilation, dynamic linking at launch, the virtual-display WebView and the Go service bridge; they are not bare-metal tests of every desktop environment, GPU driver, Wayland compositor, installer or update path.
+
+The native Ubuntu 24.04 and Windows jobs remain separate. Passing a distro container job does not replace native Windows verification or certify all hardware configurations.
