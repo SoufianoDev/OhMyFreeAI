@@ -102,8 +102,8 @@ def build(output_directory: Path) -> Path:
             cwd=temporary_root,
         )
 
-        shutil.copy2(ROOT / "desktop-src" / "main.go", project / "main.go")
-        shutil.copy2(ROOT / "desktop-src" / "app_service.go", project / "app_service.go")
+        shutil.copy2(ROOT / "desktop-src" / "main.go.tmpl", project / "main.go")
+        shutil.copy2(ROOT / "desktop-src" / "app_service.go.tmpl", project / "app_service.go")
         demo_service = project / "greetservice.go"
         if demo_service.exists():
             demo_service.unlink()
