@@ -135,3 +135,19 @@
 - llama.cpp upstream: https://github.com/ggml-org/llama.cpp
 - Material Design developer platform overview: https://m3.material.io/develop
 - Material Web roadmap: https://github.com/material-components/material-web/blob/main/docs/roadmap.md
+
+
+## Wails v3 proof-of-concept research (2026-11-07)
+
+- Re-read the official Wails v3 installation, first-application, and build documentation.
+- The documented stable CLI installation is pinned to `github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0`; do not install the moving development branch.
+- The official JavaScript-only starter command is `wails3 init -n <name> -t vanilla-js`; the official production build command is `wails3 build`.
+- Wails v3 requires Go 1.26 or later. This repository's current Go target 1.27.3 satisfies that documented minimum, subject to the selected toolchain being available on CI runners.
+- Official Linux prerequisites are GCC build tools, GTK4 and WebKitGTK 6.0. Ubuntu CI packages selected for the proof are `build-essential`, `pkg-config`, `libgtk-4-dev`, and `libwebkitgtk-6.0-dev`.
+- Official Windows prerequisite is the WebView2 Runtime; the standard GitHub-hosted Windows runner is expected to provide it, but the workflow must prove this rather than infer end-user availability.
+- Wails documents Ubuntu 24.04 as its supported Linux baseline and Windows AMD64/ARM64. The CI proof is therefore pinned to `ubuntu-24.04` and `windows-latest`.
+- The proof deliberately generates the official starter template in a temporary CI workspace and builds it on each native OS. This verifies the pinned Wails toolchain and platform dependencies, but does **not** yet prove OhMyFreeAI service bindings, process lifecycle, packaging, or end-user distro coverage.
+- Official references:
+  - https://wails.io/getting-started/installation/
+  - https://wails.io/getting-started/your-first-app/
+  - https://wails.io/guides/build/building/
