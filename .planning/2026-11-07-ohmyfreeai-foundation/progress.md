@@ -422,3 +422,13 @@
 
 
 - openSUSE Tumbleweed now completes package installation, but subsequent steps cannot resolve the built-in `sh` command after the package transaction. The bootstrap itself runs under sh and installs Bash; changed post-bootstrap job steps to use Bash (setup-python is no longer present). openSUSE did not reach pkg-config/build/smoke in this attempt.
+
+
+## 2026-11-07T19:13Z — CI incident review
+
+- Resumed the existing named plan `.planning/2026-11-07-ohmyfreeai-foundation`; no competing plan was created.
+- Read the vendored Planning with Files v3.28.1 skill and the existing plan/findings/progress ledgers before acting.
+- Confirmed repository state: active work is on `foundation/bootstrap`, not `main`; main still contains only the initial commit, while the foundation branch contains the implemented architecture, app shell, skills, and CI workflows.
+- Reviewed GitHub Actions logs. The newest failed distro run before the current head was a runner shell resolution failure in openSUSE after package bootstrap. Current head switches subsequent steps to Bash after installing Bash; run `42405097971` is the verification run and was not yet complete at review time.
+- Historical causes/fixes are recorded in findings.md. No claim is made that the current eight-distro matrix is green.
+- Next: monitor run `42405097971`; inspect and complete the existing backup archive/manifest/checksum implementation and recovery test gaps, then update this ledger with actual test evidence.
