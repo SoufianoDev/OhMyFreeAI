@@ -34,7 +34,7 @@ func RunBackup(ctx context.Context, output io.Writer, invocation Invocation, ope
 		if err := operations.Export(ctx, path); err != nil {
 			return fmt.Errorf("export backup: %w", err)
 		}
-		_, err := fmt.Fprintf(output, "Backup created: %s\\n", path)
+		_, err := fmt.Fprintf(output, "Backup created: %s\n", path)
 		return err
 	case BackupInspect:
 		inspection, err := operations.Inspect(ctx, path)
@@ -42,7 +42,7 @@ func RunBackup(ctx context.Context, output io.Writer, invocation Invocation, ope
 			return fmt.Errorf("inspect backup: %w", err)
 		}
 		_, err = fmt.Fprintf(output,
-			"Backup valid\\nFormat version: %d\\nApplication version: %s\\nDatabase schema: %d\\nCreated: %s\\nDatabase size: %d bytes\\nDatabase SHA-256: %s\\n",
+			"Backup valid\nFormat version: %d\nApplication version: %s\nDatabase schema: %d\nCreated: %s\nDatabase size: %d bytes\nDatabase SHA-256: %s\n",
 			inspection.FormatVersion, inspection.ApplicationVersion, inspection.SchemaVersion,
 			inspection.CreatedAt.UTC().Format(time.RFC3339), inspection.DatabaseSizeBytes, inspection.DatabaseSHA256,
 		)
