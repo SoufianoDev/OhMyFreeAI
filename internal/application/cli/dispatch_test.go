@@ -56,3 +56,50 @@ func TestParseRejectsUnexpectedArguments(t *testing.T) {
 		t.Fatalf("error = %v, want ErrUnexpectedArguments", err)
 	}
 }
+
+
+func TestParseRecognizesBackupExportAndInspect(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want Command
+		path string
+	}{
+		{name: "export", args: []string{"backup", "export", "/tmp/state.omfaibackup"}, want: BackupExport, path: "/tmp/state.omfaibackup"},
+		{name: "inspect", args: []string{"backup", "inspect", "/tmp/state.omfaibackup"}, want: BackupInspect, path: "/tmp/state.omfaibackup"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			invocation, err := Parse(test.args)
+			if err != nil {
+				t.Fatalf("Parse(%v) returned error: %v", test.args, err)
+			}
+			if invocation.Command != test.want {
+				t.Fatalf("command = %q, want %q", invocation.Command, test.want)
+			}
+			if len(invocation.Arguments) != 1 || invocation.Arguments[0] != test.path {
+				t.Fatalf("arguments = %#v, want [%q]", invocation.Arguments, test.path)
+			}
+		})
+	}
+}
+
+func TestParseRejectsMalformedBackupCommands(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want error
+	}{
+		{name: "missing action", args: []string{"backup"}, want: ErrUnexpectedArguments},
+		{name: "missing path", args: []string{"backup", "export"}, want: ErrUnexpectedArguments},
+		{name: "extra path", args: []string{"backup", "inspect", "one.omfaibackup", "two.omfaibackup"}, want: ErrUnexpectedArguments},
+		{name: "unknown action", args: []string{"backup", "restore", "state.omfaibackup"}, want: ErrUnknownCommand},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := Parse(test.args); !errors.Is(err, test.want) {
+				t.Fatalf("Parse(%v) error = %v, want %v", test.args, err, test.want)
+			}
+		})
+	}
+}
