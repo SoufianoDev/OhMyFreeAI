@@ -711,3 +711,13 @@
 - Commits: e8806c338590cfd6904d170cd2a4433535508e35 (controller fix), f6cc74d7d1a82e8bc5c684f6d3ab5ea56609c72f (failure-path tests), 41b009e8a29e6c471b6d41bd0ca58e29d22459f4 (plan update).
 - New root CI run 42421277886 and Linux matrix run 42421277879 were queued for the latest test commit f6cc74d. These results have not yet been observed; do not claim the new failure-path tests passed until root CI completes.
 - Restore remains disabled. Remaining Store work: deterministic concurrent configuration/backup lease-drain tests, race/stress coverage, durable journal, staging verification, atomic publication, rollback and startup crash recovery.
+
+## Continuation: lease cancellation and concurrency stress — 2026-11-07T23:49Z
+
+- Added `TestStoreControllerCanceledCloseLeavesStoreAvailable`: a timed-out shutdown must release writer preference, keep the active Store published, allow new shared operations, and permit a later successful close.
+- Added `TestStoreControllerConcurrentLeaseStress`: 12 concurrent shared workers and 4 exclusive workers repeatedly exercise lease acquisition/release while atomically checking for reader/writer overlap and stale Store exposure.
+- Commits: `4f5b68667a9901d34207421f7e694ab8dac5d046` (canceled-close regression test), `2a9755622492543252435cf010644a81343854d0` (stress test), `d79c92a9d481e43a137566edc4ac8e27feadd97a` (stress counter correctness).
+- Latest root CI run for the current branch tip: `42426993075`; SQLite driver matrix: `42426993082`; Wails: `42426993083`; Linux distribution matrix: `42426993088`. These were queued/pending at the time of this entry; no green result is claimed.
+- Previous revision root CI `42426918154`: Ubuntu completed SUCCESS; Windows was canceled when newer commits superseded it. SQLite, Wails and distro jobs were also superseded/canceled or still running. Use the newest runs above as authoritative.
+- No race-detector result has been observed yet. The stress test is committed, but it is not a substitute for `go test -race`.
+- Next: inspect current CI results; add end-to-end tests proving configuration Save/Load and backup archive creation retain shared leases for their entire operations; then add the durable journal only after lifecycle behavior is fully verified. Restore remains disabled.
