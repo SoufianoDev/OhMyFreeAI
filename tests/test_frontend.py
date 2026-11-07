@@ -24,6 +24,9 @@ class FrontendFoundationTests(unittest.TestCase):
         parser.feed(html)
         self.assertEqual(len(parser.ids), len(set(parser.ids)))
         for required in ("page-dashboard", "page-models", "page-runtime", "page-settings"):
+            self.assertIn("backup-export", parser.ids)
+            self.assertIn("backup-inspect", parser.ids)
+            self.assertIn("backup-status", parser.ids)
             self.assertIn(required, parser.ids)
         self.assertRegex(html, r'<html[^>]*lang="ar"[^>]*dir="rtl"')
 
