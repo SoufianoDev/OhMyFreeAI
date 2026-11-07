@@ -15,6 +15,7 @@ import (
 
 	appcli "github.com/SoufianoDev/OhMyFreeAI/internal/application/cli"
 	appconfig "github.com/SoufianoDev/OhMyFreeAI/internal/application/config"
+	"github.com/SoufianoDev/OhMyFreeAI/internal/infrastructure/backup"
 	"github.com/SoufianoDev/OhMyFreeAI/internal/infrastructure/sqlite"
 	"github.com/SoufianoDev/OhMyFreeAI/internal/version"
 	"github.com/SoufianoDev/OhMyFreeAI/migrations"
@@ -105,7 +106,8 @@ func run() error {
 	}
 
 	configuration := appconfig.Service{Repository: store}
-	service := NewAppService(configuration)
+	backupManager := backup.Manager{ApplicationVersion: version.Current, Migrations: migrations.Files, MigrationDir: "."}
+	service := NewAppService(configuration, backupManager, store)
 
 	app := application.New(application.Options{
 		Name:        "OhMyFreeAI",
