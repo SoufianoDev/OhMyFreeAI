@@ -130,7 +130,7 @@ jobs:
             suse:gtk4-webkit6)
               zypper --non-interactive refresh
               zypper --non-interactive install --no-recommends \
-                gcc gcc-c++ pkg-config gtk4-devel webkitgtk4-devel \
+                bash gcc gcc-c++ pkg-config gtk4-devel webkitgtk4-devel \
                 xorg-x11-server-Xvfb xauth Mesa-dri libX11-xcb1 libXcomposite1 \
                 libXdamage1 libXfixes3 libXrandr2 libXrender1 libXtst6 libXi6 \
                 libxkbcommon-x11-0 libwayland-client0 libdrm2 curl git ca-certificates
