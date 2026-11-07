@@ -60,7 +60,7 @@ func (s *AppService) GetSnapshot() (DashboardSnapshot, error) {
 				count = priorCount + 1
 			}
 		}
-		value := fmt.Sprintf("GetSnapshot success count=%d\\n", count)
+		value := fmt.Sprintf("GetSnapshot success count=%d\n", count)
 		if err := os.WriteFile(marker, []byte(value), 0o600); err != nil {
 			return DashboardSnapshot{}, fmt.Errorf("write WebView smoke marker: %w", err)
 		}
