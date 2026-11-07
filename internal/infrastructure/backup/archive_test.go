@@ -385,3 +385,28 @@ func rewriteArchiveEntryName(t *testing.T, sourcePath, destinationPath, oldName,
 		t.Fatalf("close rewritten archive file: %v", err)
 	}
 }
+
+
+func TestExtractArchiveHonorsCancellation(t *testing.T) {
+	store, err := sqlite.Open(context.Background(), filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatalf("open SQLite store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(context.Background(), migrations.Files, "."); err != nil {
+		t.Fatalf("migrate SQLite store: %v", err)
+	}
+
+	manager := Manager{ApplicationVersion: "0.1.0", Migrations: migrations.Files, MigrationDir: "."}
+	archivePath := filepath.Join(t.TempDir(), "cancel.omfaibackup")
+	if err := manager.Create(context.Background(), store, archivePath); err != nil {
+		t.Fatalf("create valid backup archive: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	extractedPath := filepath.Join(t.TempDir(), "cancelled.sqlite")
+	if _, err := extractArchive(ctx, archivePath, extractedPath); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+}
