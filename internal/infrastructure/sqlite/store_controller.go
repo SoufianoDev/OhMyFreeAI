@@ -221,16 +221,16 @@ func (c *StoreController) Close(ctx context.Context) error {
 		return err
 	}
 	defer release()
-	if err := store.Close(); err != nil {
-		return err
-	}
+	closeErr := store.Close()
+	// database/sql marks the pool closed even when closing a driver connection
+	// reports an error. Never leave a potentially closed Store published.
 	c.mu.Lock()
 	if c.store == store {
 		c.store = nil
 		c.signalLocked()
 	}
 	c.mu.Unlock()
-	return nil
+	return closeErr
 }
 
 // Load and Save make StoreController a stable configuration repository. Each
