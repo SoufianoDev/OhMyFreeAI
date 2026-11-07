@@ -577,3 +577,6 @@
 
 
 - Corrected a workflow wiring omission found during source review: the Linux distro workflow path filter included smoke_cli.py, but the execution step had not been inserted because the actual WebView step label differed from the replacement target. The exact insertion is now present in commit 5ccfb6f and runs before WebView smoke in all eight lanes.
+
+
+- Wails run 42409974970: Linux native app build passed and the native CLI smoke step passed all four commands plus the doctor read-only assertion. Linux WebView/SQLite smoke is still running; Windows app build is still running.
