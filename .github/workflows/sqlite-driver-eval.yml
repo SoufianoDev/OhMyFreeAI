@@ -23,10 +23,8 @@ jobs:
         os: [ubuntu-24.04, windows-latest]
         driver:
           - name: modernc
-            module_name: modernc.org/sqlite
             driver_name: sqlite
           - name: ncruces
-            module_name: github.com/ncruces/go-sqlite3
             driver_name: sqlite3
 
     steps:
@@ -44,4 +42,6 @@ jobs:
         env:
           OMFAI_SQLITE_DRIVER: ${{ matrix.driver.driver_name }}
         run: |
+          go mod tidy
+          go mod verify
           go test -v -count=1 ./...
