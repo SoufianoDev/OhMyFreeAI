@@ -221,5 +221,8 @@ jobs:
           WAILS_BUILD_TAGS: ${{ matrix.build_tags }}
         run: python3 scripts/build_desktop.py --output-dir dist
 
+      - name: Smoke-test native CLI dispatch
+        run: python3 scripts/smoke_cli.py dist/OhMyFreeAI
+
       - name: Launch twice and verify the live WebView-to-Go bridge
         run: python3 scripts/smoke_desktop.py dist/OhMyFreeAI
