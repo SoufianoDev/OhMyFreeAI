@@ -95,10 +95,21 @@ func TestStoreControllerWriterPreventsNewSharedLeases(t *testing.T) {
 		})
 	}()
 	<-writerStarted
-	// Wait until the writer has registered itself as waiting before attempting
-	// a second reader. The controller exposes no scheduling internals, so the
-	// short bounded wait is followed by a strict ordering assertion.
-	time.Sleep(40 * time.Millisecond)
+	// Wait until the writer has registered itself before attempting a
+	// second reader. This makes the writer-preference assertion deterministic.
+	deadline := time.Now().Add(time.Second)
+	for {
+		controller.mu.Lock()
+		waiting := controller.waitingWriters
+		controller.mu.Unlock()
+		if waiting > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("exclusive operation did not register as waiting")
+		}
+		time.Sleep(time.Millisecond)
+	}
 
 	secondEntered := make(chan struct{})
 	secondDone := make(chan error, 1)
@@ -179,5 +190,35 @@ func TestStoreControllerCanceledWaitDoesNotBlockFutureOperations(t *testing.T) {
 func TestStoreControllerRejectsNilStore(t *testing.T) {
 	if _, err := NewStoreControllerChecked(nil); err == nil {
 		t.Fatal("expected nil store to be rejected")
+	}
+}
+
+func TestStoreControllerPublishesReplacementOnlyUnderExclusiveLease(t *testing.T) {
+	oldStore := newLifecycleTestStore(t, "old.db")
+	newStore := newLifecycleTestStore(t, "new.db")
+	controller := NewStoreController(oldStore)
+
+	if err := controller.WithExclusive(context.Background(), func(current *Store) (*Store, error) {
+		if current != oldStore {
+			t.Fatal("exclusive lease received unexpected current store")
+		}
+		if err := current.Close(); err != nil {
+			return nil, err
+		}
+		return newStore, nil
+	}); err != nil {
+		t.Fatalf("replace store under exclusive lease: %v", err)
+	}
+
+	if err := controller.WithShared(context.Background(), func(current *Store) error {
+		if current != newStore {
+			t.Fatal("shared operation observed stale store after replacement")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("shared operation after replacement: %v", err)
+	}
+	if err := newStore.Close(); err != nil {
+		t.Fatalf("close replacement store: %v", err)
 	}
 }
