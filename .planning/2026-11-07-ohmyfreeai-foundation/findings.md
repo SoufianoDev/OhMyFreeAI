@@ -163,3 +163,21 @@
   - https://v3.wails.io/features/bindings/methods/
   - https://v3.wails.io/guides/dev/project-structure/
   - https://v3.wails.io/quick-start/first-app/
+
+
+## SQLite driver re-evaluation (2026-11-07)
+
+- Rechecked current package metadata and official project documentation rather than relying only on the earlier candidate summary.
+- `modernc.org/sqlite` v1.62.0 currently declares Go 1.26.0 and BSD-3-Clause, and describes itself as a pure-Go/no-CGO SQLite driver compatible with `database/sql`. Its canonical development repository is GitLab; the GitHub repository is an official mirror. The repository publishes third-party license/SBOM materials, so release packaging still needs a dependency-license review.
+- `github.com/ncruces/go-sqlite3` v0.37.0 currently declares Go 1.26.0 and MIT. It wraps a WASM SQLite build translated to Go and provides a `database/sql` driver. The project explicitly warns that per-connection memory is higher because each connection runs in a WASM sandbox.
+- ncruces' VFS documentation reports tested full file-lock and shared-memory WAL support for Linux amd64 and Windows amd64 in its default configuration. It also documents important limitations for unsupported configurations and warns that concurrent access through incompatible VFS implementations can corrupt data. This makes direct Linux/Windows tests mandatory rather than relying on the generic pure-Go label.
+- `github.com/mattn/go-sqlite3` remains a mature `database/sql` option under MIT, but its official README requires `CGO_ENABLED=1` and GCC. Windows builds also require a Windows GCC toolchain, increasing native build and packaging burden. It is not included in the first automated matrix because the current product preference is a CGO-free build; it remains a fallback if the CGO-free drivers fail acceptance.
+- Added an isolated evaluation module and a GitHub Actions matrix for modernc and ncruces on Ubuntu 24.04 and Windows. The test covers WAL, foreign keys, rollback, concurrent writes, integrity checks, checkpoint, close/reopen and checkpointed file-copy recovery. It is intentionally a smoke/evaluation test: it does not simulate abrupt process termination, fully validate the production migration runner, or establish performance.
+- Current provisional order remains modernc first because it is a direct pure-Go port with no custom WASM VFS layer and fits the Go toolchain target. This is not an approval; compare actual matrix results before pinning a production dependency.
+- Official sources:
+  - https://pkg.go.dev/modernc.org/sqlite
+  - https://github.com/modernc-org/sqlite
+  - https://pkg.go.dev/github.com/ncruces/go-sqlite3
+  - https://github.com/ncruces/go-sqlite3/blob/main/vfs/README.md
+  - https://github.com/ncruces/go-sqlite3/wiki/Support-matrix
+  - https://github.com/mattn/go-sqlite3
