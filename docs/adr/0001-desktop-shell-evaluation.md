@@ -7,7 +7,7 @@
 
 The product requires a Go core and a native desktop shell for Linux and Windows. Wails is a candidate, but the previous prototype uses Wails v2.10.2, which is not a current baseline. Official documentation now presents Wails v3.0.0 as stable and recommends it for new projects. Wails v3 requires Go 1.26+ and GTK4/WebKitGTK 6.0 on Linux by default; older distro stacks require a temporary legacy build tag. Wails v2 continues to receive critical updates and documents Go 1.21+ and GTK3/WebKit dependencies.
 
-The current tool container has Go 1.23.2 and cannot certify a Wails v3 build.
+The project toolchain target is Go 1.27.3, which exceeds the documented Wails v3 Go 1.26+ requirement. The current tool container still has Go 1.23.2 and lacks GTK4/WebKitGTK 6 development packages, the Wails CLI and a Windows host, so it cannot certify a Wails v3 build.
 
 ## Decision
 
