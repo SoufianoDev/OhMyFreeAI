@@ -29,6 +29,7 @@ def create_migrated_database(database_path: Path) -> None:
     database_path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(database_path)
     try:
+        connection.execute("PRAGMA journal_mode = WAL")
         connection.execute("PRAGMA foreign_keys = ON")
         for migration in sorted(migrations.glob("[0-9][0-9][0-9]_*.sql")):
             if migration.name.endswith(".down.sql"):
@@ -39,7 +40,6 @@ def create_migrated_database(database_path: Path) -> None:
                 "INSERT INTO schema_migrations(version, description, applied_at) VALUES (?, ?, ?)",
                 (int(prefix), description.removesuffix(".sql"), "2026-11-07T00:00:00Z"),
             )
-        connection.execute("PRAGMA journal_mode = WAL")
         connection.commit()
     finally:
         connection.close()
