@@ -16,17 +16,17 @@
 
 ## Phase 2 — Feasibility proofs
 
-- Wails v2/v3 Linux and Windows proof-of-concept.
+- Wails v3.0.0 Linux/Windows starter and generated-binding proof (passed); implement app adapter and validate packaging/distro coverage.
 - Go core compile/test.
 - Official llama.cpp prebuilt distribution and backend compatibility.
-- SQLite and local Gateway contract.
+- SQLite driver modernc.org/sqlite v1.62.0 selected after Linux/Windows migration/locking smoke tests; implement production adapter and migration runner.
 - Colab policy-compatible use case or explicit no-go.
 
 ## Phase 3 — Bootstrap
 
 - Go module and clean package layout.
 - Developer toolkit and CI.
-- Wails adapter after major-version selection.
+- Wails v3.0.0 desktop adapter with real service bindings and lifecycle integration.
 - Material 3 token system and minimal application shell.
 
 ## Phase 4 — Domain and persistence

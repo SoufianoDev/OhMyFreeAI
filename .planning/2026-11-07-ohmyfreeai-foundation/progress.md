@@ -196,3 +196,35 @@
 - Wails native jobs reached toolchain/dependency installation on Ubuntu and Windows; native build and generated-binding steps had not yet completed at the last check.
 - Multiple push commits had queued redundant copies of the same workflows. Added per-workflow/per-branch GitHub Actions concurrency groups with cancel-in-progress to ensure the newest branch revision supersedes stale queued runs.
 - No driver or desktop framework has been selected. Continue from the latest run logs and preserve exact platform outcomes.
+
+
+## Continuation session: 2026-11-07T17:15Z — native proofs completed
+
+### Verified CI results
+- Wails v3.0.0 native proof run `42394857136`: **success** on `ubuntu-24.04` and `windows-latest`. The official starter was generated, the GreetService binding was generated and checked, and each native executable was built and verified.
+- Root validation run `42395074606`: **success** on Ubuntu and Windows. Go vet/tests/build, Python compile/tests, frontend JavaScript syntax and architecture-boundary checks all passed.
+- SQLite driver matrix run `42395265071`: **success** in all four combinations (modernc/ncruces × Ubuntu/Windows). The expanded test applied the actual `migrations/001_initial.sql` in a transaction, checked schema creation and foreign-key rejection, then ran the WAL/concurrency/integrity/checkpoint/close-reopen/file-copy checks. Both drivers reported SQLite 3.54.1.
+
+### Decisions
+- Accepted Wails v3.0.0 as the desktop shell, with Ubuntu 24.04 as the only Linux baseline certified so far. The official template proof does not yet represent the complete OhMyFreeAI app or its runtime lifecycle.
+- Selected modernc.org/sqlite v1.62.0 for the production SQLite adapter. Both modernc and ncruces passed the current matrix; modernc is preferred to avoid the WASM-translated engine/custom VFS and documented per-connection memory overhead in ncruces.
+- Kept experimental driver dependencies in the nested evaluation module. The production module still has no SQLite driver import; add modernc when implementing the concrete persistence adapter.
+
+### Remaining work
+- Implement actual Wails service registration, frontend calls, lifecycle/shutdown and native adapters.
+- Implement the production SQLite adapter and transactional migration runner using modernc.
+- Add abrupt process crash/reopen, SQLite backup API/restore, long-duration stress and performance tests.
+- Verify packaging, clean uninstall, license inventory and Linux distributions beyond Ubuntu 24.04.
+- Run documentation/link validation and review the complete branch diff.
+- No changes to the user's historical Colab launcher/scripts or live runtime were made.
+
+### Files changed in this continuation
+- `docs/adr/0001-desktop-shell-evaluation.md`
+- `docs/adr/0004-sqlite-driver-evaluation.md`
+- `docs/architecture/ADR_INDEX.md`
+- `docs/architecture/IMPLEMENTATION_BLUEPRINT.md`
+- `migrations/README.md`
+- `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md`
+- `.planning/2026-11-07-ohmyfreeai-foundation/findings.md`
+- `.planning/2026-11-07-ohmyfreeai-foundation/progress.md`
+- `tests/sqlite-driver-eval/driver_test.go` (import formatting)

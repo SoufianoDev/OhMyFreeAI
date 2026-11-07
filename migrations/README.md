@@ -8,4 +8,4 @@
 - Use WAL only on supported local filesystems. Do not put the live SQLite database on Google Drive or an unverified network filesystem.
 - Store UTC timestamps. Sanitize source URIs before persistence; never store bearer tokens, signed query parameters, prompts or full inference payloads.
 - Persist OS secret references only. The secret values themselves belong in the platform secret store.
-- Do not choose or import a SQLite driver here. Driver selection is recorded in ADR 0004 and remains pending Linux/Windows validation.
+- Selected driver: `modernc.org/sqlite v1.62.0` (ADR 0004). Import it only inside the concrete SQLite persistence adapter; keep application/domain code on `database/sql`-backed ports.

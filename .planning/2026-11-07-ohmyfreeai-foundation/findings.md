@@ -181,3 +181,14 @@
   - https://github.com/ncruces/go-sqlite3/blob/main/vfs/README.md
   - https://github.com/ncruces/go-sqlite3/wiki/Support-matrix
   - https://github.com/mattn/go-sqlite3
+
+
+## Native proof results and accepted decisions (2026-11-07)
+
+- Wails v3.0.0 proof run `42394857136` completed successfully on `ubuntu-24.04` and `windows-latest`. Both jobs generated the official vanilla-js starter, ran `wails3 generate bindings`, asserted the GreetService JavaScript binding exposes `Greet`, built the native executable and checked its expected path. This selects Wails v3.0.0 as the desktop shell, but does not certify the full OhMyFreeAI app, live WebView invocation, packaging, clean uninstall or older Linux distributions.
+- Root validation run `42395074606` completed successfully on both Ubuntu and Windows: Go vet, Go tests, Go build, Python syntax/tests, frontend JavaScript syntax and architecture checks.
+- SQLite evaluation run `42395265071` completed successfully in all four combinations: modernc v1.62.0 on Ubuntu/Windows and ncruces v0.37.0 on Ubuntu/Windows. The expanded harness also applied the real `migrations/001_initial.sql` inside a transaction and verified the resulting schema and foreign-key rejection.
+- The shared SQLite test exercised SQLite 3.54.1, WAL, foreign keys, rollback, concurrent writes across four held connections, integrity_check, WAL checkpoint, close/reopen and a checkpointed database-file copy. All four combinations passed.
+- Select `modernc.org/sqlite v1.62.0` for the production adapter. Both candidates passed; modernc is preferred because it is a CGO-free direct C-to-Go SQLite port and avoids ncruces' WASM-translated engine/custom VFS layer and documented higher per-connection memory usage. This is an architectural selection, not yet an implemented production adapter.
+- Remaining gates: implement actual Wails services and lifecycle, production SQLite adapter/migration runner, abrupt crash recovery, SQLite backup API/restore, long-duration stress, dependency license inventory, packaging/uninstall and broader Linux distro coverage.
+- The first SQLite workflow attempts failed only because the nested evaluation module had no `go.sum`; adding `go mod tidy` and `go mod verify` before tests corrected the workflow. The corrected matrix passed.
