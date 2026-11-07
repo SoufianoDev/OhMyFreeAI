@@ -437,3 +437,10 @@
 - openSUSE Tumbleweed completed dependency installation and pkg-config checks, but the next step failed because the runner could not resolve `bash` from PATH even though zypper reported the package installed. A diagnostic correction now probes executable locations and appends the verified directory to `GITHUB_PATH`; run `42405525978` is queued and has not verified it yet.
 - The first attempt to add this diagnostic produced malformed YAML because the update operation split the inserted tail. The failed run `42405470161` had no jobs. The workflow was restored from the last known-good commit `64bad8b`, the diagnostic was re-applied with a safer insertion, and the current file was checked for one Checkout step and intact final smoke step. Current corrected commit: `c3aed2ff17a6f95b19d970d28bd543e1b8c53bc8`.
 - The separate Ubuntu/Windows CI run `42405330049` passed; backup cancellation propagation and its regression test are green on both platforms.
+
+
+## Frontend smoke marker contract — 2026-11-07T19:20Z
+
+- A concurrent branch commit `3d5b9363` changed the AppService marker from the exact line `GetSnapshot success\n` to `GetSnapshot success count=N\n` so multiple native bridge calls can be counted.
+- The existing `scripts/smoke_desktop.py` still compares against the old exact marker string. Without updating the consumer, every distro smoke using the new AppService template will reject the new marker as unexpected. This is a deterministic producer/consumer contract mismatch, not a platform failure.
+- The correction should parse the versioned marker and assert at least one successful call per process launch; the smoke script resets the marker before each of its two launches, so each attempt should independently report a successful count.
