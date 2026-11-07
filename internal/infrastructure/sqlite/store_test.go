@@ -468,6 +468,21 @@ func TestRestoreDatabaseRestoresSnapshotAndPreservesRollback(t *testing.T) {
 func TestRestoreDatabaseRejectsActiveTarget(t *testing.T) {
 	ctx := context.Background()
 	directory := t.TempDir()
+	sourceStore, err := Open(ctx, filepath.Join(directory, "source.db"))
+	if err != nil {
+		t.Fatalf("open source database: %v", err)
+	}
+	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate source database: %v", err)
+	}
+	backupPath := filepath.Join(directory, "source-snapshot.sqlite")
+	if err := sourceStore.BackupTo(ctx, backupPath); err != nil {
+		t.Fatalf("create source snapshot: %v", err)
+	}
+	if err := sourceStore.Close(); err != nil {
+		t.Fatalf("close source database: %v", err)
+	}
+
 	targetPath := filepath.Join(directory, "active.db")
 	store, err := Open(ctx, targetPath)
 	if err != nil {
@@ -481,10 +496,6 @@ func TestRestoreDatabaseRejectsActiveTarget(t *testing.T) {
 		t.Fatalf("write active target database: %v", err)
 	}
 
-	backupPath := filepath.Join(directory, "placeholder.sqlite")
-	if err := os.WriteFile(backupPath, []byte("unused because target is busy"), 0o600); err != nil {
-		t.Fatalf("create placeholder source: %v", err)
-	}
 	if _, err := RestoreDatabase(ctx, backupPath, targetPath, migrations.Files, "."); !errors.Is(err, ErrRestoreTargetBusy) {
 		t.Fatalf("expected active-target error, got %v", err)
 	}
