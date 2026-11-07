@@ -42,7 +42,7 @@ def doctor(_: argparse.Namespace) -> int:
                        ("wails", ["version"]), ("wails3", ["version"])):
         print(f"{name:8} {version(name, args)}")
     go_output = version("go", ["version"])
-    match = re.search(r"go(\\d+)\\.(\\d+)\\.(\\d+)", go_output)
+    match = re.search(r"go(\d+)\.(\d+)\.(\d+)", go_output)
     if match:
         current = tuple(int(part) for part in match.groups())
         target = (1, 27, 1)
