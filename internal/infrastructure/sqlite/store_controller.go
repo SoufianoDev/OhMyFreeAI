@@ -61,6 +61,10 @@ func (c *StoreController) acquireShared(ctx context.Context) (*Store, func(), er
 			return nil, nil, err
 		}
 		c.mu.Lock()
+		if err := ctx.Err(); err != nil {
+			c.mu.Unlock()
+			return nil, nil, err
+		}
 		if c.store == nil {
 			c.mu.Unlock()
 			return nil, nil, ErrStoreUnavailable
@@ -124,6 +128,13 @@ func (c *StoreController) acquireExclusive(ctx context.Context) (*Store, func(),
 			return nil, nil, err
 		}
 		c.mu.Lock()
+		if err := ctx.Err(); err != nil {
+			c.waitingWriters--
+			waiting = false
+			c.signalLocked()
+			c.mu.Unlock()
+			return nil, nil, err
+		}
 		if c.store == nil {
 			c.waitingWriters--
 			waiting = false
