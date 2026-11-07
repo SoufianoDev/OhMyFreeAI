@@ -297,3 +297,30 @@
 - Added tests for snapshot round-trip, file permissions, no-overwrite, cancellation, corrupted migration history, schema newer than the application, restore rollback preservation, active-target refusal, non-SQLite-target refusal and corrupt-source preservation.
 - Root CI run 42398884244 passed on Ubuntu 24.04 and Windows with the backup/restore tests. SQLite driver evaluation run 42398884345 passed all modernc/ncruces × Ubuntu/Windows combinations.
 - The raw SQLite snapshot primitive is not yet the complete user-facing .omfaibackup format. Archive manifest/checksum, strict ZIP entry validation and archive restore orchestration remain open.
+
+
+## CI failure investigation and Linux distribution expansion — 2026-11-07T18:36Z
+
+### Repository and workflow state inspected
+- Confirmed repository branch `foundation/bootstrap`; default `main` remains untouched.
+- Latest root CI run `42399602407` passed on Ubuntu and Windows.
+- Latest Wails run `42399602513`: Windows native build passed. Ubuntu native build and executable check passed; Ubuntu WebView smoke step failed. The earlier cancelled run is tracked separately and is not counted as a failure.
+- Failure log: the old smoke step ran the app for 12 seconds, then `grep -q "native snapshot ready"` failed. Captured output contained only a Mesa/libEGL DRI3 warning. The log does not establish that DRI3 was fatal; the actual fact is that the expected service-call log line was not observed.
+
+### Root cause correction implemented
+- Added an opt-in marker to `AppService.GetSnapshot`, activated only by `OMFAI_WEBVIEW_SMOKE_MARKER`. This marker is written only after the frontend invokes the generated Go method.
+- Added `scripts/smoke_desktop.py`: launches the actual desktop binary under Xvfb, requests software rendering, waits for the marker, terminates cleanly, then launches again and requires a second marker. This tests both JS-to-Go invocation and database reopen.
+- Replaced the fragile stdout grep in `.github/workflows/wails-poc.yml` with the new smoke script.
+- Extended `scripts/build_desktop.py` with validated optional build tags so older distributions can use Wails v3.0.x's GTK3 compatibility path without changing the default GTK4 build.
+
+### Explicit Linux distribution matrix added
+- Default GTK4/WebKitGTK 6.0: Ubuntu 24.04, Debian 13, Fedora 44, Arch Linux rolling, openSUSE Tumbleweed.
+- Legacy GTK3/WebKit2GTK 4.1 for Wails v3.0.x: Ubuntu 22.04, Debian 12, Rocky Linux 9.
+- Added `.github/workflows/linux-distro.yml` to install native distro packages, build the actual application, and run the WebView-to-Go/reopen smoke test inside each distro container on a free GitHub-hosted Ubuntu runner.
+- Updated `docs/architecture/DESKTOP_BUILD.md` and the active task plan with the exact targets and the limitation that container userland coverage is not bare-metal certification.
+- Official Wails docs identify GTK4/WebKitGTK 6.0 as the default on Ubuntu 24.04+, Debian 13+, Fedora 40+ and similar; the GTK3/WebKit2GTK 4.1 compatibility path is scheduled for removal in v3.1. Package names and version lanes were recorded in findings.md.
+
+### Verification status
+- Changes have been committed to `foundation/bootstrap`; the new CI runs are the next verification gate.
+- Do not mark the WebView bridge smoke test or any distro as passing until the new Actions jobs complete and their logs are inspected.
+- No direct writes to `main`; no paid service, Colab tunnel, live user runtime, or historical launcher was changed.
