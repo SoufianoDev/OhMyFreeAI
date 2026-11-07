@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Inspect the current Wails run with the CI-only WebKit sandbox workaround and the corrected eight-distro matrix (native GTK/WebKit packages, distro Python, matching GTK build tags and pkg-config paths). Confirm JS-to-Go and two-launch DB reopen. Then validate the WebKit sandbox on a real host, complete the .omfaibackup archive/manifest/checksum validator, abrupt-crash recovery tests, packaging and full diff review.
+Complete the current Wails and eight-distro verification runs for the two-stage native bridge smoke. Confirm openSUSE's verified Bash PATH and Ubuntu 22.04's pre/post-frontend GetSnapshot calls; do not treat a build-only pass as runtime success. Then implement the missing GUI-default CLI dispatcher and wire the existing .omfaibackup manager into user-facing export/inspect/restore workflows, followed by abrupt-process recovery tests, real-host WebKit sandbox validation, packaging and full diff review. Keep Colab remote inference policy-gated.
 
 ## Current Phase
 
@@ -63,13 +63,15 @@ Phase 4
 - [x] Perform a read-only static audit of the supplied prototype archives and Python patch/monitor scripts; record hashes, preserved invariants and risks in docs/architecture/PROTOTYPE_AUDIT.md
 - [ ] Revalidate current Colab /props and /v1/models behavior, model-specific Q8_0/262144 compatibility and the live SSE path before enabling remote inference
 - [x] Add SQLite online backup/restore primitives with integrity, foreign-key, migration-history, cancellation, no-overwrite, target-safety and rollback tests on Ubuntu and Windows
-- [ ] Package snapshots into .omfaibackup with a strict manifest, checksums, fixed entry names and archive-size/path-traversal protections
+- [x] Implement strict .omfaibackup snapshot archive with manifest, SHA-256, fixed entries, size limits and path-traversal protections; round-trip, rollback, checksum, overwrite and cancellation tests pass on Linux/Windows
+- [ ] Wire backup export/inspect/restore into the application layer, native file dialogs, GUI and CLI
 - [x] Complete actual desktop WebView-to-Go invocation and two-launch DB reopen smoke on native Ubuntu 24.04 (Wails run 42404058636)
 - [ ] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs
 - [x] Diagnose GitHub runner WebKit bubblewrap namespace restriction and keep WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 confined to the smoke-test subprocess only
 - [ ] Validate WebKit's production sandbox on a real Linux host; container CI explicitly does not certify sandbox behavior
 - [x] Define explicit Linux distribution targets and add GTK4/WebKitGTK 6.0 plus legacy GTK3/WebKit2GTK 4.1 build/runtime smoke matrix (Ubuntu 24.04, Debian 13, Fedora 44, Arch, openSUSE Tumbleweed, Ubuntu 22.04, Debian 12, Fedora 44 legacy)
-- [ ] Verify all eight Linux distro jobs pass; Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Fedora 44 legacy GTK3, Debian 12 legacy GTK3 and Arch rolling are green, two lanes remain; distinguish container userland coverage from bare-metal certification
+- [ ] Verify all eight Linux distro jobs pass; six lanes are green (Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Arch rolling, Fedora 44 GTK3 legacy, Debian 12 GTK3 legacy); openSUSE and Ubuntu 22.04 remain under investigation; distinguish container userland coverage from bare-metal certification
+- [ ] Add GUI-default CLI dispatch (`--help`, `--version`, `doctor`; unknown commands must not open GUI)
 - [ ] Add abrupt-process crash/reopen recovery tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
