@@ -517,3 +517,7 @@
 
 - openSUSE Tumbleweed / GTK4-WebKitGTK 6.0 passed the full current two-stage bridge job in run 42405729874. Output confirmed two successful GetSnapshot calls and database reopen. This run used built-in sh successfully after setup-python had been removed; the additional PATH restoration was not needed for this pass.
 - Five of eight current lanes are green: Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Arch rolling and openSUSE. Three legacy GTK3 lanes remain in progress.
+
+
+- Ubuntu 22.04 legacy GTK3/WebKit2GTK 4.1 and Fedora 44 legacy GTK3/WebKit2GTK 4.1 both passed full build and two-stage WebView bridge/SQLite reopen in run 42405729874. Each emitted two bridge pass markers and WEBVIEW_REOPEN_PASS.
+- Seven of eight lanes are now green. Debian 12 legacy GTK3 is the only remaining job in this run.
