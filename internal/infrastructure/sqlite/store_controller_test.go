@@ -11,6 +11,7 @@ import (
 	"time"
 
 	domainconfig "github.com/SoufianoDev/OhMyFreeAI/internal/domain/config"
+	"github.com/SoufianoDev/OhMyFreeAI/migrations"
 )
 
 func newLifecycleTestStore(t *testing.T, name string) *Store {
@@ -585,6 +586,9 @@ func TestStoreControllerConcurrentLeaseStress(t *testing.T) {
 func TestStoreControllerConfigRepositoryRoundTrip(t *testing.T) {
 	store := newLifecycleTestStore(t, "state.db")
 	controller := NewStoreController(store)
+	if err := store.Migrate(context.Background(), migrations.Files, "."); err != nil {
+		t.Fatalf("apply production migrations: %v", err)
+	}
 	cfg := domainconfig.Defaults()
 	cfg.UI.Language = "en"
 	cfg.UI.Theme = "dark"
