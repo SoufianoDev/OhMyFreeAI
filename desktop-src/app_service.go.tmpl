@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"time"
 
 	appconfig "github.com/SoufianoDev/OhMyFreeAI/internal/application/config"
@@ -39,12 +40,14 @@ func (s *AppService) GetSnapshot() (DashboardSnapshot, error) {
 	if err != nil {
 		return DashboardSnapshot{}, fmt.Errorf("load application snapshot: %w", err)
 	}
-	return DashboardSnapshot{
+	snapshot := DashboardSnapshot{
 		AppVersion:    "0.1.0",
 		DatabaseState: "ready",
 		RuntimeState:  "not_connected",
 		Config:        cfg,
-	}, nil
+	}
+	log.Printf("native snapshot ready: database=%s runtime=%s", snapshot.DatabaseState, snapshot.RuntimeState)
+	return snapshot, nil
 }
 
 // SaveConfig persists validated application settings. Secret values are not
