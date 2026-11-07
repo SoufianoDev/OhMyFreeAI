@@ -463,3 +463,11 @@
 - openSUSE's current correction probes the Bash executable and adds its containing directory to `GITHUB_PATH`. Verification run `42405525978` is queued.
 - One malformed workflow edit generated run `42405470161` with no jobs. Restored the file from the known-good `64bad8b` version and re-applied the change; current workflow content was checked for intact structure.
 - Next: wait for the corrected distro run and inspect the Ubuntu 22.04 WebKit startup path; then continue with CLI dispatch and backup/recovery user-facing integration without enabling policy-blocked Colab remote inference.
+
+
+## 2026-11-07T19:22Z — smoke marker contract fix
+
+- Aligned the smoke-test consumer with AppService's new counted marker format.
+- Added Python unit tests for marker parsing and malformed values.
+- Corrected the regex newline escape after source inspection.
+- Verification pending in runs `42405708011` (CI), `42405708063` (Wails) and `42405708191` (Linux distro matrix), all queued at the time of this update.
