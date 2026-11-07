@@ -42,7 +42,7 @@ This is a native compile/build and binding-generation proof. It does not yet lau
 
 ## Linux distribution verification matrix
 
-The pinned Wails v3.0.0 proof now has a separate distro-container matrix. The matrix builds the actual application and runs the executable twice under Xvfb; the frontend must call the generated `GetSnapshot` method and produce an explicit smoke marker on each launch.
+The pinned Wails v3.0.0 proof now has a separate distro-container matrix. The matrix builds the actual application and runs the executable twice against a directly managed Xvfb server; the frontend must call the generated `GetSnapshot` method and produce an explicit smoke marker on each launch.
 
 | Distribution | Web stack | Build mode | CI scope |
 |---|---|---|---|
