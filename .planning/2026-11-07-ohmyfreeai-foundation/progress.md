@@ -432,3 +432,7 @@
 - Reviewed GitHub Actions logs. The newest failed distro run before the current head was a runner shell resolution failure in openSUSE after package bootstrap. Current head switches subsequent steps to Bash after installing Bash; run `42405097971` is the verification run and was not yet complete at review time.
 - Historical causes/fixes are recorded in findings.md. No claim is made that the current eight-distro matrix is green.
 - Next: monitor run `42405097971`; inspect and complete the existing backup archive/manifest/checksum implementation and recovery test gaps, then update this ledger with actual test evidence.
+
+
+- Arch Linux rolling / GTK4-WebKitGTK 6.0 and Fedora 44 / GTK4-WebKitGTK 6.0 both passed full build and two-launch WebView-to-Go/database-reopen smoke in run 42404735351. Both emitted the two bridge pass markers and WEBVIEW_REOPEN_PASS.
+- Four of eight lanes are now green: Ubuntu 24.04, Debian 13, Fedora 44 GTK4, and Arch rolling. Fedora 44 GTK3, Debian 12 GTK3, Ubuntu 22.04 GTK3 and openSUSE Tumbleweed remain outstanding.
