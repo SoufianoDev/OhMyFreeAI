@@ -39,6 +39,9 @@ func (s *AppService) GetSnapshot() (DashboardSnapshot, error) {
 
 	cfg, err := s.configuration.Load(ctx)
 	if err != nil {
+		if marker := os.Getenv("OMFAI_WEBVIEW_SMOKE_MARKER"); marker != "" {
+			_ = os.WriteFile(marker, []byte("GetSnapshot failed: "+err.Error()+"\\n"), 0o600)
+		}
 		return DashboardSnapshot{}, fmt.Errorf("load application snapshot: %w", err)
 	}
 	snapshot := DashboardSnapshot{
