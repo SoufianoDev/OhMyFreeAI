@@ -409,3 +409,10 @@
 
 
 - A follow-up run showed the dependency-install step still explicitly used the unsupported `/bin/sh` shell even though job defaults were corrected. Aligned the step to built-in `sh`; no distro setup/build was attempted in that run.
+
+
+## First Linux distro end-to-end pass — 2026-11-07T19:11Z
+
+- Debian 13 / GTK4-WebKitGTK 6.0 passed every stage in run 42404735351: dependencies, pkg-config, Wails CLI, real application build, WebView-to-Go twice, and database reopen.
+- Output included WEBVIEW_GO_BRIDGE_PASS attempt=1, WEBVIEW_GO_BRIDGE_PASS attempt=2 and WEBVIEW_REOPEN_PASS.
+- This confirms the new matrix and CI-only sandbox workaround work on Debian 13. Other seven distro lanes remain in progress/queued.
