@@ -579,3 +579,46 @@ func TestRestoreDatabaseRejectsCorruptSourceAndPreservesTarget(t *testing.T) {
 		t.Fatalf("target changed after rejected restore:\n got: %#v\nwant: %#v", actual, expected)
 	}
 }
+
+
+func TestOpenExistingRejectsMissingDatabaseWithoutCreatingIt(t *testing.T) {
+	databasePath := filepath.Join(t.TempDir(), "missing", "state.db")
+	if _, err := OpenExisting(context.Background(), databasePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("OpenExisting error = %v, want os.ErrNotExist", err)
+	}
+	if _, err := os.Stat(databasePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("OpenExisting created missing database, stat error = %v", err)
+	}
+	if _, err := os.Stat(filepath.Dir(databasePath)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("OpenExisting created missing directory, stat error = %v", err)
+	}
+}
+
+func TestOpenExistingOpensRegularDatabaseWithoutChangingFilePermissions(t *testing.T) {
+	databasePath := filepath.Join(t.TempDir(), "existing.db")
+	if err := os.WriteFile(databasePath, nil, 0o640); err != nil {
+		t.Fatalf("create database fixture: %v", err)
+	}
+	if runtime.GOOS != "windows" {
+		if err := os.Chmod(databasePath, 0o640); err != nil {
+			t.Fatalf("set database fixture permissions: %v", err)
+		}
+	}
+	store, err := OpenExisting(context.Background(), databasePath)
+	if err != nil {
+		t.Fatalf("OpenExisting: %v", err)
+	}
+	defer store.Close()
+	if store.DatabasePath() != databasePath {
+		t.Fatalf("database path = %q, want %q", store.DatabasePath(), databasePath)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(databasePath)
+		if err != nil {
+			t.Fatalf("stat database fixture: %v", err)
+		}
+		if got := info.Mode().Perm(); got != 0o640 {
+			t.Fatalf("OpenExisting changed database permissions to %04o, want 0640", got)
+		}
+	}
+}
