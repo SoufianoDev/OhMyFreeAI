@@ -151,3 +151,15 @@
   - https://wails.io/getting-started/installation/
   - https://wails.io/getting-started/your-first-app/
   - https://wails.io/guides/build/building/
+
+
+## Wails service-binding smoke test research (2026-11-07)
+
+- Official Wails v3 method-binding documentation describes the supported flow: register an exported Go service with `application.NewService(...)`, generate bindings using `wails3 generate bindings`, then import the generated JavaScript service module and call its exported methods asynchronously.
+- The official vanilla project structure includes a `GreetService` example and generated frontend bindings. The Wails proof workflow now explicitly runs the binding generator on both Ubuntu and Windows, locates the generated `*greetservice*.js` file, and asserts that the exported `Greet` method is present before the native build.
+- This is a generator + generated-artifact + native-build smoke test. It is not yet an end-to-end GUI runtime test that launches the built application and executes the JavaScript-to-Go call in a live WebView. Do not describe it as such.
+- The workflow update has been committed to `foundation/bootstrap`; both native jobs still require a real GitHub Actions result before this proof can be marked passed.
+- Official references:
+  - https://v3.wails.io/features/bindings/methods/
+  - https://v3.wails.io/guides/dev/project-structure/
+  - https://v3.wails.io/quick-start/first-app/
