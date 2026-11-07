@@ -4,15 +4,19 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"runtime"
 	"time"
 
 	"github.com/wailsapp/wails/v3/pkg/application"
 
+	appcli "github.com/SoufianoDev/OhMyFreeAI/internal/application/cli"
 	appconfig "github.com/SoufianoDev/OhMyFreeAI/internal/application/config"
 	"github.com/SoufianoDev/OhMyFreeAI/internal/infrastructure/sqlite"
+	"github.com/SoufianoDev/OhMyFreeAI/internal/version"
 	"github.com/SoufianoDev/OhMyFreeAI/migrations"
 )
 
@@ -20,9 +24,60 @@ import (
 var assets embed.FS
 
 func main() {
-	if err := run(); err != nil {
-		log.Fatal(err)
+	invocation, err := appcli.Parse(os.Args[1:])
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "OhMyFreeAI: %v\nTry 'OhMyFreeAI --help'.\n", err)
+		os.Exit(2)
 	}
+
+	switch invocation.Command {
+	case appcli.ShowHelp:
+		fmt.Fprint(os.Stdout, appcli.Usage)
+	case appcli.ShowVersion:
+		fmt.Fprintf(os.Stdout, "OhMyFreeAI %s\n", version.Current)
+	case appcli.RunDoctor:
+		if err := runDoctor(os.Stdout); err != nil {
+			fmt.Fprintf(os.Stderr, "OhMyFreeAI doctor: %v\n", err)
+			os.Exit(1)
+		}
+	case appcli.LaunchGUI:
+		if err := run(); err != nil {
+			log.Fatal(err)
+		}
+	default:
+		fmt.Fprintf(os.Stderr, "OhMyFreeAI: unsupported command %q\n", invocation.Command)
+		os.Exit(2)
+	}
+}
+
+// runDoctor reports local environment facts only. It deliberately does not
+// infer database integrity, runtime connectivity, GPU availability or model
+// readiness from the existence of files.
+func runDoctor(output io.Writer) error {
+	configDirectory, err := os.UserConfigDir()
+	if err != nil {
+		return fmt.Errorf("resolve application config directory: %w", err)
+	}
+	databasePath := filepath.Join(configDirectory, "OhMyFreeAI", "state.db")
+	databaseState := "not created"
+	info, err := os.Lstat(databasePath)
+	switch {
+	case err == nil:
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("database path is not a regular file")
+		}
+		databaseState = "present (integrity not checked)"
+	case os.IsNotExist(err):
+		// A first launch is a valid state; doctor must not create the database.
+	case err != nil:
+		return fmt.Errorf("inspect database path: %w", err)
+	}
+
+	_, err = fmt.Fprintf(output,
+		"OhMyFreeAI doctor\nVersion: %s\nPlatform: %s/%s\nGo runtime: %s\nDatabase: %s\nDatabase file: %s\n",
+		version.Current, runtime.GOOS, runtime.GOARCH, runtime.Version(), databaseState, databasePath,
+	)
+	return err
 }
 
 func run() error {
