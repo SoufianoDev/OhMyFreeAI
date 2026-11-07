@@ -504,3 +504,11 @@
 - The older current-code run `42405729874`, which does not include the extra `GITHUB_PATH` restoration but does omit setup-python, successfully passed openSUSE package installation, checkout, Go setup, Node setup and pkg-config configuration, and reached Wails CLI installation using the built-in `sh` shell.
 - This indicates the earlier missing-shell behavior was associated with the setup-python/toolcache environment rather than an inherent openSUSE lack of sh/bash. The explicit PATH restoration in newer run `42405827037` is redundant but harmless unless its verification reveals otherwise.
 - openSUSE is not yet fully green; its Wails CLI, app build and WebView smoke still need to pass.
+
+
+## openSUSE Tumbleweed end-to-end pass — 2026-11-07T19:34Z
+
+- openSUSE Tumbleweed / GTK4-WebKitGTK 6.0 passed dependency bootstrap, pkg-config, Wails CLI installation, full app build, two-stage WebView bridge smoke and database reopen in run `42405729874`.
+- Output: `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, `WEBVIEW_REOPEN_PASS`.
+- This also confirms the earlier shell issue disappeared once setup-python was removed; the extra PATH restoration is not required for this successful run.
+- Five current two-stage lanes are now green: Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Arch rolling and openSUSE Tumbleweed. The three legacy GTK3 lanes remain in progress.
