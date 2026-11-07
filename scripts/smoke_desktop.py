@@ -52,7 +52,7 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
             while time.monotonic() < deadline:
                 if marker.is_file():
                     value = marker.read_text(encoding="utf-8")
-                    if value != "GetSnapshot invoked\\n":
+                    if value != "GetSnapshot invoked\n":
                         raise RuntimeError(f"Unexpected WebView marker: {value!r}")
                     print(f"WEBVIEW_GO_BRIDGE_PASS attempt={attempt}", flush=True)
                     return
@@ -81,7 +81,7 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
 
     if not marker.is_file():
         details = log_path.read_text(encoding="utf-8", errors="replace")[-5000:]
-        raise RuntimeError("WebView smoke marker missing. Last application output:\\n" + details)
+        raise RuntimeError("WebView smoke marker missing. Last application output:\n" + details)
 
 
 def main() -> int:
