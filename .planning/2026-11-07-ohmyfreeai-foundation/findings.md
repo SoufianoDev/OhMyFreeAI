@@ -101,6 +101,11 @@
 - Upstream llama.cpp documentation advertises official prebuilt release binaries, source builds, multiple backends (CUDA, HIP, MUSA, Vulkan, SYCL), quantization formats, CPU/GPU hybrid inference, and OpenAI-compatible llama-server endpoints. These broad capabilities do not prove every model/checkpoint/backend combination; compatibility still requires exact artifact and real runtime verification.
 - Google's Material Design developer site states Material Web and Android Views are in maintenance mode, while Jetpack Compose is the primary Material Android path. Material 3 design guidance can still inform web tokens/layout/accessible interaction, but @material/web must not be treated as an actively evolving Expressive component system.
 
+- SQLite driver evaluation: `modernc.org/sqlite v1.62.0` is a pure-Go, CGO-free `database/sql` driver under BSD-3-Clause, but its current pkg.go.dev metadata requires Go 1.26. This aligns with Wails v3's Go 1.26 baseline, but cannot be built in the current Go 1.23.2 container.
+- `github.com/mattn/go-sqlite3` is MIT-licensed and the long-standing C SQLite wrapper, but requires CGO_ENABLED=1 and a C compiler; its Windows build also requires a GCC toolchain. This increases build/release complexity across the target platforms.
+- `github.com/ncruces/go-sqlite3 v0.37.0` is MIT-licensed and CGO-free but wraps a WASM build of SQLite via wasm2go; its documentation warns of higher per-connection memory and its custom VFS has platform-specific file-locking/WAL behavior. Do not select it without dedicated Windows concurrency tests.
+- Provisional direction: isolate the driver behind `database/sql` in a SQLite adapter and evaluate `modernc.org/sqlite` first after the Go 1.26 toolchain is available. Do not add the dependency or pin a version until Linux/Windows open/migrate/concurrency/crash-recovery smoke tests pass.
+
 ### External source URLs
 
 - Wails v3 install: https://wails.io/getting-started/installation/
