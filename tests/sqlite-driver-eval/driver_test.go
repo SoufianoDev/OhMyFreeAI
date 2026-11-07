@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"strings"
 	"testing"
 	"time"
 
@@ -14,13 +15,86 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func TestSQLiteDriverEvaluation(t *testing.T) {
+func selectedDriver(t *testing.T) string {
+	t.Helper()
 	driver := os.Getenv("OMFAI_SQLITE_DRIVER")
 	switch driver {
 	case "sqlite", "sqlite3":
+		return driver
 	default:
 		t.Fatalf("OMFAI_SQLITE_DRIVER must be sqlite or sqlite3; got %q", driver)
+		return ""
 	}
+}
+
+func TestProductionMigration(t *testing.T) {
+	driver := selectedDriver(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	migration, err := os.ReadFile(filepath.Join("..", "..", "migrations", "001_initial.sql"))
+	if err != nil {
+		t.Fatalf("read production migration: %v", err)
+	}
+
+	dbPath := filepath.Join(t.TempDir(), "production-schema.db")
+	db, err := sql.Open(driver, dbPath)
+	if err != nil {
+		t.Fatalf("open migration database: %v", err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		t.Fatalf("get migration connection: %v", err)
+	}
+	defer conn.Close()
+	if _, err := conn.ExecContext(ctx, "PRAGMA foreign_keys=ON"); err != nil {
+		t.Fatalf("enable migration foreign keys: %v", err)
+	}
+
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		t.Fatalf("begin migration transaction: %v", err)
+	}
+	for _, statement := range strings.Split(string(migration), ";") {
+		statement = strings.TrimSpace(statement)
+		if statement == "" {
+			continue
+		}
+		if _, err := tx.ExecContext(ctx, statement); err != nil {
+			_ = tx.Rollback()
+			t.Fatalf("apply production migration statement %q: %v", statement, err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatalf("commit production migration: %v", err)
+	}
+
+	var tableCount int
+	if err := conn.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='model_revisions'").Scan(&tableCount); err != nil {
+		t.Fatalf("verify migrated model_revisions table: %v", err)
+	}
+	if tableCount != 1 {
+		t.Fatalf("production migration did not create model_revisions; count=%d", tableCount)
+	}
+
+	_, err = conn.ExecContext(ctx, `
+		INSERT INTO artifacts (
+			id, model_revision_id, format, quantization, file_name, size_bytes,
+			sha256, source_uri_sanitized, integrity_state, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		"artifact-invalid", "missing-model", "gguf", "q4_k_m", "model.gguf", 128,
+		strings.Repeat("a", 64), "", "verified", "2026-11-07T00:00:00Z")
+	if err == nil {
+		t.Fatal("production schema accepted an artifact with a missing model revision")
+	}
+}
+
+func TestSQLiteDriverEvaluation(t *testing.T) {
+	driver := selectedDriver(t)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 	defer cancel()
