@@ -396,3 +396,10 @@
 - The Ubuntu WebView smoke produced `WEBVIEW_GO_BRIDGE_PASS attempt=1`, `WEBVIEW_GO_BRIDGE_PASS attempt=2`, and `WEBVIEW_REOPEN_PASS`. This verifies the actual generated JS-to-Go call and a second application startup against the persisted SQLite state.
 - The smoke helper sets WebKit sandbox-disable and GTK accessibility variables only for CI subprocesses due to runner namespace restrictions. No production environment/config was changed.
 - The Linux distro matrix remains the outstanding verification gate.
+
+
+## Distro workflow scheduling correction — 2026-11-07T19:07Z
+
+- Removed the branch-wide concurrency lock that kept newer matrix runs pending behind stale queued runs.
+- Added `max-parallel: 4` to limit concurrent container jobs while allowing the current matrix to proceed.
+- New run 42404614411 is active: Arch Linux, Fedora 44 GTK4 and Ubuntu 24.04 are in progress; remaining distro jobs are queued.
