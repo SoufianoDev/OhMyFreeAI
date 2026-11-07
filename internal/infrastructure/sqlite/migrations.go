@@ -17,6 +17,7 @@ var (
 	ErrMigrationGap           = errors.New("SQLite migration version gap")
 	ErrUntrackedSchema        = errors.New("SQLite schema exists without an applied migration record")
 	ErrMigrationHistoryCorrupt = errors.New("SQLite migration history is not contiguous")
+	ErrMigrationVersionTooNew = errors.New("SQLite database schema is newer than this application")
 	ErrInvalidMigration       = errors.New("invalid SQLite migration")
 )
 
@@ -74,6 +75,13 @@ func (s *Store) Migrate(ctx context.Context, source fs.FS, directory string) err
 	}
 	if hasHistory && currentVersion == 0 {
 		return ErrUntrackedSchema
+	}
+	latestAvailableVersion := 0
+	if len(files) > 0 {
+		latestAvailableVersion = files[len(files)-1].version
+	}
+	if currentVersion > latestAvailableVersion {
+		return fmt.Errorf("%w: database=%03d application=%03d", ErrMigrationVersionTooNew, currentVersion, latestAvailableVersion)
 	}
 
 	for _, migration := range files {
