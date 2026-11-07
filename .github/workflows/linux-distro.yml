@@ -31,7 +31,7 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        shell: bash
+        shell: sh
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -141,6 +141,13 @@ jobs:
               ;;
           esac
           command -v Xvfb
+          case "$DISTRO_FAMILY" in
+            suse)
+              test -x /usr/bin/bash || test -x /bin/bash
+              echo /usr/bin >> "$GITHUB_PATH"
+              echo /bin >> "$GITHUB_PATH"
+              ;;
+          esac
           pkg-config --modversion gtk4 2>/dev/null || pkg-config --modversion gtk+-3.0
           if [ "$DISTRO_FAMILY" = suse ]; then
             printf 'PATH after package bootstrap: %s\n' "$PATH"
