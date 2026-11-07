@@ -74,6 +74,26 @@ class InitialSchemaTests(unittest.TestCase):
                 "VALUES('a','m','gguf','x.gguf',1,?,'verified','now')", ("z" * 64,)
             )
 
+    def test_assessment_artifact_must_match_model_revision(self):
+        self.db.execute(
+            "INSERT INTO model_revisions(id,family,source_repository,revision,architecture,created_at) VALUES('m1','Qwen','org/model','rev1','qwen','now')"
+        )
+        self.db.execute(
+            "INSERT INTO model_revisions(id,family,source_repository,revision,architecture,created_at) VALUES('m2','Llama','org/model2','rev1','llama','now')"
+        )
+        self.db.execute(
+            "INSERT INTO artifacts(id,model_revision_id,format,file_name,size_bytes,sha256,integrity_state,created_at) VALUES('a1','m1','gguf','x.gguf',1,?,'verified','now')",
+            ("a" * 64,),
+        )
+        self.db.execute(
+            "INSERT INTO engine_installations(id,version,target_os,target_arch,backend,asset_sha256,install_path,state,created_at) VALUES('e1','v1','linux','amd64','cpu',?,'/tmp/engine','installed','now')",
+            ("b" * 64,),
+        )
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.db.execute(
+                "INSERT INTO compatibility_assessments(id,model_revision_id,artifact_id,engine_installation_id,backend,runtime_fingerprint,status,artifact_integrity_verified,engine_load_succeeded,health_check_passed,inference_succeeded,tested_at) VALUES('c1','m2','a1','e1','cpu','cpu-test','unsupported',0,0,0,0,'now')"
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
