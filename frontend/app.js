@@ -116,9 +116,9 @@ applyTheme(theme);
 showPage("dashboard");
 
 
-window.addEventListener("ohmyfreeai:bridge-ready", async () => {
+window.addEventListener("ohmyfreeai:bridge-ready", (event) => {
   try {
-    const snapshot = await window.OhMyFreeAI?.GetSnapshot?.();
+    const snapshot = event.detail;
     if (!snapshot) throw new Error("Native application snapshot was empty.");
     root.dataset.nativeReady = "true";
     updateNativeLabel();
@@ -126,4 +126,9 @@ window.addEventListener("ohmyfreeai:bridge-ready", async () => {
     root.dataset.nativeReady = "error";
     console.error("Could not connect to the OhMyFreeAI native core:", error);
   }
+});
+
+window.addEventListener("ohmyfreeai:bridge-error", (event) => {
+  root.dataset.nativeReady = "error";
+  console.error("Could not connect to the OhMyFreeAI native core:", event.detail);
 });
