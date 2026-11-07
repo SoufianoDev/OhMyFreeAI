@@ -58,15 +58,23 @@ func Open(ctx context.Context, databasePath string) (*Store, error) {
 		return nil, fmt.Errorf("inspect SQLite database path: %w", err)
 	}
 
-	if err := os.MkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
+	databaseDirectory := filepath.Dir(absolutePath)
+	if err := os.MkdirAll(databaseDirectory, 0o700); err != nil {
 		return nil, fmt.Errorf("create SQLite database directory: %w", err)
+	}
+	if err := os.Chmod(databaseDirectory, 0o700); err != nil {
+		return nil, fmt.Errorf("restrict SQLite database directory permissions: %w", err)
 	}
 	file, err := os.OpenFile(absolutePath, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("create SQLite database file: %w", err)
 	}
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("restrict SQLite database file permissions: %w", err)
+	}
 	if err := file.Close(); err != nil {
-		return nil, fmt.Errorf("close newly created SQLite database file: %w", err)
+		return nil, fmt.Errorf("close SQLite database file: %w", err)
 	}
 
 	dsn, err := dataSourceName(absolutePath)
