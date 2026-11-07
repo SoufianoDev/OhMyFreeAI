@@ -419,3 +419,12 @@
 - The bootstrap step itself runs successfully under `sh`; it confirms GTK/WebKit pkg-config commands, but the runner cannot resolve Bash for the next step. The next correction must inspect `PATH`, `command -v bash`, and known executable locations inside the bootstrap step, then append the verified Bash directory to `GITHUB_PATH`. If no executable exists, fail with diagnostic package-file output instead of proceeding.
 - The new backup cancellation fix and its test passed the full Linux and Windows `OhMyFreeAI CI` run `42405330049` (Go vet, Go tests, build, Python tests, JS syntax and architecture checks). This verifies the code change on both operating systems.
 - Wails and distro matrix runs for commit `8a8a5707` are still running/queued; no further platform pass is inferred.
+
+
+## Six Linux distro lanes passed — 2026-11-07T19:16Z
+
+- Debian 12 / GTK3 + WebKit2GTK 4.1 passed full build and two-launch bridge/reopen smoke; both bridge pass markers and `WEBVIEW_REOPEN_PASS` observed.
+- Fedora 44 / GTK3 + WebKit2GTK 4.1 passed full build and two-launch bridge/reopen smoke; already recorded above.
+- Current successful lanes in run `42404735351`: Ubuntu 24.04 GTK4, Debian 13 GTK4, Fedora 44 GTK4, Arch rolling GTK4, Fedora 44 legacy GTK3, Debian 12 legacy GTK3.
+- Ubuntu 22.04 legacy GTK3 built successfully but timed out waiting for GetSnapshot; no application output was captured. This is a runtime/bridge failure, not a compile failure. Retest after the bridge bootstrap is made independent of app.js's custom event listener.
+- openSUSE Tumbleweed installed dependencies but its post-install shell resolution failed before pkg-config; a new run uses Bash after bootstrap.
