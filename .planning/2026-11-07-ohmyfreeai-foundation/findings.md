@@ -623,3 +623,17 @@
 - Current run `42410214638` has passed the native CLI smoke and two-launch WebView/SQLite smoke on Ubuntu 24.04, Debian 13 and Fedora 44 GTK4.
 - Arch Linux, Ubuntu 22.04, Fedora 44 GTK3 and openSUSE are still running; Debian 12 is queued.
 - This is the first matrix that executes the actual native CLI helper on each distro. Do not mark the eight-lane CLI task complete yet.
+
+
+## Read-only backup inspection and native desktop integration — 2026-11-07
+
+- Added `Manager.Inspect` to validate the archive extension, resolve the selected archive, extract the database into an isolated `os.MkdirTemp` directory, run the existing strict archive validation (exact entry set, manifest schema, SHA-256, database schema/version), and remove the temporary directory before returning the manifest. It does not open or write the live Store.
+- Added tests for valid manifest metadata, unchanged live database bytes, temporary-directory cleanup, missing/invalid archives, cancellation and extension rejection.
+- TDD evidence: root CI run `42412080552` failed at `go vet` with the expected `manager.Inspect undefined` error before implementation. This was the intended RED. The Windows job was cancelled by a subsequent push; later current root CI run `42412587313` passed on both Ubuntu and Windows after implementation.
+- Added Wails AppService actions `ExportBackup` and `InspectBackup`. Both use native file dialogs and `.omfaibackup` filters. Export preserves the archive manager's no-overwrite behavior. Inspect only returns validated metadata and never restores.
+- Verified the exact Wails v3.0.0 dialog API against the pinned upstream source: `Dialog.SaveFileWithOptions`, `Dialog.OpenFile`, `PromptForSingleSelection`, `SetTitle` for open dialogs, and `SaveFileDialogOptions` for save dialogs.
+- Added a bilingual Arabic/English backup section to Settings. The frontend invokes the generated bridge methods; the build helper now requires and exposes `ExportBackup` and `InspectBackup` alongside `GetSnapshot` and `SaveConfig`.
+- Wails run `42412554344` passed on Windows and Ubuntu. Windows native build, CLI smoke and executable verification passed. Ubuntu native build, CLI smoke, executable verification, two GetSnapshot calls per launch around frontend module import, and SQLite reopen all passed. Smoke log markers: `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, `WEBVIEW_REOPEN_PASS`.
+- Root CI run `42412587313` passed on Ubuntu and Windows, including Go vet/tests/build, Python tests, frontend JavaScript syntax and architecture checks.
+- Backup export/inspect are now exposed in the GUI. CLI commands and restore remain intentionally unimplemented. Restore must wait for coordinated Store close/reopen/reference replacement and rollback handling.
+- Current backup-enabled eight-distro retest is run `42412554358`. At the last check, four GTK4 lanes were building and the four remaining GTK3/openSUSE lanes were queued; do not mark this run green until all eight complete.
