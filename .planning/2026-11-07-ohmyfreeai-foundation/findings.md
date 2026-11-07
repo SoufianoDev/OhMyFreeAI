@@ -67,6 +67,7 @@
 - Added runtime session states and an explicit transition table, immutable transition results, UTC timestamps and stale-generation rejection.
 - Added a compatibility assessment that requires exact model revision, artifact checksum, engine version, backend, runtime fingerprint, integrity verification, successful engine load, health check and real inference before returning Ready.
 - Added a fail-closed runtime policy gate. Remote connection is rejected unless the assessment contains an approved decision, provider, explicit scope, HTTPS source, policy revision and review timestamp.
+- Added versioned application configuration defaults and validation: Gateway disabled by default, loopback-only bind, fixed default port 18081, engine port 8081, Arabic/system theme defaults, and an OS secret reference required before enabling the Gateway. Added a ConfigRepository port and application service that validates before persistence.
 - Added the first application ports for policy assessment and runtime connection. No concrete Colab connector exists or is activated.
 - Added `scripts/dev.py` using Python standard library only: doctor, test, build, fmt and arch-check. It does not install dependencies, use a shell, or invoke sudo.
 - Added a bilingual Arabic/English static frontend shell with responsive navigation, dashboard, model catalog empty state, runtime policy state, settings, light/dark themes, RTL/LTR, semantic HTML and reduced-motion support. It deliberately displays no fabricated runtime/GPU/model data and is not yet bound to Wails or application services.
@@ -81,6 +82,7 @@
 - Node 22.16.0: `node --check frontend/app.js` passed.
 - Python HTMLParser: `frontend/index.html` parsed successfully; 11 unique IDs, no duplicates.
 - Developer command smoke tests: `--help`, `doctor`, Go test/build delegation and architecture-check logic passed against an isolated local fixture. The full script has not been run from a checkout of the remote branch.
+- Chromium/Playwright browser smoke test rendered the dashboard and exercised Models navigation, Arabic-to-English RTL/LTR switching (including active page title), Settings navigation and dark theme. Screenshots were created locally for review. The browser's file:// and localhost navigation were blocked by the container policy; embedding the source with page.set_content() worked. The preview used the local UI mirror; remote branch HTML/CSS were separately checked for required IDs and balanced braces.
 - Wails proof-of-concept is blocked in this container: Go is 1.23.2 (official Wails v3 docs require Go 1.26+), neither Wails CLI is installed, GTK/WebKit development packages are absent, and Windows is unavailable. No install was attempted.
 
 ## Visual/Browser Findings
