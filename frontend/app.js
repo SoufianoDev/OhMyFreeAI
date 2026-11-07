@@ -1,7 +1,7 @@
 const translations = {
   ar: {
     workspace: "مساحة العمل", dashboard: "لوحة التحكم", models: "النماذج", runtime: "بيئة التشغيل",
-    preferences: "التفضيلات", settings: "الإعدادات", foundation: "مرحلة التأسيس", localOnly: "محلي",
+    preferences: "التفضيلات", settings: "الإعدادات", foundation: "مرحلة التأسيس", localOnly: "محلي", localConnected: "محلي · متصل",
     overview: "نظرة عامة", welcome: "مساحة عملك للذكاء الاصطناعي", welcomeSub: "إدارة النماذج والمحركات وبيئات التشغيل من مكان واحد.",
     foundationStatus: "نسخة تأسيسية", colabNoticeTitle: "تشغيل Colab المجاني قيد مراجعة التوافق",
     colabNoticeBody: "لا يتم تفعيل الاتصال البعيد قبل التحقق من شروط Google. لا يوجد تجاوز للقيود أو ضمان لتوفر GPU.",
@@ -24,7 +24,7 @@ const translations = {
   },
   en: {
     workspace: "Workspace", dashboard: "Dashboard", models: "Models", runtime: "Runtime", preferences: "Preferences",
-    settings: "Settings", foundation: "Foundation", localOnly: "Local", overview: "OVERVIEW", welcome: "Your AI workspace",
+    settings: "Settings", foundation: "Foundation", localOnly: "Local", localConnected: "Local · Connected", overview: "OVERVIEW", welcome: "Your AI workspace",
     welcomeSub: "Manage models, engines and runtime environments from one place.", foundationStatus: "Foundation build",
     colabNoticeTitle: "Colab Free is pending policy review", colabNoticeBody: "Remote access stays disabled until Google's terms are reviewed. No policy bypass or GPU availability is assumed.",
     details: "Details", systemStatus: "System status", liveState: "Current state", runtimeStatus: "Runtime", notConnected: "Not connected",
@@ -49,6 +49,13 @@ let language = "ar";
 let theme = "light";
 const root = document.documentElement;
 
+function updateNativeLabel() {
+  const label = document.querySelector(".environment-label [data-i18n='localOnly']");
+  if (!label) return;
+  const key = root.dataset.nativeReady === "true" ? "localConnected" : "localOnly";
+  label.textContent = translations[language][key];
+}
+
 function applyLanguage(next) {
   language = next;
   root.lang = next;
@@ -66,6 +73,7 @@ function applyLanguage(next) {
   document.querySelector(".sidebar").setAttribute("aria-label", next === "ar" ? "التنقل الرئيسي" : "Main navigation");
   const activePage = document.querySelector(".page.is-visible");
   if (activePage) showPage(activePage.id.replace("page-", ""));
+  updateNativeLabel();
 }
 
 function applyTheme(next) {
@@ -106,3 +114,16 @@ document.querySelectorAll("[data-language-choice]").forEach((button) => button.a
 applyLanguage(language);
 applyTheme(theme);
 showPage("dashboard");
+
+
+window.addEventListener("ohmyfreeai:bridge-ready", async () => {
+  try {
+    const snapshot = await window.OhMyFreeAI?.GetSnapshot?.();
+    if (!snapshot) throw new Error("Native application snapshot was empty.");
+    root.dataset.nativeReady = "true";
+    updateNativeLabel();
+  } catch (error) {
+    root.dataset.nativeReady = "error";
+    console.error("Could not connect to the OhMyFreeAI native core:", error);
+  }
+});
