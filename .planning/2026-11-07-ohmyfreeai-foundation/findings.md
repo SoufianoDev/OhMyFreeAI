@@ -407,3 +407,7 @@
 - The manager is currently not wired into the desktop AppService, GUI or CLI. AppService exposes only GetSnapshot and SaveConfig; the backup package has no discovered application-layer use case or public UI action. Thus the archive engine exists, but the user-facing export/restore workflow is incomplete.
 - SQLite currently stores config plus model revisions/artifact locations/engine installations/compatibility/session/download/client metadata. The archive's single database snapshot therefore carries the metadata currently persisted in SQLite; it intentionally does not bundle model weights, engine binaries or secrets.
 - Latest distro run `42405097971` is still queued with four lanes in progress and four queued at the time of this note; it is testing the openSUSE Bash-after-bootstrap correction. Do not report green yet.
+
+
+- Fedora 44 legacy GTK3/WebKit2GTK 4.1 passed the full Wails CLI + application build and two-launch WebView-to-Go/SQLite reopen smoke in run `42404735351`. Output included both bridge pass markers and `WEBVIEW_REOPEN_PASS`.
+- This verifies the Wails v3.0.x legacy GTK3 build tag on a current Fedora release, not only the default GTK4 path.
