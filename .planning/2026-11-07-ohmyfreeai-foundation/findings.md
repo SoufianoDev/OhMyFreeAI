@@ -192,3 +192,29 @@
 - Select `modernc.org/sqlite v1.62.0` for the production adapter. Both candidates passed; modernc is preferred because it is a CGO-free direct C-to-Go SQLite port and avoids ncruces' WASM-translated engine/custom VFS layer and documented higher per-connection memory usage. This is an architectural selection, not yet an implemented production adapter.
 - Remaining gates: implement actual Wails services and lifecycle, production SQLite adapter/migration runner, abrupt crash recovery, SQLite backup API/restore, long-duration stress, dependency license inventory, packaging/uninstall and broader Linux distro coverage.
 - The first SQLite workflow attempts failed only because the nested evaluation module had no `go.sum`; adding `go mod tidy` and `go mod verify` before tests corrected the workflow. The corrected matrix passed.
+
+
+## Production adapters and application-specific native proof (2026-11-07)
+
+### SQLite production adapter
+- The root module now pins modernc.org/sqlite v1.62.0 with a committed go.sum. The complete dependency graph was resolved by Go 1.27.3 in CI, and the workflow now checks go mod tidy/verify plus a clean diff.
+- internal/infrastructure/sqlite.Store opens a file-backed database and configures WAL, foreign-key enforcement on every connection, a 5-second busy timeout and FULL synchronous durability. It rejects in-memory paths, symlink database files and Windows UNC paths; this is not yet a general network-filesystem detector.
+- The migration runner reads embedded forward SQL, sorts versioned filenames, skips .down.sql files, rejects version gaps and untracked migration history, runs each migration in a transaction and records the migration only after successful execution.
+- The SQL statement splitter handles single/double/backtick/bracket quoting and line/block comments. Trigger bodies with internal semicolons are explicitly unsupported; do not add such migrations until the parser is replaced with a robust SQLite-aware migration executor.
+- The Store implements the application ConfigRepository port. Missing config returns defaults; writes validate first and upsert one JSON document. Only secret references are persisted.
+- Production adapter tests cover migration idempotence, transactional rollback, gaps, defaults, config round-trip, invalid-config rejection, file permissions, WAL and foreign_keys/busy_timeout/synchronous on four concurrently held connections.
+- Root CI run 42396865948 passed Go vet, tests and build on Ubuntu 24.04 and Windows. The separate driver matrix run 42396720960 passed modernc and ncruces on both OSes.
+- Not yet covered: abrupt process death, SQLite online backup API/restore, long stress/performance, filesystem-type detection, schema migration checksums and dependency license inventory.
+
+### Wails v3.0.0 application integration
+- Added desktop-src Go source templates and scripts/build_desktop.py. The script creates the official vanilla-js Wails project in a temporary workspace, overlays the application source/frontend, adds a local replace to the root module, runs go mod tidy, generates service bindings, builds and copies the executable to dist/.
+- The application registers one AppService with two methods: GetSnapshot and SaveConfig. The generated bindings contain 7 models. The frontend invokes GetSnapshot at startup and only reports local native connectivity after the call resolves.
+- Wails run 42396866046 passed on ubuntu-24.04 and windows-latest. Both produced a Vite production bundle and the native executable at the expected path.
+- Database location is based on os.UserConfigDir()/OhMyFreeAI/state.db. Startup opens the store and applies embedded migrations before registering the UI service. The snapshot correctly reports database ready and runtime not_connected; no inference engine or Gateway is started by this adapter.
+- This verifies the complete native app build and generated service bindings, not the actual WebView runtime call, shutdown cancellation, process ownership, packaging or installer.
+
+### CI and warning observations
+- GitHub Actions path filters now avoid running unrelated matrices for docs-only changes.
+- Workflow action pins were upgraded to actions/checkout v7.0.1, setup-go v7.0.0, setup-node v7.1.0 and setup-python v7.1.0 to move off deprecated Node 20 action runtimes. Runs 42397224021 (core), 42397229073 (SQLite matrix) and 42397232427 (Wails) were still running at the time of this note.
+- Windows Wails build printed "-VThe system cannot find the file specified." immediately after the build banner. The taskfile continued; bindings, Vite build and executable verification all passed. Its origin is not established and remains an observed non-fatal warning.
+- The first app-specific Wails attempt failed because the build script passed the final project path to -d; Wails appends the project name itself. The script was corrected to pass the workspace parent, and the subsequent Linux/Windows build passed.
