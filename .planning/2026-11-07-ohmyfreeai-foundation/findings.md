@@ -61,9 +61,32 @@
 - Project architecture baseline: Architecture Foundation v3.3 in project conversation context
 - Uploaded historical inputs: /mnt/data/SoufianoDev-Monitor-GUI-Remote-Complete.zip, /mnt/data/SoufianoDev-Monitor-GUI.zip, /mnt/data/fix-soufianodev-free-ai.py, /mnt/data/fix-soufianodev-sse-framing.py, /mnt/data/monitor-soufianodev-free-ai.py
 
+## Implementation Findings
+
+- Added a Go 1.23 framework-independent core module. The Wails dependency is intentionally not added to the core while v2/v3 selection remains open.
+- Added runtime session states and an explicit transition table, immutable transition results, UTC timestamps and stale-generation rejection.
+- Added a compatibility assessment that requires exact model revision, artifact checksum, engine version, backend, runtime fingerprint, integrity verification, successful engine load, health check and real inference before returning Ready.
+- Added a fail-closed runtime policy gate. Remote connection is rejected unless the assessment contains an approved decision, provider, explicit scope, HTTPS source, policy revision and review timestamp.
+- Added the first application ports for policy assessment and runtime connection. No concrete Colab connector exists or is activated.
+- Added `scripts/dev.py` using Python standard library only: doctor, test, build, fmt and arch-check. It does not install dependencies, use a shell, or invoke sudo.
+- Added a bilingual Arabic/English static frontend shell with responsive navigation, dashboard, model catalog empty state, runtime policy state, settings, light/dark themes, RTL/LTR, semantic HTML and reduced-motion support. It deliberately displays no fabricated runtime/GPU/model data and is not yet bound to Wails or application services.
+- The Material 3 visual baseline uses muted blue semantic primary colors, neutral tonal surfaces, limited outlined surfaces, 4dp-compatible spacing, restrained shape/elevation, and no gradients/glow/glass effects.
+- The Compose skill is applied only as component ownership/slot guidance; no Kotlin or Compose dependencies were added.
+
+## Local Verification
+
+- Go 1.23.2: `go test ./...` passed for the local mirror of the committed core foundation, including runtime transition/generation, compatibility readiness and policy-gate tests.
+- Go 1.23.2: `go build ./...` passed for the same local module.
+- Python 3.13.5: `python3 -m py_compile scripts/dev.py` passed.
+- Node 22.16.0: `node --check frontend/app.js` passed.
+- Python HTMLParser: `frontend/index.html` parsed successfully; 11 unique IDs, no duplicates.
+- Developer command smoke tests: `--help`, `doctor`, Go test/build delegation and architecture-check logic passed against an isolated local fixture. The full script has not been run from a checkout of the remote branch.
+- Wails proof-of-concept is blocked in this container: Go is 1.23.2 (official Wails v3 docs require Go 1.26+), neither Wails CLI is installed, GTK/WebKit development packages are absent, and Windows is unavailable. No install was attempted.
+
 ## Visual/Browser Findings
 
-- No visual design references have been accepted or applied yet. Inspect the user's Material Design 3 skill before making UI decisions.
+- The static frontend shell has been authored but not rendered in a real browser/WebView screenshot. Visual acceptance is therefore pending an actual desktop preview.
+
 
 ## External Technical Research (Exa, 2026-11-07)
 
