@@ -57,6 +57,10 @@ jobs:
           cd "$RUNNER_TEMP/omfai-wails-proof"
           wails3 init -n omfai-wails-poc -t vanilla-js
           cd omfai-wails-poc
+          wails3 generate bindings
+          binding_file="$(find frontend/bindings -type f -iname '*greetservice*.js' -print -quit)"
+          test -n "$binding_file"
+          grep -q 'Greet' "$binding_file"
           wails3 build
           test -f bin/omfai-wails-poc
 
@@ -70,6 +74,14 @@ jobs:
           try {
             wails3 init -n omfai-wails-poc -t vanilla-js
             Set-Location (Join-Path $proof "omfai-wails-poc")
+            wails3 generate bindings
+            $binding = Get-ChildItem -Path "frontend/bindings" -Recurse -File -Filter "*greetservice*.js" | Select-Object -First 1
+            if ($null -eq $binding) {
+              throw "Wails did not generate the greeting service JavaScript binding."
+            }
+            if (-not (Select-String -Path $binding.FullName -Pattern "Greet" -Quiet)) {
+              throw "Generated greeting service binding does not expose Greet."
+            }
             wails3 build
             if (-not (Test-Path "bin/omfai-wails-poc.exe")) {
               throw "Wails build completed without the expected executable."
