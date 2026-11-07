@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        shell: /bin/sh
+        shell: /bin/sh -e {0}
     strategy:
       fail-fast: false
       matrix:
