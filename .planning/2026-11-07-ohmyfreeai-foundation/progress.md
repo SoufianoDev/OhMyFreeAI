@@ -537,3 +537,10 @@
 - Follow-up run 42405827037 (including the openSUSE PATH guard) also completed SUCCESS for all eight distro/stack jobs.
 - Each job passed native package bootstrap, pkg-config verification, Wails CLI installation, actual app build, two-stage JS-to-Go smoke and SQLite reopen.
 - This verifies the latest workflow revision. Run: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405827037
+
+
+## Repository status and review hygiene — 2026-11-07T19:38Z
+
+- main remains unchanged at a1b12fbe5dd854c4619463eb1c7cccc0bd951941. No PR or merge was created.
+- foundation/bootstrap is 437 commits ahead / 0 behind main and changes 133 files. It was already 323 commits ahead at the start of this work; repeated per-file GitHub updates have made the history too granular for a review-ready PR.
+- No history rewrite was performed. Before opening a PR, prepare a squashed snapshot branch or obtain approval to rewrite the working branch. Current branch and tested code remain intact.
