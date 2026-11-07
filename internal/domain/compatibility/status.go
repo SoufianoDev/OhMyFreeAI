@@ -15,19 +15,19 @@ const (
 
 type Evidence struct {
 	ArtifactIntegrityVerified bool
-	EngineLoadSucceeded      bool
-	HealthCheckPassed        bool
-	InferenceSucceeded       bool
+	EngineLoadSucceeded       bool
+	HealthCheckPassed         bool
+	InferenceSucceeded        bool
 }
 
 type Assessment struct {
-	ModelRevision      string
-	ArtifactSHA256     string
-	EngineVersion      string
-	Backend            string
+	ModelRevision       string
+	ArtifactSHA256      string
+	EngineVersion       string
+	Backend             string
 	RuntimeFingerprint string
-	Status             Status
-	Evidence           Evidence
+	Status              Status
+	Evidence            Evidence
 }
 
 // Ready requires exact tuple identity and successful end-to-end execution evidence.
