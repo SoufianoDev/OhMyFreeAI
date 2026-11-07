@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Observe the Wails v3.0.0 native CI proof on Ubuntu 24.04 and Windows; fix any runner/template issues. The workflow now generates and checks the vanilla-js template's GreetService JavaScript binding before building. Keep Wails undecided until both OS jobs pass. In parallel, run the existing Go/Python/architecture checks and evaluate SQLite drivers with an explicit cross-platform test matrix.
+Observe both native CI matrices: Wails v3.0.0 (including generated GreetService binding) and SQLite drivers on Ubuntu 24.04/Windows. Fix any runner or test issues from actual logs. Wails and the production SQLite driver remain unselected until their respective proof criteria pass. Then run the repository Go/Python/architecture checks and expand the recovery tests.
 
 ## Current Phase
 
@@ -40,6 +40,7 @@ Phase 3
 - [x] Add Linux/Windows GitHub Actions validation workflow
 - [x] Add a pinned Wails v3.0.0 official vanilla-js starter build proof to GitHub Actions; do not lock the app to Wails until native jobs pass
 - [x] Extend the Wails proof to generate and assert the starter's Go-to-JavaScript GreetService binding on both native runners
+- [x] Add an isolated SQLite driver evaluation module and Ubuntu/Windows matrix for modernc and ncruces; keep experimental dependencies out of the production module
 - [x] Establish the initial bilingual Material 3 web shell using the repository's Material Design skill
 - [x] Preserve historical Colab scripts and launcher behavior unchanged; keep remote-inference activation policy-gated
 **Status:** in_progress
