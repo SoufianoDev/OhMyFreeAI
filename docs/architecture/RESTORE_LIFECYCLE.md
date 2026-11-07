@@ -2,14 +2,14 @@
 
 ## Status
 
-Archive restore is **not exposed** in the GUI or CLI. `backup.Manager.Restore` and `sqlite.RestoreDatabase` are infrastructure primitives only. The current Wails AppService owns one Store for the full application lifetime, and configuration/backup services retain references to it. Calling the primitive directly from the current service would be unsafe.
+Archive restore is **not exposed** in the GUI or CLI. `backup.Manager.Restore` and `sqlite.RestoreDatabase` remain infrastructure primitives only. The Wails composition root now owns a `sqlite.StoreController`; configuration persistence and GUI/CLI backup export use its shared leases. This removes the former long-lived raw-Store references from those paths, but does not yet make restore safe: there is still no durable journal, startup recovery coordinator, or application-level restore transaction.
 
 ## Required ownership boundary
 
-- Introduce one application-lifetime Store controller that owns the current `*sqlite.Store` and implements the stable configuration repository port.
-- Normal repository operations and backup export acquire a shared lifecycle lease and hold it until the operation completes.
+- The application-lifetime `sqlite.StoreController` now owns the current `*sqlite.Store` and implements the stable configuration repository port.
+- Configuration `Load`/`Save` and GUI/CLI backup export now acquire shared lifecycle leases and hold them for the complete SQLite/archive operation.
 - Restore acquires an exclusive lifecycle lease, preventing new work and waiting for all in-flight DB operations to finish.
-- No application service may retain or cache a raw Store pointer across lifecycle transitions. The controller is the only owner allowed to close or replace it.
+- No application service may retain or cache a raw Store pointer across lifecycle transitions. The controller is the only owner allowed to close or replace it. Current Wails and CLI composition routes follow this boundary.
 - The desktop adapter and CLI must call the same restore application service; they must not implement separate restore logic.
 
 ## Required restore transaction
@@ -60,4 +60,6 @@ Journal updates must use write-to-temp, fsync, atomic rename and directory sync 
 
 ## Current implementation gap
 
-`AppService` currently retains a direct `*sqlite.Store`; `appconfig.Service.Repository` also points directly to that Store. There is no stable Store controller, exclusive lifecycle lease, durable restore journal, startup journal recovery or coordinated rollback/reopen service. Restore therefore remains disabled.
+The stable Store controller and shared-lease wiring are implemented. Its tests cover shared/exclusive exclusion, writer preference, cancellation, shutdown draining, failed replacement, panic fail-closed behavior, and concurrent lease stress; a configuration repository round-trip test is also present. A Linux `go test -race ./...` CI step has been added, but its result must be observed before declaring race verification complete.
+
+The remaining blockers are the durable restore journal, crash recovery before canonical Store open, a coordinated application-level restore/rollback/reopen service, and deterministic failure-injection tests across every durable phase. `sqlite.RestoreDatabase` currently performs its own staging and target publication, but it has no journal and cannot alone satisfy the lifecycle contract above. Restore therefore remains disabled.
