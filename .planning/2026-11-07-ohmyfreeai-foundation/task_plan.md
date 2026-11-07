@@ -67,7 +67,8 @@ Phase 4
 - [x] Implement read-only Manager.Inspect with isolated temporary extraction, full manifest/checksum/schema validation and cleanup tests
 - [x] Wire backup export/inspect into the Wails service using native file dialogs and bilingual settings UI
 - [x] Add CLI backup export/inspect commands using the shared archive manager and existing-only SQLite open
-- [ ] Implement coordinated Store lifecycle and rollback before enabling restore
+- [x] Specify crash-safe restore lifecycle, durable journal, startup recovery and failure-injection requirements in RESTORE_LIFECYCLE.md
+- [ ] Implement coordinated Store lifecycle, journal and rollback before enabling restore
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
 - [x] Revalidate the refactored two-stage bridge bootstrap on native Ubuntu; run 42405729902 passed with two GetSnapshot calls per launch and DB reopen
 - [x] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs (run 42405827037)
