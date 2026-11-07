@@ -53,7 +53,7 @@ The pinned Wails v3.0.0 proof now has a separate distro-container matrix. The ma
 | openSUSE Tumbleweed | GTK4 + WebKitGTK 6.0 | Default | Build + WebView bridge + reopen |
 | Ubuntu 22.04 | GTK3 + WebKit2GTK 4.1 | `gtk3` tag | Build + WebView bridge + reopen |
 | Debian 12 | GTK3 + WebKit2GTK 4.1 | `gtk3` tag | Build + WebView bridge + reopen |
-| Rocky Linux 9 | GTK3 + WebKit2GTK 4.1 | `gtk3` tag | Build + WebView bridge + reopen |
+| Fedora 44 (legacy lane) | GTK3 + WebKit2GTK 4.1 | `gtk3` tag | Build + WebView bridge + reopen |
 
 The GTK3 compatibility lane is specific to Wails v3.0.x; upstream schedules removal of the legacy stack in v3.1. These jobs run in distribution containers on GitHub-hosted Linux runners. They validate distro userland package availability, compilation, dynamic linking at launch, the virtual-display WebView and the Go service bridge; they are not bare-metal tests of every desktop environment, GPU driver, Wayland compositor, installer or update path.
 
