@@ -468,3 +468,10 @@
 - Refactored generated frontend bootstrap to call the native GetSnapshot method before dynamically importing app.js, then call it again only after the UI module imports successfully. The app receives the returned snapshot via the bridge-ready event instead of issuing its own first call. The smoke marker now counts calls and requires count=2, proving both the native bridge and successful frontend-module import.
 - This change is a targeted hypothesis to isolate GTK3 module/bootstrap ordering; the next Ubuntu 22.04 and Debian 12 runs must confirm it. It is not yet a proven fix.
 - openSUSE's post-bootstrap shell lookup still fails even after installing Bash. The workflow now restores /usr/bin and /bin into the GitHub Actions PATH after the package transaction, and uses the built-in sh shell again. The next openSUSE run will verify this.
+
+
+## Two-stage bridge refactor static/Windows validation — 2026-11-07T19:24Z
+
+- Root CI run `42405729818` passed on Ubuntu and Windows after the two-stage bridge refactor, confirming Python tooling, architecture checks and test suite remain green.
+- Wails v3 run `42405729902` Windows native build and executable verification passed with the new generated bridge bootstrap. Ubuntu build is still in progress and must complete its WebView smoke.
+- Linux distro matrix run `42405827037` includes the openSUSE PATH fix and the two-stage bridge code; all eight jobs are currently queued behind available hosted runners.
