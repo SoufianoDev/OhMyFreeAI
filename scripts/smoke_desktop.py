@@ -29,6 +29,11 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
             "GSK_RENDERER": "cairo",
             "LIBGL_ALWAYS_SOFTWARE": "1",
             "WEBKIT_DISABLE_COMPOSITING_MODE": "1",
+            # GitHub-hosted/container runners cannot create the network namespace
+            # required by WebKit's bubblewrap sandbox. This is test-only; never
+            # propagate it into the installed application environment.
+            "WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS": "1",
+            "GTK_A11Y": "none",
         }
     )
 
