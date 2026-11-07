@@ -356,3 +356,10 @@
 
 
 - openSUSE Tumbleweed package installation now succeeds and confirms Xvfb/WebKitGTK packages, but subsequent actions still failed to resolve Bash despite zypper reporting it installed. Removed the Bash dependency from workflow execution entirely: distro job run steps now use POSIX sh globally. The next matrix run will verify.
+
+
+## Upstream WebKit/Wails signal research — 2026-11-07T18:53Z
+
+- Confirmed from the exact Wails v3.0.0 source that it already includes the periodic SA_ONSTACK repair and the WebKit load-finished repair, and intentionally excludes SIGUSR1 from SA_ONSTACK.
+- Confirmed from upstream WebKit source that JSC_SIGNAL_FOR_GC accepts a numeric signal ID (not the symbolic name SIGUSR2) and that JSC uses SIGUSR1 by default. Do not add a signal override until the fatal error's exact signal/headline is known; it may be harmful or irrelevant.
+- The current smoke output includes a native Go stack and register dump, but the diagnostic excerpt starts too late to show the fatal headline. Next step is to emit both head and tail of the captured application log, then diagnose from the exact signal message.
