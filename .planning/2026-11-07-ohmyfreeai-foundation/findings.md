@@ -497,3 +497,10 @@
 
 
 - Ubuntu 24.04 GTK4/WebKitGTK 6.0 also passed the latest two-stage bridge run `42405827037`, including both bridge calls and database reopen. Four current-run lanes are green: Ubuntu 24.04, Debian 13, Fedora 44 GTK4 and Arch rolling.
+
+
+## openSUSE shell issue narrowed — 2026-11-07T19:30Z
+
+- The older current-code run `42405729874`, which does not include the extra `GITHUB_PATH` restoration but does omit setup-python, successfully passed openSUSE package installation, checkout, Go setup, Node setup and pkg-config configuration, and reached Wails CLI installation using the built-in `sh` shell.
+- This indicates the earlier missing-shell behavior was associated with the setup-python/toolcache environment rather than an inherent openSUSE lack of sh/bash. The explicit PATH restoration in newer run `42405827037` is redundant but harmless unless its verification reveals otherwise.
+- openSUSE is not yet fully green; its Wails CLI, app build and WebView smoke still need to pass.
