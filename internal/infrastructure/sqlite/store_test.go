@@ -74,7 +74,7 @@ want: %#v", actual, expected)
 		}
 		connections = append(connections, conn)
 
-		var foreignKeys, busyTimeout int
+		var foreignKeys, busyTimeout, synchronous int
 		if err := conn.QueryRowContext(ctx, "PRAGMA foreign_keys").Scan(&foreignKeys); err != nil {
 			t.Fatalf("read foreign_keys on connection %d: %v", i, err)
 		}
@@ -86,6 +86,12 @@ want: %#v", actual, expected)
 		}
 		if busyTimeout != busyTimeoutMS {
 			t.Fatalf("unexpected busy_timeout on connection %d: got %d, want %d", i, busyTimeout, busyTimeoutMS)
+		}
+		if err := conn.QueryRowContext(ctx, "PRAGMA synchronous").Scan(&synchronous); err != nil {
+			t.Fatalf("read synchronous on connection %d: %v", i, err)
+		}
+		if synchronous != 2 {
+			t.Fatalf("synchronous is %d on connection %d, want FULL (2)", synchronous, i)
 		}
 	}
 	for _, conn := range connections {
