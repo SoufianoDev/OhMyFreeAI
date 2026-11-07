@@ -32,3 +32,15 @@ Use `database/sql` at the adapter boundary. Evaluate `modernc.org/sqlite` first 
 - https://pkg.go.dev/modernc.org/sqlite
 - https://github.com/mattn/go-sqlite3
 - https://pkg.go.dev/github.com/ncruces/go-sqlite3
+
+
+## Evaluation harness
+
+A separate nested Go module at `tests/sqlite-driver-eval` keeps experimental driver dependencies out of the production module. The GitHub Actions matrix runs it on Ubuntu 24.04 and Windows for:
+
+- `modernc.org/sqlite` v1.62.0 (driver name `sqlite`)
+- `github.com/ncruces/go-sqlite3` v0.37.0 (driver name `sqlite3`)
+
+The shared smoke test checks open/ping, SQLite version reporting, WAL activation, per-connection foreign-key enforcement, transaction rollback, concurrent inserts across four held connections with a busy timeout, integrity_check, WAL checkpoint, close/reopen and a checkpointed database-file copy. It does not yet simulate abrupt process termination, test the complete production migration runner, or establish long-duration stress/performance results. The test is evidence for narrowing the driver choice, not a complete acceptance certificate.
+
+The workflow is added but must not be treated as passed until both OS jobs complete successfully. Driver selection remains Proposed until results and a follow-up review of locking, dependency/license inventory, packaging and recovery are recorded.
