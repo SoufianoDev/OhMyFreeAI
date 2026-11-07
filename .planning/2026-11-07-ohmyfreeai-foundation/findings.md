@@ -491,3 +491,6 @@
 - Arch Linux rolling / GTK4-WebKitGTK 6.0 passed the latest two-stage bridge smoke in run `42405827037`.
 - Output: `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, `WEBVIEW_REOPEN_PASS`.
 - This confirms the two-stage frontend bootstrap works on Arch as well as native Ubuntu. Other lanes in the latest run remain in progress/queued.
+
+
+- Latest two-stage bridge run `42405827037` has now revalidated Debian 13, Fedora 44 GTK4 and Arch Linux rolling. All three passed full build, two calls around UI-module import, and SQLite reopen.
