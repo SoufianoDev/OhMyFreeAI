@@ -52,7 +52,6 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
     display = ":97"
     with log_path.open("wb") as output:
         display_process = subprocess.Popen(
-            print(f"WEBVIEW_SMOKE_START attempt={attempt} display={display}", flush=True)
             [xvfb, display, "-screen", "0", "1280x820x24", "-nolisten", "tcp", "-ac"],
             stdout=output,
             stderr=subprocess.STDOUT,
@@ -83,6 +82,7 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                 stdout=output,
                 stderr=subprocess.STDOUT,
             )
+            print(f"WEBVIEW_SMOKE_START attempt={attempt} display={display}", flush=True)
             deadline = time.monotonic() + 60
             initial_call_logged = False
             while time.monotonic() < deadline:
