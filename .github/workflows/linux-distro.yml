@@ -140,7 +140,7 @@ jobs:
               exit 2
               ;;
           esac
-          command -v xvfb-run
+          command -v Xvfb
           pkg-config --modversion gtk4 2>/dev/null || pkg-config --modversion gtk+-3.0
 
       - name: Checkout
