@@ -11,9 +11,7 @@ import (
 
 var ErrRepositoryRequired = errors.New("configuration repository is required")
 
-type Service struct {
-	Repository ports.ConfigRepository
-}
+type Service struct{ Repository ports.ConfigRepository }
 
 func (s Service) Load(ctx context.Context) (domainconfig.Config, error) {
 	if s.Repository == nil {
