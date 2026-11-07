@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Build the initial accessible Material 3 web shell on top of the framework-independent Go domain foundation; then run the local verification suite.
+Add configuration and persistence port contracts, then implement and test the versioned configuration model without prematurely selecting a Wails major version.
 
 ## Current Phase
 
@@ -36,9 +36,9 @@ Phase 3
 
 - [x] Add the framework-independent Go domain foundation and standard-library developer toolkit
 - [ ] Add the Wails feasibility proof without committing to it before Linux/Windows validation
-- [ ] Establish UI foundations using the repository's Material Design skill
+- [x] Establish the initial bilingual Material 3 web shell using the repository's Material Design skill
 - [x] Preserve historical Colab scripts and launcher behavior unchanged; keep remote-inference activation policy-gated
-- **Status:** pending
+- **Status:** in_progress
 
 ### Phase 4: Testing & Verification
 
@@ -61,6 +61,8 @@ Phase 3
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
+Resolved so far: Go core tests pass on Go 1.23.2. Wails v3 requires Go 1.26+ and cannot be tested in this container; the Wails PoC remains open. Colab remote-inference activation is policy-gated.
+
 ## Decisions Made
 
 | Decision | Rationale |
@@ -71,12 +73,16 @@ Phase 3
 | Backup extension/name is omfaibackup | Explicit user decision |
 | Use Planning with Files structure under .planning | Persistent task state, isolated from future tasks |
 | Do not claim the skill is installed in the agent runtime | The available environment has no writable agent-home mount; repository vendoring is the durable project-level route |
+| Keep Wails version undecided | v3 is current stable but needs Go 1.26+/GTK4/WebKitGTK 6; v2 has a different platform baseline. Verify on Linux and Windows before selecting |
 
 ## Errors Encountered
 
 | Error | Attempt | Resolution |
 |-------|---------|------------|
 | Git clone failed: DNS resolution for github.com unavailable in the container | 1 | Use the connected GitHub integration for repository reads/writes; do not repeat the network clone |
+| Code Mode tool-call limit exceeded during bulk skill vendoring | 1 | Reconcile partial writes and split into smaller batches |
+| GitHub create-file returned HTTP 422 because a path already existed | 1 | Fetch the existing file SHA and use update_file |
+| Policy-gate Go test failed after adding required policy revision | 1 | Add the missing revision to the test fixture and rerun the full Go suite |
 
 ## Notes
 
