@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Continue from the implemented Wails v3.0.0 shell and modernc.org/sqlite v1.62.0 persistence adapter. Next add a live WebView-to-Go invocation test, abrupt-crash recovery, SQLite backup API/restore, then finish prototype audit, packaging, Linux distro coverage and full diff review.
+Continue from the implemented Wails v3.0.0 shell and modernc.org/sqlite v1.62.0 persistence adapter. Next add a live WebView-to-Go invocation test, validate the JavaScriptCore signal setting on Wails v3, add abrupt-crash recovery and SQLite backup API/restore, then finish packaging, Linux distro coverage and full diff review.
 
 ## Current Phase
 
@@ -60,7 +60,8 @@ Phase 4
 - [x] Pin and verify Go dependency lockfiles in CI
 - [x] Upgrade GitHub Actions to Node 24-compatible releases; latest core, SQLite and Wails workflows pass without the Node 20 deprecation warning
 - [ ] Run documentation/link validation and review all source changes
-- [ ] Verify the original prototype path and identify unverified assumptions
+- [x] Perform a read-only static audit of the supplied prototype archives and Python patch/monitor scripts; record hashes, preserved invariants and risks in docs/architecture/PROTOTYPE_AUDIT.md
+- [ ] Revalidate current Colab /props and /v1/models behavior, model-specific Q8_0/262144 compatibility and the live SSE path before enabling remote inference
 - [ ] Add actual desktop WebView-to-Go invocation, crash-recovery and production backup/restore tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
@@ -79,7 +80,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows, with one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView invocation testing, abrupt-crash recovery, SQLite backup/restore API, long-duration stress/performance, dependency license inventory, broader Linux distro coverage, packaging/uninstall and historical prototype audit. Colab remote-inference activation remains policy-gated.
+Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows, with one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView invocation testing, Wails v3 JavaScriptCore signal validation, abrupt-crash recovery, SQLite backup/restore API, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, broader Linux distro coverage and packaging/uninstall. Colab remote-inference activation remains policy-gated.
 
 ## Decisions Made
 
@@ -94,6 +95,7 @@ Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.0
 | Select modernc.org/sqlite v1.62.0 for the SQLite adapter | Both CGO-free candidates passed Linux/Windows smoke tests and the initial migration; modernc avoids the WASM VFS and documented per-connection memory overhead of ncruces |
 | Do not claim the skill is installed in the agent runtime | The available environment has no writable agent-home mount; repository vendoring is the durable project-level route |
 | Keep Wails confined to the desktop adapter | Core domain/application packages remain Wails-independent; the desktop build is generated from the pinned official vanilla-js template in a temporary workspace |
+| Keep the historical Colab monitor read-only | Preserve the busy-session guard and SSE framing invariant, but do not port Linux-only Wails v2 UI/process code into the cross-platform product |
 
 ## Errors Encountered
 
