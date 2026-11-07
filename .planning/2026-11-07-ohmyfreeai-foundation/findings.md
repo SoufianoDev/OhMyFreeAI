@@ -460,3 +460,11 @@
 - Commit `f189e0b1` updates the smoke helper to require the marker count to reach 2 for each launch (one call before UI import, one after). The helper still resets the marker before each of its two process launches.
 - Marker parser tests were added in `tests/test_smoke_desktop.py`; they validate the counted marker format, not the native Wails bridge itself.
 - Runs `42405729818` (CI), `42405729902` (Wails) and `42405729874` (Linux distro matrix) are the latest verification set and are queued/pending at this point.
+
+
+## Legacy GTK3 runtime smoke refinement — 2026-11-07T19:18Z
+
+- In run `42404735351`, Ubuntu 22.04 GTK3/WebKit2GTK 4.1 built but the WebView smoke timed out without a marker or application log. In run `42405097971`, Debian 12 GTK3/WebKit2GTK 4.1 exited before marker with no captured app output. These are runtime smoke failures, not compile failures; the legacy lane is not certified yet.
+- Refactored generated frontend bootstrap to call the native GetSnapshot method before dynamically importing app.js, then call it again only after the UI module imports successfully. The app receives the returned snapshot via the bridge-ready event instead of issuing its own first call. The smoke marker now counts calls and requires count=2, proving both the native bridge and successful frontend-module import.
+- This change is a targeted hypothesis to isolate GTK3 module/bootstrap ordering; the next Ubuntu 22.04 and Debian 12 runs must confirm it. It is not yet a proven fix.
+- openSUSE's post-bootstrap shell lookup still fails even after installing Bash. The workflow now restores /usr/bin and /bin into the GitHub Actions PATH after the package transaction, and uses the built-in sh shell again. The next openSUSE run will verify this.
