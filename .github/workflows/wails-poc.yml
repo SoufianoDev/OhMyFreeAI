@@ -10,6 +10,8 @@ on:
       - 'scripts/build_desktop.py'
       - 'go.mod'
       - 'go.sum'
+      - 'internal/**'
+      - 'migrations/**'
       - '.github/workflows/wails-poc.yml'
   pull_request:
     branches:
