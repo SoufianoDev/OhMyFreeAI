@@ -428,3 +428,12 @@
 - Current successful lanes in run `42404735351`: Ubuntu 24.04 GTK4, Debian 13 GTK4, Fedora 44 GTK4, Arch rolling GTK4, Fedora 44 legacy GTK3, Debian 12 legacy GTK3.
 - Ubuntu 22.04 legacy GTK3 built successfully but timed out waiting for GetSnapshot; no application output was captured. This is a runtime/bridge failure, not a compile failure. Retest after the bridge bootstrap is made independent of app.js's custom event listener.
 - openSUSE Tumbleweed installed dependencies but its post-install shell resolution failed before pkg-config; a new run uses Bash after bootstrap.
+
+
+## Remaining Linux smoke and workflow-file incident — 2026-11-07T19:19Z
+
+- Run `42404735351` completed six of eight Linux distro lanes successfully: Ubuntu 24.04 GTK4, Debian 13 GTK4, Fedora 44 GTK4, Arch rolling GTK4, Fedora 44 GTK3 legacy, and Debian 12 GTK3 legacy.
+- Ubuntu 22.04 GTK3 legacy installed dependencies and built the native executable, but the smoke helper timed out waiting for the frontend-to-Go `GetSnapshot` call. The captured application output was empty. This is a runtime/WebView bridge failure, not a compile failure. Root cause remains unproven; inspect WebKitGTK 4.1/Ubuntu 22.04 startup behavior before changing application logic.
+- openSUSE Tumbleweed completed dependency installation and pkg-config checks, but the next step failed because the runner could not resolve `bash` from PATH even though zypper reported the package installed. A diagnostic correction now probes executable locations and appends the verified directory to `GITHUB_PATH`; run `42405525978` is queued and has not verified it yet.
+- The first attempt to add this diagnostic produced malformed YAML because the update operation split the inserted tail. The failed run `42405470161` had no jobs. The workflow was restored from the last known-good commit `64bad8b`, the diagnostic was re-applied with a safer insertion, and the current file was checked for one Checkout step and intact final smoke step. Current corrected commit: `c3aed2ff17a6f95b19d970d28bd543e1b8c53bc8`.
+- The separate Ubuntu/Windows CI run `42405330049` passed; backup cancellation propagation and its regression test are green on both platforms.
