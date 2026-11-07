@@ -324,3 +324,12 @@
 - Changes have been committed to `foundation/bootstrap`; the new CI runs are the next verification gate.
 - Do not mark the WebView bridge smoke test or any distro as passing until the new Actions jobs complete and their logs are inspected.
 - No direct writes to `main`; no paid service, Colab tunnel, live user runtime, or historical launcher was changed.
+
+
+## Distro package bootstrap correction — 2026-11-07T18:41Z
+
+- First Linux distro matrix run failed during package installation on Ubuntu 24.04, Debian 13, openSUSE Tumbleweed and Rocky Linux 9. None of these jobs reached checkout, Wails compilation or application smoke testing.
+- Diagnosed exact causes from job logs: `libegl1-mesa` package name is unavailable on Ubuntu/Debian; openSUSE package is `webkitgtk4-devel`; Rocky Linux 9 only offers WebKit2GTK 4.0 and therefore cannot satisfy the required 4.1 compatibility lane.
+- Corrected Ubuntu/Debian dependency to `libegl1`; corrected openSUSE package to `webkitgtk4-devel`; removed Rocky 9 from the legacy lane and replaced it with a Fedora 44 GTK3/WebKit2GTK 4.1 job (official Fedora package metadata confirms availability).
+- The eight-job matrix is now five default GTK4 distributions plus Ubuntu 22.04, Debian 12 and Fedora 44 legacy GTK3.
+- These initial failures are recorded as package-bootstrap errors, not app build failures. The corrected workflow must run to completion before marking any distro passed.
