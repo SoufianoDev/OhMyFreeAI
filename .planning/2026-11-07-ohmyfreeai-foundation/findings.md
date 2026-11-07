@@ -306,3 +306,11 @@
 - Relevant upstream changes: Wails commit `6329e9d` (periodic reapply for JSC lazy initialization) and `ef782b7` (do not force SA_ONSTACK on SIGUSR1). The exact v3.0.0 source contains both code paths. The current failure therefore cannot be attributed simply to missing upstream signal code; need inspect the complete first lines of the fatal report and determine whether the crash is a remaining timing/runtime issue or a different native fault.
 - The smoke helper currently reports only the tail of the native process log, which omitted the fatal error headline. Next change should include both the first and last sections of the captured log, then reproduce before changing JSC signal configuration.
 - Source: https://bugs.webkit.org/show_bug.cgi?id=220641 ; https://bugs.webkit.org/show_bug.cgi?id=221081 ; https://github.com/wailsapp/wails/commit/6329e9d2bec94a6916b9a700667b78a9569a3d9b ; https://github.com/wailsapp/wails/commit/ef782b77c892b6a7e45c3227f73fb0e20d0ed600 ; https://raw.githubusercontent.com/wailsapp/wails/v3.0.0/v3/pkg/application/linux_cgo.c
+
+
+## Second distro matrix failure classification — 2026-11-07T18:57Z
+
+- Legacy GTK3 jobs (Ubuntu 22.04, Debian 12, Fedora 44) failed while installing the Wails CLI, before application build. The CLI itself was compiled with Wails' default GTK4 build tags, so it requested `gtk4` and `webkitgtk-6.0` even on GTK3-only images. The CLI must be installed with the same `-tags gtk3` as the application in legacy jobs.
+- openSUSE Tumbleweed still invoked Bash for the Wails CLI step because that step explicitly set `shell: bash`, overriding job defaults. Removed the explicit Bash shell; the whole job uses POSIX `sh`.
+- Debian 13's dev package was installed, but Go's pkg-config invocation could not locate `webkitgtk-6.0.pc`; setup-python had changed `PKG_CONFIG_PATH`. Added distro-specific system pkg-config directories after setup-python and explicit checks for both GTK and WebKit modules before building.
+- Modern GTK4 jobs (Arch, Fedora 44, Ubuntu 24.04, Debian 13) reached the smoke step but exited with a Go/native stack dump. The previous smoke helper output omitted the fatal headline; the latest helper now prints both head and tail, so the next run can identify the exact signal. Do not mark these app smoke tests passed.
