@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	appconfig "github.com/SoufianoDev/OhMyFreeAI/internal/application/config"
@@ -45,6 +46,13 @@ func (s *AppService) GetSnapshot() (DashboardSnapshot, error) {
 		DatabaseState: "ready",
 		RuntimeState:  "not_connected",
 		Config:        cfg,
+	}
+	// The opt-in marker lets CI prove that the frontend actually invoked this
+	// Go method through the generated Wails bridge. It is inert in normal runs.
+	if marker := os.Getenv("OMFAI_WEBVIEW_SMOKE_MARKER"); marker != "" {
+		if err := os.WriteFile(marker, []byte("GetSnapshot invoked\\n"), 0o600); err != nil {
+			return DashboardSnapshot{}, fmt.Errorf("write WebView smoke marker: %w", err)
+		}
 	}
 	log.Printf("native snapshot ready: database=%s runtime=%s", snapshot.DatabaseState, snapshot.RuntimeState)
 	return snapshot, nil
