@@ -277,3 +277,13 @@
 - Updated GitHub Actions pins to checkout v7.0.1, setup-go v7.0.0, setup-node v7.1.0 and setup-python v7.1.0. The Node 20 deprecation warning is gone in the subsequent runs.
 - The Windows Wails build still prints a non-fatal '-VThe system cannot find the file specified.' line before Taskfile tasks. The executable and bindings succeed; origin remains unknown and is not marked resolved.
 - Added docs/architecture/DESKTOP_BUILD.md and internal/infrastructure/sqlite/README.md; refreshed ADR 0001/0004, the ADR index, implementation blueprint and migrations README.
+
+
+## Historical prototype audit: 2026-11-07
+
+- Read-only inspection completed for both supplied monitor GUI archives and all three Python scripts. Nothing was executed; no launcher, runtime.env, Gateway, OpenCode process or Colab session was modified.
+- Recorded SHA-256 hashes for both archives and the three scripts in docs/architecture/PROTOTYPE_AUDIT.md.
+- Recovered the actual historical topology: OpenCode -> local Gateway 127.0.0.1:18081 -> Colab CLI session qwen-opencode -> remote llama-server at 127.0.0.1:8081. Telemetry uses /props, /proc, nvidia-smi and /proc/meminfo.
+- Confirmed the core safety invariant: remote telemetry polling defers while a matching colab exec is active. The SSE patch's key correction is preserving blank lines, because they delimit SSE events.
+- Found concrete risks: the Q8_0 patch overwrites runtime.env with only two keys; the SSE patch is not transactional and has no rollback after restart/test failure; PID-only process checks are identity-unsafe; monitor history/log reads are unbounded; the Python history file does not enforce private permissions; the Wails v2 monitor is Linux-only and uses a UI style that should not be reused.
+- Documented all risks and unverified runtime assumptions in docs/architecture/PROTOTYPE_AUDIT.md. The old Wails v2 JSC_SIGNAL_FOR_GC=12 workaround is not carried into Wails v3 until tested against the actual GTK4/WebKitGTK 6 runtime.
