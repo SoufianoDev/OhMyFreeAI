@@ -326,3 +326,12 @@
 - Upstream WebKit explicitly provides `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` for debugging when sandbox setup is unavailable. Added this variable and `GTK_A11Y=none` only to the temporary child-process environment of `scripts/smoke_desktop.py`; no production config, launcher or installer receives it.
 - Documentation now states the CI boundary: bridge/window/reopen smoke is exercised, but sandbox behavior is not certified by these restricted CI runners and must be validated separately on a real host.
 - Source: https://github.com/WebKit/WebKit/pull/8591 ; https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
+
+
+## Final distro toolchain/bootstrap refinements — 2026-11-07T19:02Z
+
+- Debian 12's system glibc is older than the Python 3.13 toolcache binary provided by setup-python (it requires GLIBC_2.38; Debian 12 has GLIBC 2.36). Removed setup-python from distro-container jobs and use each distro's system Python 3 instead; the scripts require only the standard library.
+- The Wails CLI itself must be compiled with `-tags gtk3` on the legacy GTK3/WebKit2GTK 4.1 lane, not only the app binary. The workflow now selects the same tag for both.
+- Added explicit system pkg-config search directories after setup actions and verifies the exact GTK/WebKit .pc modules before installing Wails.
+- The openSUSE container had a shell path resolution problem after package installation. Distro jobs now use an explicit absolute POSIX shell template, `/bin/sh -e {0}`, for all run steps; this avoids PATH-based Bash/sh lookup.
+- The previous d95838d4 run was cancelled while correcting these issues; Debian 12's only actual build failure was Python 3.13's GLIBC requirement, and openSUSE's pkg-config step was blocked by shell lookup. No distro was yet marked successful from that run.
