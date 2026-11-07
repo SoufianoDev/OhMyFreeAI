@@ -493,3 +493,11 @@
 - Root CI run 42405729818 passed on Ubuntu and Windows after the two-stage bridge bootstrap refactor.
 - Wails Windows native build/executable verification passed in run 42405729902. Wails Ubuntu build and live smoke are still in progress.
 - The updated eight-distro matrix run 42405827037 includes the openSUSE PATH fix and two-stage bridge code; its jobs are queued pending hosted runner capacity.
+
+
+## Two-stage native bridge smoke passed — 2026-11-07T19:26Z
+
+- Wails run 42405729902 is fully green on Windows and Ubuntu 24.04.
+- The new two-stage bridge test passed twice on Ubuntu: WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2; WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2; WEBVIEW_REOPEN_PASS.
+- This confirms the initial Go call, successful dynamic import of app.js, second Go call and SQLite reopen on GTK4/WebKitGTK 6.0.
+- The same code is now being tested across all eight distro lanes in run 42405827037, including the openSUSE PATH correction.
