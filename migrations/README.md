@@ -13,4 +13,4 @@
 - Store.Open configures WAL, foreign_keys, a 5-second busy timeout and synchronous=FULL. It rejects in-memory paths, database-file symlinks and Windows UNC paths. It does not yet identify every network filesystem type.
 - Selected production driver: modernc.org/sqlite v1.62.0 (ADR 0004). Import it only inside the concrete SQLite persistence adapter; keep application/domain code on database/sql-backed ports.
 - Production tests cover idempotence, migration gap rejection, rollback, configuration round-trip, invalid-config rejection, file permissions, WAL and per-connection PRAGMAs on four simultaneously held connections.
-- Abrupt process termination, SQLite backup API export/restore, long-duration stress/performance and clean-uninstall data handling remain open.
+- SQLite online backup API snapshot and restore primitives are implemented in internal/infrastructure/sqlite and tested on Ubuntu/Windows. The full .omfaibackup archive/manifest wrapper, abrupt-process crash tests, long-duration stress/performance and clean-uninstall data handling remain open.
