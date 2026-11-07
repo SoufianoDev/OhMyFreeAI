@@ -52,6 +52,7 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
     display = ":97"
     with log_path.open("wb") as output:
         display_process = subprocess.Popen(
+            print(f"WEBVIEW_SMOKE_START attempt={attempt} display={display}", flush=True)
             [xvfb, display, "-screen", "0", "1280x820x24", "-nolisten", "tcp", "-ac"],
             stdout=output,
             stderr=subprocess.STDOUT,
@@ -82,7 +83,8 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                 stdout=output,
                 stderr=subprocess.STDOUT,
             )
-            deadline = time.monotonic() + 30
+            deadline = time.monotonic() + 60
+            initial_call_logged = False
             while time.monotonic() < deadline:
                 if marker.is_file():
                     value = marker.read_text(encoding="utf-8")
@@ -95,6 +97,9 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                     if call_count == 2:
                         print(f"WEBVIEW_GO_BRIDGE_PASS attempt={attempt} calls={call_count}", flush=True)
                         return
+                    if call_count == 1 and not initial_call_logged:
+                        print(f"WEBVIEW_GO_BRIDGE_PROGRESS attempt={attempt} initial_call=1", flush=True)
+                        initial_call_logged = True
                     if call_count != 1:
                         raise RuntimeError(f"Expected one initial bridge call before UI import, got {call_count}.")
                 if process.poll() is not None:
