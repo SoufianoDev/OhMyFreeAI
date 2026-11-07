@@ -397,3 +397,13 @@
 - Arch Linux rolling / GTK4-WebKitGTK 6.0 passed the full build + two-launch bridge smoke in run `42404735351`; both success markers and `WEBVIEW_REOPEN_PASS` were observed.
 - Fedora 44 / GTK4-WebKitGTK 6.0 also passed the full build + two-launch bridge smoke in the same run.
 - Confirmed green lanes so far: Ubuntu 24.04, Debian 13, Fedora 44 (GTK4), Arch Linux rolling. The three legacy lanes and openSUSE remain outstanding.
+
+
+## Backup implementation audit — 2026-11-07T19:14Z
+
+- The repository already contains a substantial `internal/infrastructure/backup.Manager`; the Phase 4 checkbox describing archive creation is stale rather than proof that the feature is absent.
+- The implemented `.omfaibackup` archive is a strict ZIP with exactly `manifest.json` and `state.sqlite`; it records app/schema versions, creation time, entry size and SHA-256. It caps archive, manifest and database sizes; rejects unknown/duplicate entries, directories, symlinks, encrypted/unsupported entries, path traversal names, malformed/trailing manifest data, checksum mismatches and schema-version mismatches. It verifies the archive after creation and restores through the SQLite online-backup path with rollback preservation.
+- Existing tests cover archive structure/permissions, round-trip restore and rollback, checksum tampering without target mutation, refusing overwrite, and path traversal. Need inspect/add edge-case tests for duplicate entries, symlink/directory entries, unsupported version, cancellation and corrupt ZIP if missing.
+- The manager is currently not wired into the desktop AppService, GUI or CLI. AppService exposes only GetSnapshot and SaveConfig; the backup package has no discovered application-layer use case or public UI action. Thus the archive engine exists, but the user-facing export/restore workflow is incomplete.
+- SQLite currently stores config plus model revisions/artifact locations/engine installations/compatibility/session/download/client metadata. The archive's single database snapshot therefore carries the metadata currently persisted in SQLite; it intentionally does not bundle model weights, engine binaries or secrets.
+- Latest distro run `42405097971` is still queued with four lanes in progress and four queued at the time of this note; it is testing the openSUSE Bash-after-bootstrap correction. Do not report green yet.
