@@ -22,5 +22,6 @@ type PolicyAssessment struct {
 // AllowsRemoteInference fails closed unless a scoped, sourced review is recorded.
 func (p PolicyAssessment) AllowsRemoteInference() bool {
 	return p.Provider != "" && p.Decision == PolicyApproved && p.Scope != "" &&
-		p.SourceURL != "" && !p.ReviewedAt.IsZero()
+		p.PolicyRevision != "" && len(p.SourceURL) > len("https://") &&
+		p.SourceURL[:len("https://")] == "https://" && !p.ReviewedAt.IsZero()
 }
