@@ -500,3 +500,39 @@ func TestRestoreDatabaseRejectsActiveTarget(t *testing.T) {
 		t.Fatalf("expected active-target error, got %v", err)
 	}
 }
+
+
+func TestRestoreDatabaseRefusesNonSQLiteTarget(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	sourceStore, err := Open(ctx, filepath.Join(directory, "source.db"))
+	if err != nil {
+		t.Fatalf("open source database: %v", err)
+	}
+	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate source database: %v", err)
+	}
+	backupPath := filepath.Join(directory, "source-snapshot.sqlite")
+	if err := sourceStore.BackupTo(ctx, backupPath); err != nil {
+		t.Fatalf("create source snapshot: %v", err)
+	}
+	if err := sourceStore.Close(); err != nil {
+		t.Fatalf("close source database: %v", err)
+	}
+
+	targetPath := filepath.Join(directory, "not-a-database")
+	original := []byte("preserve unrelated user file")
+	if err := os.WriteFile(targetPath, original, 0o600); err != nil {
+		t.Fatalf("create unrelated target file: %v", err)
+	}
+	if _, err := RestoreDatabase(ctx, backupPath, targetPath, migrations.Files, "."); !errors.Is(err, ErrRestoreTargetInvalid) {
+		t.Fatalf("expected invalid-target error, got %v", err)
+	}
+	actual, err := os.ReadFile(targetPath)
+	if err != nil {
+		t.Fatalf("read unrelated target file: %v", err)
+	}
+	if !reflect.DeepEqual(actual, original) {
+		t.Fatalf("unrelated target file changed: %q", actual)
+	}
+}
