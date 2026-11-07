@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Run the Wails v3.0.0 vanilla-js proof-of-concept on Linux and Windows using Go 1.27.3; then decide the shell version and implement the SQLite driver adapter after its cross-platform matrix passes.
+Observe the new Wails v3.0.0 native CI proof on Ubuntu 24.04 and Windows; fix any runner/template issues, then add a minimal Go-to-JavaScript service-binding smoke test. Keep Wails undecided until both OS builds pass. In parallel, run the existing Go/Python/architecture checks and then evaluate SQLite drivers with an explicit cross-platform test matrix.
 
 ## Current Phase
 
@@ -38,7 +38,7 @@ Phase 3
 - [x] Add validated versioned configuration defaults, repository port and application service
 - [x] Add SQLite initial/up and development-only down migrations with schema integrity tests
 - [x] Add Linux/Windows GitHub Actions validation workflow
-- [ ] Add the Wails feasibility proof without committing to it before Linux/Windows validation
+- [x] Add a pinned Wails v3.0.0 official vanilla-js starter build proof to GitHub Actions; do not lock the app to Wails until native jobs pass
 - [x] Establish the initial bilingual Material 3 web shell using the repository's Material Design skill
 - [x] Preserve historical Colab scripts and launcher behavior unchanged; keep remote-inference activation policy-gated
 **Status:** in_progress
@@ -64,7 +64,7 @@ Phase 3
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Resolved so far: Go core tests pass on Go 1.23.2. Wails v3 requires Go 1.26+ and cannot be tested in this container; the Wails PoC remains open. Colab remote-inference activation is policy-gated.
+Resolved so far: Go core tests passed in the previously tested local mirror; the local container cannot run the current Go 1.27.3 module or Wails v3.0.0. A native Ubuntu 24.04/Windows Wails CI proof has now been added, but it is not verified until GitHub Actions reports both jobs green. Colab remote-inference activation remains policy-gated.
 
 ## Decisions Made
 
