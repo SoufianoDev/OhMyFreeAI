@@ -347,3 +347,31 @@ func TestOpenRestrictsExistingDatabasePermissions(t *testing.T) {
 		}
 	}
 }
+
+
+func TestMigrationRejectsDatabaseNewerThanAvailableMigrations(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "newer-schema.db"))
+	if err != nil {
+		t.Fatalf("open SQLite store: %v", err)
+	}
+	defer store.Close()
+
+	_, err = store.DB().ExecContext(ctx,
+		"CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, description TEXT NOT NULL, applied_at TEXT NOT NULL)")
+	if err != nil {
+		t.Fatalf("create migration history fixture: %v", err)
+	}
+	_, err = store.DB().ExecContext(ctx,
+		"INSERT INTO schema_migrations(version, description, applied_at) VALUES (1, 'first', '2026-11-07T00:00:00Z'), (2, 'second', '2026-11-07T00:00:00Z')")
+	if err != nil {
+		t.Fatalf("insert newer migration history fixture: %v", err)
+	}
+
+	available := fstest.MapFS{
+		"001_initial.sql": &fstest.MapFile{Data: []byte("CREATE TABLE should_not_run (id INTEGER PRIMARY KEY);")},
+	}
+	if err := store.Migrate(ctx, available, "."); !errors.Is(err, ErrMigrationVersionTooNew) {
+		t.Fatalf("expected newer-schema error, got %v", err)
+	}
+}
