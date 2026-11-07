@@ -521,3 +521,12 @@
 
 - Ubuntu 22.04 legacy GTK3/WebKit2GTK 4.1 and Fedora 44 legacy GTK3/WebKit2GTK 4.1 both passed full build and two-stage WebView bridge/SQLite reopen in run 42405729874. Each emitted two bridge pass markers and WEBVIEW_REOPEN_PASS.
 - Seven of eight lanes are now green. Debian 12 legacy GTK3 is the only remaining job in this run.
+
+
+## All eight Linux distro/stack lanes passed — 2026-11-07T19:36Z
+
+- Linux distribution workflow run 42405729874 completed SUCCESS.
+- All eight jobs passed: Ubuntu 24.04 GTK4, Debian 13 GTK4, Fedora 44 GTK4, Arch rolling GTK4, openSUSE Tumbleweed GTK4, Ubuntu 22.04 GTK3, Debian 12 GTK3, Fedora 44 legacy GTK3.
+- Each job built the actual desktop app, launched it twice under Xvfb, recorded two successful GetSnapshot bridge calls, and verified SQLite reopen.
+- Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405729874
+- Production WebKit sandbox remains enabled. The CI-only sandbox-disable variable is restricted to smoke-test subprocesses because GitHub's runner lacks bubblewrap network-namespace permissions. Bare-metal sandbox verification remains open.
