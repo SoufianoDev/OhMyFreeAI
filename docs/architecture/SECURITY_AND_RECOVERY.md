@@ -26,3 +26,8 @@ Use OS-backed secret storage where available. Store references, not secret value
 ## Shutdown
 
 Cancel owned work, stop only owned processes, flush durable state, close DB handles and release OS resources. No orphaned goroutines/processes.
+
+
+## Database restore safety
+
+Database restore must use an exclusive Store lifecycle lease, durable phase journal, verified staging database, atomic publication, rollback and startup crash recovery. The current direct Store references do not satisfy these requirements; restore must remain unavailable until the complete contract and failure-injection tests in [RESTORE_LIFECYCLE.md](RESTORE_LIFECYCLE.md) pass.
