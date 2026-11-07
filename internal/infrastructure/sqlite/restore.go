@@ -57,6 +57,9 @@ func RestoreDatabase(ctx context.Context, sourcePath, targetPath string, migrati
 	if !sourceInfo.Mode().IsRegular() {
 		return "", ErrRestoreSourceInvalid
 	}
+	if err := verifyBackupDatabase(ctx, absoluteSource); err != nil {
+		return "", fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
+	}
 	if err := validateRestoreTarget(absoluteTarget); err != nil {
 		return "", err
 	}
