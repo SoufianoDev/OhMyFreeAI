@@ -51,10 +51,12 @@
   - Added versioned config defaults/validation, a ConfigRepository port and an application config service that rejects invalid settings before persistence. Gateway defaults to disabled and loopback-only.
   - Added the shared Planning with Files pointer at .planning/.active_plan for the single named plan.
   - Verified the static UI with Node syntax check and Python HTML parsing; no duplicate IDs were found.
-  - Verified the local Go mirror with go test ./... and go build ./...; all current packages passed, including the new config package.
+  - Verified the committed Go core against an exact local mirror (Git blob SHA match): go test ./... and go build ./... passed, including config, runtime, compatibility and policy gate packages.
+  - Added initial SQLite schema with foreign keys, state/checksum constraints, redacted URI fields and cross-table model/artifact identity; six Python sqlite3/unittest cases passed against the exact committed SQL and test file.
   - Matched committed Go source blobs against the tested local mirror after applying gofmt formatting to the remaining files.
   - Verified Python syntax and developer command smoke tests. The architecture checker was exercised against a local fixture, not a full remote checkout.
   - Rendered the local UI mirror in Chromium via Playwright; tested Models navigation, Arabic/English direction and active page title, Settings navigation and dark theme. UI preview screenshots were captured locally.
+  - Evaluated SQLite drivers: modernc.org/sqlite v1.62.0 is CGO-free/BSD-3-Clause but requires Go 1.26; mattn/go-sqlite3 is MIT but requires CGO/GCC; ncruces/go-sqlite3 is CGO-free but uses a WASM-derived SQLite VFS with additional memory and WAL/locking validation needs. Added a proposed ADR; no driver is pinned.
   - Wails v3 PoC remains blocked by Go 1.23.2 (v3 docs require Go 1.26+), missing Wails CLI/GTK/WebKit dependencies and no Windows host. No dependencies were installed.
 
 ### Errors and corrections in this session
