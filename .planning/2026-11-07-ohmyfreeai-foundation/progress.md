@@ -574,3 +574,6 @@
 - Latest native Wails run 42409974970 has completed Linux dependency bootstrap and pinned Wails installation and is building the updated application; the CLI smoke steps are queued immediately after build.
 - Linux distro run 42410021330 includes the new native CLI smoke in all eight lanes. Four GTK4 lanes are installing/building while legacy GTK3/openSUSE lanes are queued.
 - Root CI run 42410030822 passed Ubuntu; Windows has completed its validation steps and is finalizing. This run also compiles scripts/smoke_cli.py.
+
+
+- Corrected a workflow wiring omission found during source review: the Linux distro workflow path filter included smoke_cli.py, but the execution step had not been inserted because the actual WebView step label differed from the replacement target. The exact insertion is now present in commit 5ccfb6f and runs before WebView smoke in all eight lanes.
