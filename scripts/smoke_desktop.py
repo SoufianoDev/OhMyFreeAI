@@ -14,7 +14,7 @@ from pathlib import Path
 
 
 def parse_snapshot_marker(value: str) -> int:
-    match = re.fullmatch(r"GetSnapshot success count=([1-9][0-9]*)\\n?", value)
+    match = re.fullmatch(r"GetSnapshot success count=([1-9][0-9]*)\n?", value)
     if match is None:
         raise ValueError(f"invalid snapshot marker: {value!r}")
     return int(match.group(1))
