@@ -26,10 +26,25 @@
 
 ### Phase 2: Planning & Structure
 
+- **Status:** complete
+- Actions taken:
+  - Established the project specification, system architecture, module boundaries, domain model, state machines, compatibility, runtime/engine, Gateway/client, storage/backup, security/recovery, UI/UX, developer toolkit and implementation blueprint documents.
+  - Added platform, process, monitoring, downloads, configuration, CLI, persistent storage, terminal, client integration, privacy, event and data architecture contracts.
+  - Added ADRs for Wails evaluation, Colab policy gate and omfaibackup format.
+  - Added draft terms, privacy and third-party service disclosure documents.
+  - Recorded the Colab Free policy restrictions as a feasibility gate; no prohibited remote-control or service-tunnel workaround will be implemented.
+
+### Phase 3: Implementation
+
 - **Status:** in_progress
 - Actions taken:
-  - Began establishing project-scoped skills and core architecture documentation.
-  - Recorded the Colab Free policy restrictions as a feasibility gate; no prohibited remote-control or service-tunnel workaround will be implemented.
+  - Added a framework-independent Go module and domain state machine for runtime sessions.
+  - Added evidence-backed model compatibility status and strict Ready predicate.
+  - Added standard-library Python developer commands: doctor, test, build, fmt and arch-check.
+  - Added repository-level agent instructions and .gitignore rules.
+  - Ran Go tests and build successfully in an isolated local module matching the committed domain foundation.
+  - Ran Python syntax validation, developer command help, doctor, test/build delegation and architecture-check logic on local test fixtures.
+  - Preserved historical launcher/monitor scripts unchanged; did not run them against the user's live machine.
 
 ## Test Results
 
