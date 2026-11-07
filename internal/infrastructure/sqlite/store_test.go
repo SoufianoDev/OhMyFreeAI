@@ -215,3 +215,102 @@ func TestMigrationHistoryGapIsRejected(t *testing.T) {
 		t.Fatalf("expected corrupt migration history error, got %v", err)
 	}
 }
+
+
+func TestBackupToProducesVerifiedSnapshot(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatalf("open source SQLite store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate source SQLite store: %v", err)
+	}
+
+	expected := config.Defaults()
+	expected.Gateway.Port = 18082
+	expected.UI.Language = "en"
+	if err := store.Save(ctx, expected); err != nil {
+		t.Fatalf("save source configuration: %v", err)
+	}
+
+	backupPath := filepath.Join(t.TempDir(), "state-snapshot.sqlite")
+	if err := store.BackupTo(ctx, backupPath); err != nil {
+		t.Fatalf("create online SQLite backup: %v", err)
+	}
+	info, err := os.Stat(backupPath)
+	if err != nil {
+		t.Fatalf("stat SQLite backup: %v", err)
+	}
+	if info.Size() == 0 {
+		t.Fatal("SQLite backup is empty")
+	}
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("SQLite backup permissions = %o, want 600", info.Mode().Perm())
+	}
+
+	backupStore, err := Open(ctx, backupPath)
+	if err != nil {
+		t.Fatalf("open SQLite backup: %v", err)
+	}
+	defer backupStore.Close()
+	if err := backupStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("verify backup migration history: %v", err)
+	}
+	actual, err := backupStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load configuration from backup: %v", err)
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("backup configuration mismatch:
+ got: %#v
+want: %#v", actual, expected)
+	}
+}
+
+func TestBackupToDoesNotOverwriteExistingDestination(t *testing.T) {
+	ctx := context.Background()
+	store, err := Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatalf("open SQLite store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate SQLite store: %v", err)
+	}
+
+	backupPath := filepath.Join(t.TempDir(), "existing.sqlite")
+	original := []byte("preserve this file")
+	if err := os.WriteFile(backupPath, original, 0o600); err != nil {
+		t.Fatalf("create existing destination: %v", err)
+	}
+	if err := store.BackupTo(ctx, backupPath); !errors.Is(err, ErrBackupDestinationExists) {
+		t.Fatalf("expected existing-destination error, got %v", err)
+	}
+	actual, err := os.ReadFile(backupPath)
+	if err != nil {
+		t.Fatalf("read existing destination: %v", err)
+	}
+	if !reflect.DeepEqual(actual, original) {
+		t.Fatalf("existing destination changed: %q", actual)
+	}
+}
+
+func TestBackupToHonorsCanceledContext(t *testing.T) {
+	store, err := Open(context.Background(), filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatalf("open SQLite store: %v", err)
+	}
+	defer store.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	backupPath := filepath.Join(t.TempDir(), "canceled.sqlite")
+	if err := store.BackupTo(ctx, backupPath); !errors.Is(err, context.Canceled) {
+		t.Fatalf("expected context cancellation, got %v", err)
+	}
+	if _, err := os.Stat(backupPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("canceled backup should not publish a destination, stat error: %v", err)
+	}
+}
