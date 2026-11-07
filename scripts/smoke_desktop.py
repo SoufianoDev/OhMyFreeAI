@@ -12,6 +12,13 @@ import time
 from pathlib import Path
 
 
+def diagnostic_excerpt(path: Path) -> str:
+    text = path.read_text(encoding="utf-8", errors="replace")
+    if len(text) <= 10000:
+        return text
+    return text[:5000] + "\\n... middle of native log omitted ...\\n" + text[-5000:]
+
+
 def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None:
     marker.unlink(missing_ok=True)
     env = os.environ.copy()
@@ -60,7 +67,7 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                     return
                 if process.poll() is not None:
                     output.flush()
-                    details = log_path.read_text(encoding="utf-8", errors="replace")[-5000:]
+                    details = diagnostic_excerpt(log_path)
                     raise RuntimeError(
                         f"Desktop process exited before the frontend called GetSnapshot "
                         f"(exit={process.returncode}). Application output:\\n{details}"
