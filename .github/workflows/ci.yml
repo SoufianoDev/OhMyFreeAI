@@ -34,6 +34,21 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Resolve and verify Go modules
+        run: |
+          go mod tidy
+          go mod verify
+
+      - name: Upload resolved Go module lockfiles
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-module-lockfiles
+          path: |
+            go.mod
+            go.sum
+          if-no-files-found: error
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
