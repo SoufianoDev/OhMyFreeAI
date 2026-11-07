@@ -593,3 +593,6 @@
 
 - Diagnosed a failure in older distro run 42409848051: Ubuntu 22.04 GTK3 built but timed out waiting for GetSnapshot; app output was empty. This same lane passed in run 42405827037, so root cause is not established and the failure appears intermittent/environment-sensitive. No speculative code change made.
 - Current CLI-enabled distro rerun 42410214638 is the authoritative retest; its Ubuntu 22.04 result is pending.
+
+
+- CLI-enabled distro run 42410214638 has passed both native CLI smoke and two-launch WebView/SQLite smoke on Ubuntu 24.04, Debian 13 and Fedora 44 GTK4. Four other lanes are still running and Debian 12 is queued.
