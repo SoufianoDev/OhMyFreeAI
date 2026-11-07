@@ -56,11 +56,11 @@ def attach_generated_binding(project: Path) -> None:
     if bindings.exists():
         for path in bindings.rglob("*.js"):
             source = path.read_text(encoding="utf-8", errors="replace")
-            if "GetSnapshot" in source and "SaveConfig" in source:
+            if all(name in source for name in ("GetSnapshot", "SaveConfig", "ExportBackup", "InspectBackup")):
                 candidates.append(path)
 
     if not candidates:
-        raise RuntimeError("Wails did not generate the AppService GetSnapshot/SaveConfig binding.")
+        raise RuntimeError("Wails did not generate all required AppService bindings.")
 
     binding = sorted(candidates)[0]
     relative = Path(os.path.relpath(binding, source_dir)).as_posix()
@@ -68,7 +68,7 @@ def attach_generated_binding(project: Path) -> None:
         relative = "./" + relative
 
     bridge = (
-        f'import {{ GetSnapshot, SaveConfig }} from "{relative}";\n'
+        f'import {{ GetSnapshot, SaveConfig, ExportBackup, InspectBackup }} from "{relative}";\n'
         'window.OhMyFreeAI = Object.freeze({ GetSnapshot, SaveConfig });\n'
         'const firstSnapshot = Promise.resolve().then(() => GetSnapshot());\n'
         'import("../app.js").then(async () => {\n'
