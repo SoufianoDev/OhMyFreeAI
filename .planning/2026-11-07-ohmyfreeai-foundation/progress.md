@@ -333,3 +333,12 @@
 - Corrected Ubuntu/Debian dependency to `libegl1`; corrected openSUSE package to `webkitgtk4-devel`; removed Rocky 9 from the legacy lane and replaced it with a Fedora 44 GTK3/WebKit2GTK 4.1 job (official Fedora package metadata confirms availability).
 - The eight-job matrix is now five default GTK4 distributions plus Ubuntu 22.04, Debian 12 and Fedora 44 legacy GTK3.
 - These initial failures are recorded as package-bootstrap errors, not app build failures. The corrected workflow must run to completion before marking any distro passed.
+
+
+## Xvfb portability and diagnostic refinement — 2026-11-07T18:46Z
+
+- Removed reliance on `xvfb-run`; the smoke helper now starts the `Xvfb` server directly, sets `DISPLAY`, and tears down both the app and virtual display after each of two launches.
+- Corrected the Go and Python smoke marker literals to use an actual newline rather than a literal backslash-n sequence.
+- The first direct-Xvfb native Ubuntu attempt exited with status 2 before the marker. The prior helper discarded the useful application log on this early-exit path. Updated it to flush and include the last 5,000 log characters in the failure report; the next Wails run is required to diagnose the exact startup error.
+- openSUSE Tumbleweed failed because its minimal container did not include Bash, the default shell GitHub Actions requested. Added Bash to its dependency installation.
+- All of these are test-harness/CI bootstrap corrections. Do not mark distro or WebView coverage passed until the latest matrix and native Wails jobs finish.
