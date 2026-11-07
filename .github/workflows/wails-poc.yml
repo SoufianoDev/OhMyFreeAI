@@ -9,6 +9,7 @@ on:
       - 'frontend/**'
       - 'scripts/build_desktop.py'
       - 'scripts/smoke_desktop.py'
+      - 'scripts/smoke_cli.py'
       - 'go.mod'
       - 'go.sum'
       - 'internal/**'
@@ -70,6 +71,14 @@ jobs:
 
       - name: Build native OhMyFreeAI application
         run: python scripts/build_desktop.py
+
+      - name: Smoke-test native CLI dispatch (Linux)
+        if: runner.os == 'Linux'
+        run: python scripts/smoke_cli.py dist/OhMyFreeAI
+
+      - name: Smoke-test native CLI dispatch (Windows)
+        if: runner.os == 'Windows'
+        run: python scripts/smoke_cli.py dist/OhMyFreeAI.exe
 
       - name: Verify native executable (Linux)
         if: runner.os == 'Linux'
