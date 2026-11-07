@@ -439,3 +439,11 @@
 
 
 - Fedora 44 legacy GTK3/WebKit2GTK 4.1 passed Wails CLI install, full application build, and the two-launch WebView bridge/SQLite reopen smoke in run 42404735351. Both bridge markers and WEBVIEW_REOPEN_PASS were observed.
+
+
+## 2026-11-07T19:17Z — backup cancellation fix and CI result
+
+- Fixed `extractArchive` to return an already-cancelled context immediately and preserve context cancellation during database-entry extraction rather than misclassifying it as an invalid archive.
+- Added `TestExtractArchiveHonorsCancellation`.
+- GitHub Actions run `42405330049` passed on Ubuntu and Windows, including vet, Go tests/build, Python tests, frontend syntax and architecture checks.
+- Distro workflow run `42405097971` still exposes an openSUSE follow-up: Bash is reported installed but cannot be resolved by the next container step. The upcoming fix will inspect and export the verified executable directory via `GITHUB_PATH`.
