@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="OhMyFreeAI desktop control plane">
+  <title>OhMyFreeAI</title>
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="styles/app.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="التنقل الرئيسي">
+      <a class="brand" href="#dashboard" aria-label="OhMyFreeAI — الرئيسية">
+        <span class="brand-mark" aria-hidden="true">O</span>
+        <span class="brand-copy"><strong>OhMyFreeAI</strong><small>Free AI workspace</small></span>
+      </a>
+      <div class="nav-caption" data-i18n="workspace">مساحة العمل</div>
+      <nav class="nav-list" aria-label="Main navigation">
+        <button class="nav-item is-active" type="button" data-page="dashboard" aria-current="page">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.8 12 3l9 7.8v9.1a1.1 1.1 0 0 1-1.1 1.1h-5.2v-6.2H9.3V21H4.1A1.1 1.1 0 0 1 3 19.9z"/></svg><span data-i18n="dashboard">لوحة التحكم</span>
+        </button>
+        <button class="nav-item" type="button" data-page="models">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8 21 7.5v9L12 21.2 3 16.5v-9zm0 2.3L7.2 7.6 12 10.1l4.8-2.5zM5 9.3v5.8l5.9 3.1v-5.8zm14 0-5.9 3.1v5.8l5.9-3.1z"/></svg><span data-i18n="models">النماذج</span>
+        </button>
+        <button class="nav-item" type="button" data-page="runtime">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H4zm-2 14h20v2H2zm7-11v6l6-3z"/></svg><span data-i18n="runtime">بيئة التشغيل</span>
+        </button>
+      </nav>
+      <div class="sidebar-spacer"></div>
+      <div class="nav-caption" data-i18n="preferences">التفضيلات</div>
+      <nav class="nav-list">
+        <button class="nav-item" type="button" data-page="settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m19.4 13 .1-2 2-1.5-2-3.4-2.4.8-1.7-1-.4-2.5h-4l-.4 2.5-1.7 1-2.4-.8-2 3.4 2 1.5-.1 2-2 1.5 2 3.4 2.4-.8 1.7 1 .4 2.5h4l.4-2.5 1.7-1 2.4.8 2-3.4zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7"/></svg><span data-i18n="settings">الإعدادات</span>
+        </button>
+      </nav>
+      <div class="sidebar-footer"><span class="version-dot"></span><span>v0.1.0 · <span data-i18n="foundation">مرحلة التأسيس</span></span></div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar">
+        <div class="breadcrumbs"><span data-i18n="workspace">مساحة العمل</span><span class="crumb-separator">/</span><strong id="page-title" data-i18n="dashboard">لوحة التحكم</strong></div>
+        <div class="top-actions">
+          <span class="environment-label"><span class="status-dot neutral"></span><span data-i18n="localOnly">محلي</span></span>
+          <button class="icon-button" id="theme-toggle" type="button" aria-label="تبديل المظهر" title="تبديل المظهر"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 9 9 7.2 7.2 0 0 1-9-9m0-2v2m0 18v2M1 12h2m18 0h2M4.2 4.2l1.4 1.4m12.8 12.8 1.4 1.4m0-15.6-1.4 1.4M5.6 18.4l-1.4 1.4"/></svg></button>
+          <button class="language-button" id="language-toggle" type="button">EN</button>
+          <span class="avatar" aria-label="OhMyFreeAI">O</span>
+        </div>
+      </header>
+      <div class="content-wrap">
+        <section class="page is-visible" id="page-dashboard" aria-labelledby="dashboard-heading">
+          <div class="page-heading">
+            <div><p class="eyebrow" data-i18n="overview">نظرة عامة</p><h1 id="dashboard-heading" data-i18n="welcome">مساحة عملك للذكاء الاصطناعي</h1><p class="page-subtitle" data-i18n="welcomeSub">إدارة النماذج والمحركات وبيئات التشغيل من مكان واحد.</p></div>
+            <span class="build-label"><span class="status-dot neutral"></span><span data-i18n="foundationStatus">نسخة تأسيسية</span></span>
+          </div>
+          <div class="notice notice-warning" role="status"><span class="notice-icon" aria-hidden="true">!</span><div><strong data-i18n="colabNoticeTitle">تشغيل Colab المجاني قيد مراجعة التوافق</strong><p data-i18n="colabNoticeBody">لا يتم تفعيل الاتصال البعيد قبل التحقق من شروط Google. لا يوجد تجاوز للقيود أو ضمان لتوفر GPU.</p></div><button class="text-action" type="button" data-open-page="runtime" data-i18n="details">التفاصيل</button></div>
+          <div class="section-heading"><h2 data-i18n="systemStatus">حالة النظام</h2><span data-i18n="liveState">الحالة الحالية</span></div>
+          <div class="status-grid">
+            <article class="status-panel"><div class="panel-top"><span class="panel-label" data-i18n="runtimeStatus">بيئة التشغيل</span><span class="status-dot neutral"></span></div><strong class="panel-value" data-i18n="notConnected">غير متصل</strong><p data-i18n="runtimeEmpty">لم يتم إنشاء جلسة تشغيل.</p><button class="inline-link" type="button" data-open-page="runtime" data-i18n="manage">إدارة البيئة</button></article>
+            <article class="status-panel"><div class="panel-top"><span class="panel-label" data-i18n="gatewayStatus">البوابة المحلية</span><span class="status-dot neutral"></span></div><strong class="panel-value" data-i18n="stopped">متوقفة</strong><p>127.0.0.1:18081</p><span class="panel-footnote" data-i18n="notStarted">لم يتم تشغيل الخدمة.</span></article>
+            <article class="status-panel"><div class="panel-top"><span class="panel-label" data-i18n="modelsStatus">النماذج</span><span class="status-dot neutral"></span></div><strong class="panel-value">0</strong><p data-i18n="verifiedModels">نماذج تم التحقق منها</p><button class="inline-link" type="button" data-open-page="models" data-i18n="browseCatalog">استعراض الكتالوج</button></article>
+          </div>
+          <div class="dashboard-columns">
+            <section class="surface-section"><div class="section-heading"><h2 data-i18n="recentActivity">النشاط الأخير</h2><span data-i18n="noEvents">لا توجد أحداث</span></div><div class="empty-state compact"><span class="empty-mark" aria-hidden="true">—</span><strong data-i18n="nothingYet">لا يوجد نشاط بعد</strong><p data-i18n="activityWillAppear">ستظهر هنا عمليات التنزيل والتشغيل والاستعادة بعد تنفيذها.</p></div></section>
+            <section class="surface-section quick-section"><div class="section-heading"><h2 data-i18n="quickAccess">وصول سريع</h2></div>
+              <button class="quick-row" type="button" data-open-page="models"><span class="quick-icon">01</span><span><strong data-i18n="modelCatalog">كتالوج النماذج</strong><small data-i18n="modelCatalogSub">التوافق والموارد المطلوبة</small></span><span class="quick-arrow" aria-hidden="true">↗</span></button>
+              <button class="quick-row" type="button" data-open-page="runtime"><span class="quick-icon">02</span><span><strong data-i18n="runtimeSetup">بيئة التشغيل</strong><small data-i18n="runtimeSetupSub">حالة الاتصال والسياسات</small></span><span class="quick-arrow" aria-hidden="true">↗</span></button>
+              <button class="quick-row" type="button" data-open-page="settings"><span class="quick-icon">03</span><span><strong data-i18n="preferences">التفضيلات</strong><small data-i18n="settingsSub">اللغة والمظهر</small></span><span class="quick-arrow" aria-hidden="true">↗</span></button>
+            </section>
+          </div>
+          <footer class="page-footer"><span>OhMyFreeAI</span><span data-i18n="footerNote">مجاني · محلي أولًا · مفتوح المصدر</span></footer>
+        </section>
+        <section class="page" id="page-models" aria-labelledby="models-heading" hidden>
+          <div class="page-heading"><div><p class="eyebrow" data-i18n="library">المكتبة</p><h1 id="models-heading" data-i18n="models">النماذج</h1><p class="page-subtitle" data-i18n="modelsSub">الكتالوج يميز بين الدعم المثبت والتوافق غير المتحقق.</p></div></div>
+          <div class="notice notice-info"><span class="notice-icon">i</span><div><strong data-i18n="compatibilityRule">لا نعتمد اسم العائلة وحده لإثبات التوافق</strong><p data-i18n="compatibilityRuleSub">كل نتيجة مرتبطة بإصدار النموذج وملفه والمحرك والـ backend وموارد التشغيل واختبار استدلال فعلي.</p></div></div>
+          <div class="empty-state large"><span class="empty-illustration" aria-hidden="true">◇</span><strong data-i18n="catalogEmpty">لم تتم إضافة نماذج بعد</strong><p data-i18n="catalogEmptySub">ستظهر هنا النماذج المدعومة وغير المدعومة وغير المتحقق منها مع أسباب واضحة ومتطلبات التشغيل الدنيا.</p></div>
+        </section>
+        <section class="page" id="page-runtime" aria-labelledby="runtime-heading" hidden>
+          <div class="page-heading"><div><p class="eyebrow" data-i18n="infrastructure">البنية التحتية</p><h1 id="runtime-heading" data-i18n="runtime">بيئة التشغيل</h1><p class="page-subtitle" data-i18n="runtimeSub">حالة الموارد والسياسات منفصلة عن حالة الاتصال التقنية.</p></div></div>
+          <div class="runtime-summary"><div><span class="panel-label" data-i18n="provider">الموفر</span><strong>Google Colab Free</strong></div><span class="badge badge-warning" data-i18n="policyReview">مراجعة السياسة مطلوبة</span></div>
+          <div class="surface-section policy-copy"><h2 data-i18n="policyGate">بوابة التوافق مع شروط الخدمة</h2><p data-i18n="policyDetails">تقيّد Google بعض أنماط التحكم عن بُعد وتجاوز واجهة الدفتر وتقديم خدمات الويب على بيئات Colab المُدارة المجانية. لذلك لا يمكن تفعيل مسار خادم استدلال بعيد قبل مراجعة نمط الاستخدام المحدد والتأكد من توافقه.</p><p class="muted" data-i18n="policySource">المصدر: شروط وأسئلة Colab الرسمية.</p><a href="https://research.google.com/colaboratory/faq.html" target="_blank" rel="noreferrer">Google Colab FAQ ↗</a></div>
+          <div class="surface-section resource-placeholder"><h2 data-i18n="resourceSnapshot">لقطة الموارد</h2><p data-i18n="resourceUnavailable">لا توجد بيانات GPU أو RAM أو مساحة قرص موثقة. لا يتم افتراض نوع GPU أو توفره.</p></div>
+        </section>
+        <section class="page" id="page-settings" aria-labelledby="settings-heading" hidden>
+          <div class="page-heading"><div><p class="eyebrow" data-i18n="preferences">التفضيلات</p><h1 id="settings-heading" data-i18n="settings">الإعدادات</h1><p class="page-subtitle" data-i18n="settingsSub">تفضيلات الواجهة الأساسية.</p></div></div>
+          <section class="surface-section settings-group"><div><h2 data-i18n="appearance">المظهر</h2><p data-i18n="appearanceSub">اختر المظهر الفاتح أو الداكن.</p></div><div class="segmented" role="group" aria-label="Theme"><button type="button" data-theme-choice="light" class="is-selected" data-i18n="light">فاتح</button><button type="button" data-theme-choice="dark" data-i18n="dark">داكن</button></div></section>
+          <section class="surface-section settings-group"><div><h2 data-i18n="language">اللغة</h2><p data-i18n="languageSub">العربية والإنجليزية مع اتجاه تخطيط صحيح.</p></div><div class="segmented" role="group" aria-label="Language"><button type="button" data-language-choice="ar" class="is-selected">العربية</button><button type="button" data-language-choice="en">English</button></div></section>
+        </section>
+      </div>
+    </main>
+  </div>
+</body>
+</html>
