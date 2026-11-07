@@ -6,3 +6,4 @@
 | [0002 — Colab Free policy gate](../adr/0002-colab-free-policy-gate.md) | No remote inference adapter activation until the exact flow is policy-cleared | Accepted |
 | [0003 — Backup artifact naming](../adr/0003-omfaibackup-format.md) | Use `.omfaibackup`; preserve legacy import compatibility | Accepted |
 | [0004 — SQLite driver evaluation](../adr/0004-sqlite-driver-evaluation.md) | Evaluate modernc first after Go 1.26; no dependency pin before Linux/Windows validation | Proposed |
+| [0005 — Go toolchain baseline](../adr/0005-go-toolchain-baseline.md) | Target latest stable patch, Go 1.27.3 as of 2026-11-07 | Accepted |
