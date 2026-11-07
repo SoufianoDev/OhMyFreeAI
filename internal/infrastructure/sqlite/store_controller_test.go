@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	domainconfig "github.com/SoufianoDev/OhMyFreeAI/internal/domain/config"
 )
 
 func newLifecycleTestStore(t *testing.T, name string) *Store {
@@ -574,6 +576,28 @@ func TestStoreControllerConcurrentLeaseStress(t *testing.T) {
 	}
 	if readers, writers := activeReaders.Load(), activeWriters.Load(); readers != 0 || writers != 0 {
 		t.Fatalf("leases remained active after stress test: readers=%d writers=%d", readers, writers)
+	}
+	if err := controller.Close(context.Background()); err != nil {
+		t.Fatalf("close controller: %v", err)
+	}
+}
+
+func TestStoreControllerConfigRepositoryRoundTrip(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	controller := NewStoreController(store)
+	cfg := domainconfig.Defaults()
+	cfg.UI.Language = "en"
+	cfg.UI.Theme = "dark"
+
+	if err := controller.Save(context.Background(), cfg); err != nil {
+		t.Fatalf("controller Save: %v", err)
+	}
+	loaded, err := controller.Load(context.Background())
+	if err != nil {
+		t.Fatalf("controller Load: %v", err)
+	}
+	if loaded != cfg {
+		t.Fatalf("loaded config = %#v, want %#v", loaded, cfg)
 	}
 	if err := controller.Close(context.Background()); err != nil {
 		t.Fatalf("close controller: %v", err)
