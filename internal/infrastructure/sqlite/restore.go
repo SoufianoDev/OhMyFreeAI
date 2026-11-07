@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
+
+	moderncsqlite "modernc.org/sqlite"
 )
 
 var (
