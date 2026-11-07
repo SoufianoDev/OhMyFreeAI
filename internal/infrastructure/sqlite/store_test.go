@@ -375,3 +375,121 @@ func TestMigrationRejectsDatabaseNewerThanAvailableMigrations(t *testing.T) {
 		t.Fatalf("expected newer-schema error, got %v", err)
 	}
 }
+
+
+func TestRestoreDatabaseRestoresSnapshotAndPreservesRollback(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	sourcePath := filepath.Join(directory, "source.db")
+	sourceStore, err := Open(ctx, sourcePath)
+	if err != nil {
+		t.Fatalf("open source database: %v", err)
+	}
+	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate source database: %v", err)
+	}
+	sourceConfig := config.Defaults()
+	sourceConfig.Gateway.Port = 18082
+	if err := sourceStore.Save(ctx, sourceConfig); err != nil {
+		t.Fatalf("save source configuration: %v", err)
+	}
+
+	backupPath := filepath.Join(directory, "source-snapshot.sqlite")
+	if err := sourceStore.BackupTo(ctx, backupPath); err != nil {
+		t.Fatalf("create source snapshot: %v", err)
+	}
+	if err := sourceStore.Close(); err != nil {
+		t.Fatalf("close source database: %v", err)
+	}
+
+	targetPath := filepath.Join(directory, "target.db")
+	targetStore, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("open target database: %v", err)
+	}
+	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate target database: %v", err)
+	}
+	targetConfig := config.Defaults()
+	targetConfig.Gateway.Port = 18083
+	if err := targetStore.Save(ctx, targetConfig); err != nil {
+		t.Fatalf("save target configuration: %v", err)
+	}
+	if err := targetStore.Close(); err != nil {
+		t.Fatalf("close target database: %v", err)
+	}
+
+	rollbackPath, err := RestoreDatabase(ctx, backupPath, targetPath, migrations.Files, ".")
+	if err != nil {
+		t.Fatalf("restore SQLite snapshot: %v", err)
+	}
+	if rollbackPath == "" {
+		t.Fatal("restore did not preserve the previous database")
+	}
+	if _, err := os.Stat(rollbackPath); err != nil {
+		t.Fatalf("stat preserved rollback database: %v", err)
+	}
+
+	restoredStore, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("open restored database: %v", err)
+	}
+	if err := restoredStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("verify restored database migrations: %v", err)
+	}
+	restoredConfig, err := restoredStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load restored configuration: %v", err)
+	}
+	if !reflect.DeepEqual(restoredConfig, sourceConfig) {
+		t.Fatalf("restored configuration mismatch:
+ got: %#v
+want: %#v", restoredConfig, sourceConfig)
+	}
+	if err := restoredStore.Close(); err != nil {
+		t.Fatalf("close restored database: %v", err)
+	}
+
+	previousStore, err := Open(ctx, rollbackPath)
+	if err != nil {
+		t.Fatalf("open preserved rollback database: %v", err)
+	}
+	defer previousStore.Close()
+	if err := previousStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("verify rollback database migrations: %v", err)
+	}
+	previousConfig, err := previousStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load preserved configuration: %v", err)
+	}
+	if !reflect.DeepEqual(previousConfig, targetConfig) {
+		t.Fatalf("rollback configuration mismatch:
+ got: %#v
+want: %#v", previousConfig, targetConfig)
+	}
+}
+
+func TestRestoreDatabaseRejectsActiveTarget(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	targetPath := filepath.Join(directory, "active.db")
+	store, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("open active target database: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate active target database: %v", err)
+	}
+	if _, err := store.DB().ExecContext(ctx, "CREATE TABLE active_restore_fixture (id INTEGER PRIMARY KEY)"); err != nil {
+		t.Fatalf("write active target database: %v", err)
+	}
+
+	backupPath := filepath.Join(directory, "placeholder.sqlite")
+	if err := os.WriteFile(backupPath, []byte("unused because target is busy"), 0o600); err != nil {
+		t.Fatalf("create placeholder source: %v", err)
+	}
+	if _, err := RestoreDatabase(ctx, backupPath, targetPath, migrations.Files, "."); !errors.Is(err, ErrRestoreTargetBusy) {
+		t.Fatalf("expected active-target error, got %v", err)
+	}
+}
