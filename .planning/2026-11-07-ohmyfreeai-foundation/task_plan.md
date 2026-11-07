@@ -66,7 +66,7 @@ Phase 4
 - [x] Implement strict .omfaibackup snapshot archive with manifest, SHA-256, fixed entries, size limits and path-traversal protections; round-trip, rollback, checksum, overwrite and cancellation tests pass on Linux/Windows
 - [ ] Wire backup export/inspect/restore into the application layer, native file dialogs, GUI and CLI
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
-- [ ] Revalidate the refactored two-stage bridge bootstrap on the current native Ubuntu Wails run
+- [x] Revalidate the refactored two-stage bridge bootstrap on native Ubuntu; run 42405729902 passed with two GetSnapshot calls per launch and DB reopen
 - [ ] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs
 - [x] Diagnose GitHub runner WebKit bubblewrap namespace restriction and keep WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 confined to the smoke-test subprocess only
 - [ ] Validate WebKit's production sandbox on a real Linux host; container CI explicitly does not certify sandbox behavior
