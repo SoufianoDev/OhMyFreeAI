@@ -416,3 +416,6 @@
 - Debian 13 / GTK4-WebKitGTK 6.0 passed every stage in run 42404735351: dependencies, pkg-config, Wails CLI, real application build, WebView-to-Go twice, and database reopen.
 - Output included WEBVIEW_GO_BRIDGE_PASS attempt=1, WEBVIEW_GO_BRIDGE_PASS attempt=2 and WEBVIEW_REOPEN_PASS.
 - This confirms the new matrix and CI-only sandbox workaround work on Debian 13. Other seven distro lanes remain in progress/queued.
+
+
+- Ubuntu 24.04 / GTK4-WebKitGTK 6.0 has also passed the distro-container job in run 42404735351, including both WebView-to-Go markers and DB reopen. Debian 13 and Ubuntu 24.04 are now green; six other distro lanes remain.
