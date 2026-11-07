@@ -351,3 +351,10 @@
 
 - The distro workflow's branch-wide concurrency group left later matrix runs pending behind stale queued runs. Removed that group and set matrix `max-parallel: 4` to let the current eight-job matrix progress without spawning all eight containers simultaneously.
 - New run `42404614411` is queued with three distro jobs already in progress and the remaining jobs queued. This is a scheduling adjustment only; no compatibility result is inferred from queued jobs.
+
+
+## POSIX shell template correction — 2026-11-07T19:08Z
+
+- The latest eight-distro run failed immediately on all six started jobs with GitHub Actions `Invalid shell option`: `/bin/sh -e {0}` was not accepted as a valid shell template by the runner.
+- Replaced it with the supported built-in shell identifier `sh`. The previous missing-shell issue occurred while setup-python altered the container environment; setup-python has since been removed in favor of system Python, so the built-in shell should now resolve from the distro PATH.
+- No dependency installation, compilation or app smoke test was attempted in that failed run.
