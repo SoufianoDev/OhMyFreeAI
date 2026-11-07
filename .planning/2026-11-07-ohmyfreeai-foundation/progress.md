@@ -544,3 +544,12 @@
 - main remains unchanged at a1b12fbe5dd854c4619463eb1c7cccc0bd951941. No PR or merge was created.
 - foundation/bootstrap is 437 commits ahead / 0 behind main and changes 133 files. It was already 323 commits ahead at the start of this work; repeated per-file GitHub updates have made the history too granular for a review-ready PR.
 - No history rewrite was performed. Before opening a PR, prepare a squashed snapshot branch or obtain approval to rewrite the working branch. Current branch and tested code remain intact.
+
+
+## 2026-11-07T20:10Z — resumed foundation and started CLI TDD
+
+- Read the vendored Planning with Files v3.28.1 skill and restored the selected plan/findings/progress ledgers.
+- Verified latest Linux distro run 42405827037: all eight matrix jobs completed SUCCESS. Also verified the Wails and root CI workflows from the previous run were green.
+- Corrected the stale Phase 4 checklist and summary: all eight Linux distro smoke lanes are complete; bare-metal WebKit sandbox remains open.
+- Inspected current desktop entrypoint, AppService, application config service, backup archive manager, and developer CLI. The desktop entrypoint still unconditionally starts GUI; there is no application CLI dispatcher.
+- Applied ECC TDD workflow: added dispatch tests before implementation (commit eb2f0b0). Expected contract covers GUI default, help/version/doctor, unknown commands and unexpected args. CI run 42409735886 is pending/in progress; wait for actual RED evidence before implementation.
