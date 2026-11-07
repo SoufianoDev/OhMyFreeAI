@@ -561,3 +561,11 @@
 - Implemented the command parser and integrated it before GUI/database startup in the Wails entrypoint. Added read-only doctor diagnostics and updated CLI architecture documentation.
 - Verification in progress: root CI run 42409816192 (Ubuntu passed; Windows running); Wails native build run 42409847974 (Ubuntu and Windows building).
 - Next: inspect both platform results and any failures. Do not mark CLI complete on the parser unit tests alone; the generated Wails application must compile with the new entrypoint on both platforms.
+
+
+## 2026-11-07T20:14Z — parser GREEN, native CLI smoke added
+
+- Root CI run 42409816192 passed on Ubuntu and Windows, including Go vet/tests/build and existing validation suites. This validates the new parser and its test cases cross-platform.
+- Added a standard-library native executable smoke helper covering --help, --version, doctor, unknown command exit code, and a check that doctor creates no application config directory.
+- Added the CLI smoke to the native Wails Linux/Windows workflow and all eight Linux distro lanes; added py_compile coverage for the helper.
+- Native Wails run 42409974970 and Linux distro run 42410021330 are pending. Do not close CLI task until those executable-level tests pass.
