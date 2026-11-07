@@ -200,17 +200,15 @@ func TestMigrationHistoryGapIsRejected(t *testing.T) {
 	}
 	defer store.Close()
 
-	_, err = store.DB().ExecContext(ctx, `
-		CREATE TABLE schema_migrations (
-			version INTEGER PRIMARY KEY,
-			description TEXT NOT NULL,
-			applied_at TEXT NOT NULL
-		);
-		INSERT INTO schema_migrations(version, description, applied_at)
-		VALUES (1, 'first', '2026-11-07T00:00:00Z'), (3, 'third', '2026-11-07T00:00:00Z');
-	`)
+	_, err = store.DB().ExecContext(ctx,
+		"CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, description TEXT NOT NULL, applied_at TEXT NOT NULL)")
 	if err != nil {
-		t.Fatalf("create corrupt migration history fixture: %v", err)
+		t.Fatalf("create migration history fixture: %v", err)
+	}
+	_, err = store.DB().ExecContext(ctx,
+		"INSERT INTO schema_migrations(version, description, applied_at) VALUES (1, 'first', '2026-11-07T00:00:00Z'), (3, 'third', '2026-11-07T00:00:00Z')")
+	if err != nil {
+		t.Fatalf("insert corrupt migration history fixture: %v", err)
 	}
 
 	if err := store.Migrate(ctx, migrations.Files, "."); !errors.Is(err, ErrMigrationHistoryCorrupt) {
