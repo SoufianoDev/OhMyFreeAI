@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"path/filepath"
+	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -504,5 +506,75 @@ func TestStoreControllerCanceledCloseLeavesStoreAvailable(t *testing.T) {
 	}
 	if err := controller.Close(context.Background()); err != nil {
 		t.Fatalf("close controller after canceled close: %v", err)
+	}
+}
+
+func TestStoreControllerConcurrentLeaseStress(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	controller := NewStoreController(store)
+
+	var activeReaders atomic.Int32
+	var activeWriters atomic.Int32
+	var violations atomic.Int32
+	var workers sync.WaitGroup
+
+	for reader := 0; reader < 12; reader++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for i := 0; i < 80; i++ {
+				err := controller.WithShared(context.Background(), func(got *Store) error {
+					if got != store {
+						violations.Add(1)
+					}
+					if activeWriters.Load() != 0 {
+						violations.Add(1)
+					}
+					activeReaders.Add(1)
+					runtime.Gosched()
+					activeReaders.Add(-1)
+					return nil
+				})
+				if err != nil {
+					t.Errorf("shared stress operation: %v", err)
+					return
+				}
+			}
+		}()
+	}
+
+	for writer := 0; writer < 4; writer++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for i := 0; i < 40; i++ {
+				err := controller.WithExclusive(context.Background(), func(got *Store) (*Store, error) {
+					if got != store {
+						violations.Add(1)
+					}
+					if activeReaders.Load() != 0 || activeWriters.Add(1) != 1 {
+						violations.Add(1)
+					}
+					runtime.Gosched()
+					activeWriters.Add(-1)
+					return got, nil
+				})
+				if err != nil {
+					t.Errorf("exclusive stress operation: %v", err)
+					return
+				}
+			}
+		}()
+	}
+
+	workers.Wait()
+	if got := violations.Load(); got != 0 {
+		t.Fatalf("detected %d overlapping or stale-store lease violations", got)
+	}
+	if readers, writers := activeReaders.Load(), activeWriters.Load(); readers != 0 || writers != 0 {
+		t.Fatalf("leases remained active after stress test: readers=%d writers=%d", readers, writers)
+	}
+	if err := controller.Close(context.Background()); err != nil {
+		t.Fatalf("close controller: %v", err)
 	}
 }
