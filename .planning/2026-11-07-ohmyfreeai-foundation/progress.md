@@ -672,3 +672,31 @@
 - Raised the native WebView smoke deadline to 60 seconds, added explicit launch/first-call progress markers, retained the X11 socket readiness probe and captured Xvfb logs. The final 60-second version is in commit `c4d7bf5c`; current Wails retest `42415960222` is running and current eight-distro matrix `42415960198` is queued.
 - Added `docs/architecture/RESTORE_LIFECYCLE.md` and linked it from ADR_INDEX and SECURITY_AND_RECOVERY. It specifies a stable Store controller, shared/exclusive lifecycle leases, durable phase journal, staged restore verification, atomic publish, rollback, startup crash recovery and failure-injection tests.
 - Explicitly documented why restore remains disabled: current AppService and appconfig repository retain direct `*sqlite.Store` references; the infrastructure restore primitive has no durable transaction journal or application-level reopen/swap/rollback coordination.
+
+
+## Continuation session: 2026-11-07T22:04Z — Store lifecycle controller (TDD)
+
+### Work started
+- Confirmed the Linux distribution matrix run `42416221475` completed successfully across all eight lanes, including the Ubuntu 22.04 legacy GTK3/WebKit2GTK 4.1 live WebView-to-Go and two-launch SQLite reopen checks.
+- Re-read the active plan, restore lifecycle architecture, SQLite Store/config repository, backup manager, and Wails/CLI composition roots before changing implementation.
+- Added `internal/infrastructure/sqlite/store_controller_test.go` before the controller implementation. Tests cover:
+  - Exclusive lease waits for active shared leases to drain.
+  - Waiting exclusive lease blocks new shared leases (writer preference).
+  - Canceled exclusive wait releases its queue position and does not poison later operations.
+  - Nil Store is rejected by the checked constructor.
+  - Store replacement is only published under an exclusive lease; subsequent shared work sees the replacement.
+- Added `internal/infrastructure/sqlite/store_controller.go` with context-aware shared/exclusive lease coordination, writer preference, idempotent lease release, guarded Store replacement, and stable ConfigRepository Load/Save delegation.
+- Added a compile-time assertion that StoreController implements `ports.ConfigRepository`.
+- Kept the implementation isolated so far: Wails AppService, CLI backup composition, and the backup Manager have not yet been rewired to the controller. Restore remains disabled.
+
+### Verification state
+- Root CI, Wails, SQLite-driver, and Linux distribution workflows were triggered by implementation commits. Several earlier attempts were superseded/canceled by subsequent commits before their Go test steps ran.
+- The latest implementation revision still requires a complete, non-canceled root CI result on both Ubuntu and Windows. Do not mark the controller verified until `go vet ./...`, `go test ./...`, and `go build ./...` finish successfully.
+- No local Go execution was claimed. The source was committed through GitHub; CI is the execution environment for the repository's Go 1.27.3 toolchain.
+- No Colab session, model runtime, paid service, `main` branch, or user machine state was changed.
+
+### Remaining controller work
+- Wait for and inspect the full root CI result on the final controller commit.
+- Fix any test, race, vet, or cross-platform failures before proceeding.
+- Add controller-mediated backup export and rewire Wails/CLI composition so no long-lived service caches a raw Store.
+- Add further tests for repository operations and operation-drain behavior before beginning the durable restore journal.
