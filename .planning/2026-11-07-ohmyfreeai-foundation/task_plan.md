@@ -6,11 +6,11 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Complete repository and skills discovery, then publish the baseline architecture documents on the foundation/bootstrap branch.
+Publish the core architecture and policy documents, then establish the Go core/tooling skeleton without prematurely selecting a Wails major version.
 
 ## Current Phase
 
-Phase 1
+Phase 2
 
 ## Phases
 
@@ -18,14 +18,15 @@ Phase 1
 
 - [x] Recover the agreed v3.3 architecture and project constraints from conversation context
 - [x] Inspect the target repository and confirm its starting state
-- [ ] Inspect required Material Design and Kotlin Compose Kit skill repositories
-- [ ] Inspect the supplied prototype archives and Python scripts before adopting any behavior
-- [ ] Record findings and source boundaries
-- **Status:** in_progress
+- [x] Inspect required Material Design and Kotlin Compose Kit skill repositories
+- [x] Inspect the supplied prototype archives and Python scripts before adopting any behavior
+- [x] Record findings and source boundaries
+- **Status:** complete
 
 ### Phase 2: Planning & Structure
 
 - [ ] Establish architecture documentation and repository conventions
+- [ ] Vendor Planning with Files v3.28.1, Material 3 v1.1.1, and Compose component-design guidance under .agents/skills/
 - [ ] Define module boundaries, ports/adapters, runtime lifecycle, and state contracts
 - [ ] Define compatibility layers including Colab resource fit and verification levels
 - [ ] Define omfaibackup format and backward-compatibility policy
