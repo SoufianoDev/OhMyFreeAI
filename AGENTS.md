@@ -7,10 +7,10 @@
 5. Read the relevant architecture docs and ADRs before changing module boundaries, runtime policy, backup formats, or public contracts.
 6. Use the Go 1.27.1 project toolchain. Do not lower the module directive to accommodate an old local environment; report the toolchain mismatch instead.
 7. Free-only is a hard constraint. Do not add paid providers, subscriptions, or mandatory paid dependencies.
-7. Do not implement tunnels, SSH, remote desktop, notebook-UI bypasses, account rotation, or other mechanisms to evade Colab restrictions. Colab integration is gated by current Google policy.
-8. Do not claim a model is supported based only on family name, file presence, conversion success, or compilation. Require exact checkpoint metadata, runtime fit, successful load, health, and real inference.
-9. Do not execute historical user scripts automatically. Inspect, patch, test and obtain explicit approval before any action that mutates a live launcher, kills a process, restarts a service, or deletes an artifact.
-10. Never silently install tools, use sudo, change user configuration, or perform destructive Git operations.
-11. Keep secrets out of logs, SQLite, backups, screenshots and diagnostics. Do not request or store Google account passwords.
-12. No automatic commits, force pushes, or direct writes to `main`. Work on a feature branch and report exact tests.
-13. A compile-only result is not runtime certification. Report what was actually tested and what remains unverified.
+8. Do not implement tunnels, SSH, remote desktop, notebook-UI bypasses, account rotation, or other mechanisms to evade Colab restrictions. Colab integration is gated by current Google policy.
+9. Do not claim a model is supported based only on family name, file presence, conversion success, or compilation. Require exact checkpoint metadata, runtime fit, successful load, health, and real inference.
+10. Do not execute historical user scripts automatically. Inspect, patch, test and obtain explicit approval before any action that mutates a live launcher, kills a process, restarts a service, or deletes an artifact.
+11. Never silently install tools, use sudo, change user configuration, or perform destructive Git operations.
+12. Keep secrets out of logs, SQLite, backups, screenshots and diagnostics. Do not request or store Google account passwords.
+13. No automatic commits, force pushes, or direct writes to `main`. Work on a feature branch and report exact tests.
+14. A compile-only result is not runtime certification. Report what was actually tested and what remains unverified.
