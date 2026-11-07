@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -24,16 +25,30 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
         }
     )
 
+    xvfb = shutil.which("Xvfb")
+    if not xvfb:
+        raise RuntimeError("Xvfb is required for the Linux WebView smoke test.")
+    display = ":97"
     with log_path.open("wb") as output:
-        process = subprocess.Popen(
-            ["xvfb-run", "-a", str(binary)],
-            cwd=binary.parent,
-            env=env,
-            stdout=output,
-            stderr=subprocess.STDOUT,
+        display_process = subprocess.Popen(
+            [xvfb, display, "-screen", "0", "1280x820x24", "-nolisten", "tcp", "-ac"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
         )
-        deadline = time.monotonic() + 30
+        process = None
         try:
+            time.sleep(0.5)
+            if display_process.poll() is not None:
+                raise RuntimeError("Xvfb exited before the desktop application could start.")
+            env["DISPLAY"] = display
+            process = subprocess.Popen(
+                [str(binary)],
+                cwd=binary.parent,
+                env=env,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+            )
+            deadline = time.monotonic() + 30
             while time.monotonic() < deadline:
                 if marker.is_file():
                     value = marker.read_text(encoding="utf-8")
@@ -49,13 +64,20 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                 time.sleep(0.2)
             raise RuntimeError("Timed out waiting for the frontend-to-Go GetSnapshot call.")
         finally:
-            if process.poll() is None:
+            if process is not None and process.poll() is None:
                 process.terminate()
                 try:
                     process.wait(timeout=8)
                 except subprocess.TimeoutExpired:
                     process.kill()
                     process.wait(timeout=5)
+            if display_process.poll() is None:
+                display_process.terminate()
+                try:
+                    display_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    display_process.kill()
+                    display_process.wait(timeout=5)
 
     if not marker.is_file():
         details = log_path.read_text(encoding="utf-8", errors="replace")[-5000:]
@@ -72,7 +94,7 @@ def main() -> int:
         print(f"Desktop executable not found: {binary}", file=sys.stderr)
         return 2
     if os.name != "posix":
-        print("This smoke test requires Linux and xvfb-run.", file=sys.stderr)
+        print("This smoke test requires Linux and Xvfb.", file=sys.stderr)
         return 2
 
     try:
