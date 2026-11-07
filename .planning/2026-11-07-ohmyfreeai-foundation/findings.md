@@ -335,3 +335,13 @@
 - Added explicit system pkg-config search directories after setup actions and verifies the exact GTK/WebKit .pc modules before installing Wails.
 - The openSUSE container had a shell path resolution problem after package installation. Distro jobs now use an explicit absolute POSIX shell template, `/bin/sh -e {0}`, for all run steps; this avoids PATH-based Bash/sh lookup.
 - The previous d95838d4 run was cancelled while correcting these issues; Debian 12's only actual build failure was Python 3.13's GLIBC requirement, and openSUSE's pkg-config step was blocked by shell lookup. No distro was yet marked successful from that run.
+
+
+## Native Wails WebView smoke passed — 2026-11-07T19:04Z
+
+- Wails workflow run `42404058636` completed successfully on both Windows and Ubuntu 24.04.
+- Ubuntu native build and executable verification passed. The direct-Xvfb smoke test emitted `WEBVIEW_GO_BRIDGE_PASS attempt=1`, `WEBVIEW_GO_BRIDGE_PASS attempt=2` and `WEBVIEW_REOPEN_PASS`.
+- This proves the frontend successfully called the generated Go AppService.GetSnapshot method twice and the application reopened cleanly with the persisted SQLite state.
+- The CI-only WebKit sandbox disable is required because the GitHub-hosted runner cannot create the bubblewrap network namespace. It is confined to the smoke helper's child process; production defaults remain sandboxed.
+- This resolves the previous false signal attribution: the observed SIGTRAP came from bubblewrap/D-Bus setup, not the signal-10 warning. No JSC signal override was introduced.
+- Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42404058636
