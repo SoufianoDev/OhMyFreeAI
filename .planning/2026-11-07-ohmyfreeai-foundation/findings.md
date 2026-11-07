@@ -583,3 +583,10 @@
 
 
 - Workflow review caught that the first automated insertion updated the Linux distro path filter but did not add the execution step because the actual step name was `Launch twice and verify the live WebView-to-Go bridge`, not the expected label. Corrected the insertion against the exact current workflow content. Commit `5ccfb6f` now runs `smoke_cli.py` before the two-launch WebView test in every distro lane. No false test-pass claim was made.
+
+
+## Native Linux CLI smoke passed — 2026-11-07T20:16Z
+
+- Wails workflow run `42409974970` built the updated native Linux executable successfully.
+- Its `Smoke-test native CLI dispatch (Linux)` step completed SUCCESS before the WebView smoke. This exercises the actual generated executable for `--help`, `--version`, `doctor`, unknown-command exit code 2, and confirms doctor did not create the isolated config directory.
+- Linux WebView bridge/SQLite reopen remains in progress; Windows native build and CLI smoke remain in progress.
