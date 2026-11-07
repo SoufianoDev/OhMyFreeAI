@@ -590,3 +590,13 @@
 - Wails workflow run `42409974970` built the updated native Linux executable successfully.
 - Its `Smoke-test native CLI dispatch (Linux)` step completed SUCCESS before the WebView smoke. This exercises the actual generated executable for `--help`, `--version`, `doctor`, unknown-command exit code 2, and confirms doctor did not create the isolated config directory.
 - Linux WebView bridge/SQLite reopen remains in progress; Windows native build and CLI smoke remain in progress.
+
+
+## Native CLI smoke passed on Ubuntu and Windows — 2026-11-07T20:17Z
+
+- Wails native platform workflow `42409974970` completed SUCCESS on Ubuntu 24.04 and Windows.
+- Both actual generated executables passed `--help`, `--version`, `doctor`, and unknown-command exit code 2. The helper also confirmed `doctor` did not create the isolated application config directory.
+- Ubuntu also passed the two-stage native WebView-to-Go bridge and SQLite reopen smoke in the same run.
+- Root CI run `42410030822` completed SUCCESS on Ubuntu and Windows.
+- The remaining CLI verification is the eight-distro Linux matrix, now configured to execute the native CLI smoke in every lane (run `42410214638`, queued at this update).
+- Wails workflow: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42409974970
