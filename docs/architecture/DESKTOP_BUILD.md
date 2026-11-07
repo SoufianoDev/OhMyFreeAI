@@ -63,3 +63,6 @@ The native Ubuntu 24.04 and Windows jobs remain separate. Passing a distro conta
 ### CI sandbox boundary
 
 The Xvfb smoke test sets `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` and `GTK_A11Y=none` only in the child process environment used by GitHub Actions. GitHub-hosted/container runners deny the network-namespace operation required by WebKit's bubblewrap sandbox (`RTM_NEWADDR: Operation not permitted`), which otherwise makes the WebKit process fail before the application bridge can be tested. The sandbox-disable variable is explicitly documented by upstream WebKit as dangerous and is not written to application configuration, packaged launchers, or production runtime defaults. The CI smoke therefore verifies window startup, frontend loading, Go bridge invocation and database reopen, but does not certify WebKit sandbox operation; sandbox validation remains a separate host-level security test.
+
+
+The smoke marker is a monotonic call counter scoped to the test process: the generated entry point calls `GetSnapshot` once before dynamically importing the UI module, then calls it a second time after that module resolves and dispatches the returned snapshot to the UI. CI requires count=2. This distinguishes a native bridge failure from a frontend-module/bootstrap failure.
