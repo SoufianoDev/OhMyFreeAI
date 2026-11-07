@@ -345,3 +345,9 @@
 - The CI-only WebKit sandbox disable is required because the GitHub-hosted runner cannot create the bubblewrap network namespace. It is confined to the smoke helper's child process; production defaults remain sandboxed.
 - This resolves the previous false signal attribution: the observed SIGTRAP came from bubblewrap/D-Bus setup, not the signal-10 warning. No JSC signal override was introduced.
 - Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42404058636
+
+
+## Distro workflow scheduling correction — 2026-11-07T19:07Z
+
+- The distro workflow's branch-wide concurrency group left later matrix runs pending behind stale queued runs. Removed that group and set matrix `max-parallel: 4` to let the current eight-job matrix progress without spawning all eight containers simultaneously.
+- New run `42404614411` is queued with three distro jobs already in progress and the remaining jobs queued. This is a scheduling adjustment only; no compatibility result is inferred from queued jobs.
