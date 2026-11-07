@@ -471,3 +471,10 @@
 - Added Python unit tests for marker parsing and malformed values.
 - Corrected the regex newline escape after source inspection.
 - Verification pending in runs `42405708011` (CI), `42405708063` (Wails) and `42405708191` (Linux distro matrix), all queued at the time of this update.
+
+
+## 2026-11-07T19:23Z — bridge bootstrap sequencing
+
+- Reviewed the latest bridge bootstrap changes: native snapshot call before UI import, a second call after import, and explicit bridge-ready event carrying the snapshot.
+- Smoke helper now requires two successful native calls per process launch, matching the producer's count marker.
+- Awaiting CI/Wails/distro runs `42405729818`, `42405729902`, `42405729874`; no result inferred yet.
