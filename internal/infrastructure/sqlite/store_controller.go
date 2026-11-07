@@ -195,7 +195,22 @@ func (c *StoreController) WithExclusive(ctx context.Context, operation func(*Sto
 	}
 	defer release()
 
-	next, operationErr := operation(store)
+	var next *Store
+	var operationErr error
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				// The callback may have closed or replaced the active database
+				// before panicking. Its safety state is unknowable, so fail closed.
+				c.mu.Lock()
+				c.store = nil
+				c.signalLocked()
+				c.mu.Unlock()
+				panic(recovered)
+			}
+		}()
+		next, operationErr = operation(store)
+	}()
 	c.mu.Lock()
 	c.store = next
 	c.signalLocked()
