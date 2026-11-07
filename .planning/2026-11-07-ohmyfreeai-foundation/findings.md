@@ -552,3 +552,12 @@
 - Working branch `foundation/bootstrap` is `437` commits ahead and `0` behind `main`, with `133` changed files.
 - It was already 323 commits ahead when this work resumed. Incremental GitHub file-update operations have added further commits, so the history is too granular for a clean review. Do not open a PR from this branch without first preparing a squashed snapshot/branch.
 - No history rewrite was performed. The current branch remains intact and all verified workflow runs are linked above.
+
+
+## GUI-default CLI dispatcher — TDD RED stage — 2026-11-07T20:10Z
+
+- Reconciled the task plan with verified run `42405827037`: all eight Linux distro/stack lanes passed; prior plan text incorrectly still described openSUSE and Ubuntu 22.04 as outstanding.
+- Inspected the current Wails entrypoint and confirmed all arguments currently flow directly to `run()`; there is no application CLI dispatch yet.
+- Added `internal/application/cli/dispatch_test.go` first. It defines the contract: no arguments launch GUI; `--help/-h`, `--version/-v`, and `doctor` dispatch without GUI; unknown commands and unexpected arguments are explicit errors.
+- Commit: `eb2f0b0196afa4e7b706f881233abb75e6ede0b0`.
+- CI run `42409735886` is executing on Ubuntu and Windows. RED evidence is pending; do not implement until the targeted compile/test failure is confirmed.
