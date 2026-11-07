@@ -447,3 +447,10 @@
 - Added `TestExtractArchiveHonorsCancellation`.
 - GitHub Actions run `42405330049` passed on Ubuntu and Windows, including vet, Go tests/build, Python tests, frontend syntax and architecture checks.
 - Distro workflow run `42405097971` still exposes an openSUSE follow-up: Bash is reported installed but cannot be resolved by the next container step. The upcoming fix will inspect and export the verified executable directory via `GITHUB_PATH`.
+
+
+## Six Linux distro lanes passed — 2026-11-07T19:16Z
+
+- Debian 12 legacy GTK3/WebKit2GTK 4.1 passed the actual build, two WebView-to-Go calls and SQLite reopen. Both success markers and WEBVIEW_REOPEN_PASS were observed.
+- Six lanes are green in run 42404735351: Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Arch rolling, Fedora 44 legacy GTK3, Debian 12 legacy GTK3.
+- Ubuntu 22.04 legacy GTK3 built but the WebView smoke timed out without app output; the generated Go bridge was not observed. openSUSE installed dependencies but failed at the post-install shell lookup. Both are being retested with the current workflow.
