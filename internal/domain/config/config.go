@@ -46,10 +46,10 @@ type UIConfig struct {
 func Defaults() Config {
 	return Config{
 		SchemaVersion: CurrentSchemaVersion,
-		Gateway: GatewayConfig{Enabled: false, Host: "127.0.0.1", Port: 18081},
-		Engine: EngineConfig{ServerPort: 8081},
-		Runtime: RuntimeConfig{Provider: "colab"},
-		UI: UIConfig{Language: "ar", Theme: "system"},
+		Gateway:       GatewayConfig{Enabled: false, Host: "127.0.0.1", Port: 18081},
+		Engine:        EngineConfig{ServerPort: 8081},
+		Runtime:       RuntimeConfig{Provider: "colab"},
+		UI:            UIConfig{Language: "ar", Theme: "system"},
 	}
 }
 
