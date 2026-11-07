@@ -263,9 +263,7 @@ func TestBackupToProducesVerifiedSnapshot(t *testing.T) {
 		t.Fatalf("load configuration from backup: %v", err)
 	}
 	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("backup configuration mismatch:
- got: %#v
-want: %#v", actual, expected)
+		t.Fatalf("backup configuration mismatch:\n got: %#v\nwant: %#v", actual, expected)
 	}
 }
 
