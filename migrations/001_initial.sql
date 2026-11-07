@@ -8,10 +8,10 @@ CREATE TABLE schema_migrations (
 );
 
 CREATE TABLE app_settings (
-    singleton_id   INTEGER PRIMARY KEY CHECK (singleton_id = 1),
+    singleton_id  INTEGER PRIMARY KEY CHECK (singleton_id = 1),
     schema_version INTEGER NOT NULL CHECK (schema_version > 0),
-    config_json    TEXT NOT NULL,
-    updated_at     TEXT NOT NULL
+    config_json   TEXT NOT NULL,
+    updated_at    TEXT NOT NULL
 );
 
 CREATE TABLE model_revisions (
@@ -27,37 +27,37 @@ CREATE TABLE model_revisions (
 );
 
 CREATE TABLE artifacts (
-    id                TEXT PRIMARY KEY,
+    id              TEXT PRIMARY KEY,
     model_revision_id TEXT NOT NULL REFERENCES model_revisions(id) ON DELETE RESTRICT,
-    format            TEXT NOT NULL,
-    quantization      TEXT NOT NULL DEFAULT '',
-    file_name         TEXT NOT NULL,
-    size_bytes        INTEGER NOT NULL CHECK (size_bytes >= 0),
-    sha256            TEXT NOT NULL CHECK (length(sha256) = 64),
-    source_uri        TEXT NOT NULL DEFAULT '',
-    integrity_state   TEXT NOT NULL CHECK (integrity_state IN ('unknown', 'pending', 'verified', 'failed')),
-    created_at        TEXT NOT NULL,
+    format          TEXT NOT NULL,
+    quantization    TEXT NOT NULL DEFAULT '',
+    file_name       TEXT NOT NULL,
+    size_bytes      INTEGER NOT NULL CHECK (size_bytes >= 0),
+    sha256          TEXT NOT NULL CHECK (length(sha256) = 64 AND sha256 NOT GLOB '*[^0-9a-fA-F]*'),
+    source_uri_sanitized TEXT NOT NULL DEFAULT '',
+    integrity_state TEXT NOT NULL CHECK (integrity_state IN ('unknown', 'pending', 'verified', 'failed')),
+    created_at      TEXT NOT NULL,
     UNIQUE (sha256)
 );
 
 CREATE TABLE artifact_locations (
-    artifact_id  TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
-    store_kind   TEXT NOT NULL CHECK (store_kind IN ('local', 'drive', 'other')),
-    location_ref TEXT NOT NULL,
-    verified_at  TEXT NOT NULL DEFAULT '',
+    artifact_id     TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+    store_kind      TEXT NOT NULL CHECK (store_kind IN ('local', 'drive', 'other')),
+    location_ref    TEXT NOT NULL,
+    verified_at     TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (artifact_id, store_kind, location_ref)
 );
 
 CREATE TABLE engine_installations (
-    id           TEXT PRIMARY KEY,
-    version      TEXT NOT NULL,
-    target_os    TEXT NOT NULL,
-    target_arch  TEXT NOT NULL,
-    backend      TEXT NOT NULL,
-    asset_sha256 TEXT NOT NULL CHECK (length(asset_sha256) = 64),
-    install_path TEXT NOT NULL,
-    state        TEXT NOT NULL CHECK (state IN ('verified', 'installed', 'unhealthy', 'removed')),
-    created_at   TEXT NOT NULL,
+    id              TEXT PRIMARY KEY,
+    version         TEXT NOT NULL,
+    target_os       TEXT NOT NULL,
+    target_arch     TEXT NOT NULL,
+    backend         TEXT NOT NULL,
+    asset_sha256    TEXT NOT NULL CHECK (length(asset_sha256) = 64 AND asset_sha256 NOT GLOB '*[^0-9a-fA-F]*'),
+    install_path    TEXT NOT NULL,
+    state           TEXT NOT NULL CHECK (state IN ('verified', 'installed', 'unhealthy', 'removed')),
+    created_at      TEXT NOT NULL,
     UNIQUE (version, target_os, target_arch, backend)
 );
 
@@ -76,49 +76,52 @@ CREATE TABLE compatibility_assessments (
     reason_code                 TEXT NOT NULL DEFAULT '',
     minimum_requirements_json   TEXT NOT NULL DEFAULT '{}',
     tested_at                   TEXT NOT NULL,
-    expires_at                  TEXT NOT NULL DEFAULT ''
+    expires_at                  TEXT NOT NULL DEFAULT '',
+    CHECK (status NOT IN ('supported', 'supported_with_limits') OR
+        (artifact_integrity_verified = 1 AND engine_load_succeeded = 1 AND
+         health_check_passed = 1 AND inference_succeeded = 1))
 );
 
 CREATE TABLE runtime_sessions (
-    id         TEXT NOT NULL,
-    generation INTEGER NOT NULL CHECK (generation > 0),
-    provider   TEXT NOT NULL,
-    state      TEXT NOT NULL,
-    created_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
+    id              TEXT NOT NULL,
+    generation      INTEGER NOT NULL CHECK (generation > 0),
+    provider        TEXT NOT NULL,
+    state           TEXT NOT NULL,
+    created_at      TEXT NOT NULL,
+    updated_at      TEXT NOT NULL,
     PRIMARY KEY (id, generation)
 );
 
 CREATE TABLE download_jobs (
-    id                   TEXT PRIMARY KEY,
-    artifact_id          TEXT REFERENCES artifacts(id) ON DELETE SET NULL,
+    id                  TEXT PRIMARY KEY,
+    artifact_id         TEXT REFERENCES artifacts(id) ON DELETE SET NULL,
     source_uri_sanitized TEXT NOT NULL,
-    destination_ref      TEXT NOT NULL,
-    expected_size        INTEGER NOT NULL DEFAULT 0 CHECK (expected_size >= 0),
-    expected_sha256      TEXT NOT NULL DEFAULT '',
-    bytes_received       INTEGER NOT NULL DEFAULT 0 CHECK (bytes_received >= 0),
-    state                TEXT NOT NULL CHECK (state IN ('queued', 'preparing', 'downloading', 'verifying', 'completed', 'paused', 'cancelling', 'cancelled', 'failed', 'integrity_error')),
-    created_at           TEXT NOT NULL,
-    updated_at           TEXT NOT NULL
+    destination_ref     TEXT NOT NULL,
+    expected_size       INTEGER NOT NULL DEFAULT 0 CHECK (expected_size >= 0),
+    expected_sha256     TEXT NOT NULL DEFAULT '' CHECK (expected_sha256 = '' OR (length(expected_sha256) = 64 AND expected_sha256 NOT GLOB '*[^0-9a-fA-F]*')),
+    bytes_received      INTEGER NOT NULL DEFAULT 0 CHECK (bytes_received >= 0),
+    state               TEXT NOT NULL CHECK (state IN ('queued', 'preparing', 'downloading', 'verifying', 'completed', 'paused', 'cancelling', 'cancelled', 'failed', 'integrity_error')),
+    created_at          TEXT NOT NULL,
+    updated_at          TEXT NOT NULL
 );
 
 CREATE TABLE client_integrations (
-    id               TEXT PRIMARY KEY,
-    client_name      TEXT NOT NULL,
-    config_path_ref  TEXT NOT NULL,
-    backup_reference TEXT NOT NULL DEFAULT '',
-    state            TEXT NOT NULL,
-    updated_at       TEXT NOT NULL,
+    id                  TEXT PRIMARY KEY,
+    client_name         TEXT NOT NULL,
+    config_path_ref     TEXT NOT NULL,
+    backup_reference    TEXT NOT NULL DEFAULT '',
+    state               TEXT NOT NULL,
+    updated_at          TEXT NOT NULL,
     UNIQUE (client_name, config_path_ref)
 );
 
 CREATE TABLE operational_events (
-    id                    TEXT PRIMARY KEY,
-    entity_type           TEXT NOT NULL,
-    entity_id             TEXT NOT NULL,
-    generation            INTEGER NOT NULL DEFAULT 0,
-    event_type            TEXT NOT NULL,
-    occurred_at           TEXT NOT NULL,
+    id              TEXT PRIMARY KEY,
+    entity_type     TEXT NOT NULL,
+    entity_id       TEXT NOT NULL,
+    generation      INTEGER NOT NULL DEFAULT 0,
+    event_type      TEXT NOT NULL,
+    occurred_at     TEXT NOT NULL,
     details_redacted_json TEXT NOT NULL DEFAULT '{}'
 );
 
