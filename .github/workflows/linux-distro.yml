@@ -84,7 +84,7 @@ jobs:
 
     steps:
       - name: Install native desktop build and virtual-display dependencies
-        shell: /bin/sh
+        shell: sh
         env:
           DISTRO_FAMILY: ${{ matrix.family }}
           BUILD_STACK: ${{ matrix.stack }}
