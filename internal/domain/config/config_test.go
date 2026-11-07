@@ -34,3 +34,20 @@ func TestEnabledGatewayRequiresSecretReference(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestRejectsRawGatewaySecret(t *testing.T) {
+	c := Defaults()
+	c.Gateway.Enabled = true
+	c.Gateway.AuthSecretRef = "sk-live-this-is-not-a-reference"
+	if err := c.Validate(); !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("expected raw secret to be rejected, got %v", err)
+	}
+}
+
+func TestGatewayAndEnginePortsMustDiffer(t *testing.T) {
+	c := Defaults()
+	c.Engine.ServerPort = c.Gateway.Port
+	if err := c.Validate(); !errors.Is(err, ErrInvalidConfig) {
+		t.Fatalf("expected duplicate port to be rejected, got %v", err)
+	}
+}
