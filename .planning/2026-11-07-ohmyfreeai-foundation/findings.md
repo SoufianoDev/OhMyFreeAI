@@ -616,3 +616,10 @@
 - The same Ubuntu 22.04 lane had passed in the earlier full matrix run `42405827037`, so this is intermittent or environment-sensitive; the evidence does not identify a root cause. It is not a compiler or dependency-install failure.
 - The current smoke script uses a fixed Xvfb display :97 and a 500 ms startup delay. These are hypotheses to inspect only if the current rerun reproduces; do not change GTK/WebKit code based on this one failure.
 - Latest full CLI-enabled distro rerun `42410214638` is testing the current revision and will provide the next comparison. All other completed jobs in `42409848051` passed; Debian 12 was still running at inspection.
+
+
+## CLI-enabled Linux matrix partial success — 2026-11-07T20:19Z
+
+- Current run `42410214638` has passed the native CLI smoke and two-launch WebView/SQLite smoke on Ubuntu 24.04, Debian 13 and Fedora 44 GTK4.
+- Arch Linux, Ubuntu 22.04, Fedora 44 GTK3 and openSUSE are still running; Debian 12 is queued.
+- This is the first matrix that executes the actual native CLI helper on each distro. Do not mark the eight-lane CLI task complete yet.
