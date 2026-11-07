@@ -63,6 +63,11 @@ jobs:
             family: suse
             stack: gtk4-webkit6
             build_tags: ""
+          - distro: Fedora 44 legacy GTK3
+            image: fedora:44
+            family: fedora
+            stack: legacy-gtk3-webkit41
+            build_tags: gtk3
 
           # Wails v3.0.x compatibility lane for WebKit2GTK 4.1 systems.
           - distro: Ubuntu 22.04
@@ -75,11 +80,7 @@ jobs:
             family: debian
             stack: legacy-gtk3-webkit41
             build_tags: gtk3
-          - distro: Rocky Linux 9
-            image: rockylinux:9
-            family: fedora
-            stack: legacy-gtk3-webkit41
-            build_tags: gtk3
+
 
     steps:
       - name: Install native desktop build and virtual-display dependencies
@@ -94,7 +95,7 @@ jobs:
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
                 build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev \
-                xvfb xauth dbus-x11 libegl1-mesa libgl1-mesa-dri libgbm1 \
+                xvfb xauth dbus-x11 libegl1 libgl1-mesa-dri libgbm1 \
                 libx11-xcb1 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
                 libxrender1 libxtst6 libxi6 libxkbcommon-x11-0 libwayland-client0 \
                 libdrm2 curl git ca-certificates
@@ -129,7 +130,7 @@ jobs:
             suse:gtk4-webkit6)
               zypper --non-interactive refresh
               zypper --non-interactive install --no-recommends \
-                gcc gcc-c++ pkg-config gtk4-devel webkitgtk-6_0-devel \
+                gcc gcc-c++ pkg-config gtk4-devel webkitgtk4-devel \
                 xorg-x11-server-Xvfb xauth Mesa-dri libX11-xcb1 libXcomposite1 \
                 libXdamage1 libXfixes3 libXrandr2 libXrender1 libXtst6 libXi6 \
                 libxkbcommon-x11-0 libwayland-client0 libdrm2 curl git ca-certificates
