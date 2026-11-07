@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Implement the selected Wails v3.0.0 desktop adapter with real application services and lifecycle handling. Implement the selected modernc.org/sqlite v1.62.0 persistence adapter and transactional migration runner. Keep the domain/application layers framework- and driver-independent. Then add actual WebView call tests, abrupt-crash recovery, backup API tests, packaging and Linux distro validation.
+Continue from the implemented Wails v3.0.0 shell and modernc.org/sqlite v1.62.0 persistence adapter. Next add a live WebView-to-Go invocation test, abrupt-crash recovery, SQLite backup API/restore, then finish prototype audit, packaging, Linux distro coverage and full diff review.
 
 ## Current Phase
 
@@ -40,17 +40,24 @@ Phase 4
 - [x] Add Linux/Windows GitHub Actions validation workflow
 - [x] Add a pinned Wails v3.0.0 official vanilla-js starter build proof to GitHub Actions; do not lock the app to Wails until native jobs pass
 - [x] Extend the Wails proof to generate and assert the starter's Go-to-JavaScript GreetService binding on both native runners
-- [x] Select Wails v3.0.0 after the official starter and generated service-binding builds passed on Ubuntu 24.04 and Windows
+- [x] Select Wails v3.0.0 after official and application-specific builds passed on Ubuntu 24.04 and Windows
+- [x] Add the actual Wails AppService with GetSnapshot and SaveConfig methods; generate and verify the JavaScript binding
+- [x] Add a reproducible Python build script that generates the official Wails template in a temporary workspace and builds the real application
 - [x] Select modernc.org/sqlite v1.62.0 after the Linux/Windows driver matrix and production migration SQL passed
+- [x] Implement the production SQLite Store, per-connection PRAGMAs, transactional migration runner and validated config repository
+- [x] Pin modernc dependency graph in go.mod/go.sum and verify tidy does not change committed lockfiles
 - [x] Add an isolated SQLite driver evaluation module and Ubuntu/Windows matrix for modernc and ncruces; keep experimental dependencies out of the production module
 - [x] Establish the initial bilingual Material 3 web shell using the repository's Material Design skill
 - [x] Preserve historical Colab scripts and launcher behavior unchanged; keep remote-inference activation policy-gated
-**Status:** in_progress
+**Status:** complete
 
 ### Phase 4: Testing & Verification
 
 - [x] Run repository Go vet/tests/build, Python tests, frontend syntax and architecture checks on Ubuntu and Windows via GitHub Actions
 - [x] Evaluate modernc and ncruces on Ubuntu and Windows, including the production initial migration SQL
+- [x] Test the production SQLite adapter, migration rollback/idempotence, config round-trip, file permissions and per-connection PRAGMAs on Ubuntu and Windows
+- [x] Build the complete Wails application on Ubuntu and Windows; generate 1 service, 2 methods and 7 models, produce the Vite production bundle and verify the native executable
+- [x] Pin and verify Go dependency lockfiles in CI
 - [ ] Run documentation/link validation and review all source changes
 - [ ] Verify the original prototype path and identify unverified assumptions
 - [ ] Add actual desktop WebView-to-Go invocation, crash-recovery and production backup/restore tests
@@ -71,7 +78,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Resolved so far: Wails v3.0.0 official starter + GreetService binding builds passed on Ubuntu 24.04 and Windows. Root Go/Python/frontend/architecture CI passed on both OSes. modernc.org/sqlite v1.62.0 and ncruces v0.37.0 passed the evaluation matrix on both OSes, including applying migrations/001_initial.sql; modernc is selected for production. The actual Wails adapter, production SQLite adapter/migration runner, packaging, crash recovery and broad Linux distro support remain unimplemented. Colab remote-inference activation remains policy-gated.
+Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows, with one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView invocation testing, abrupt-crash recovery, SQLite backup/restore API, long-duration stress/performance, dependency license inventory, broader Linux distro coverage, packaging/uninstall and historical prototype audit. Colab remote-inference activation remains policy-gated.
 
 ## Decisions Made
 
@@ -82,10 +89,10 @@ Resolved so far: Wails v3.0.0 official starter + GreetService binding builds pas
 | Preserve the Colab + llama.cpp + Gateway + OpenCode path until audited | It is the only proven direction in the existing project history |
 | Backup extension/name is omfaibackup | Explicit user decision |
 | Use Planning with Files structure under .planning | Persistent task state, isolated from future tasks |
-| Select Wails v3.0.0 as the desktop shell | Official starter and generated Go service binding built on Ubuntu 24.04 and Windows; app-specific lifecycle and packaging still require implementation |
+| Select Wails v3.0.0 as the desktop shell | The actual OhMyFreeAI app, AppService binding and Vite production bundle build on Ubuntu 24.04 and Windows; live WebView invocation and packaging remain unverified |
 | Select modernc.org/sqlite v1.62.0 for the SQLite adapter | Both CGO-free candidates passed Linux/Windows smoke tests and the initial migration; modernc avoids the WASM VFS and documented per-connection memory overhead of ncruces |
 | Do not claim the skill is installed in the agent runtime | The available environment has no writable agent-home mount; repository vendoring is the durable project-level route |
-| Keep Wails version undecided | v3 is current stable but needs Go 1.26+/GTK4/WebKitGTK 6; v2 has a different platform baseline. Verify on Linux and Windows before selecting |
+| Keep Wails confined to the desktop adapter | Core domain/application packages remain Wails-independent; the desktop build is generated from the pinned official vanilla-js template in a temporary workspace |
 
 ## Errors Encountered
 
@@ -97,7 +104,11 @@ Resolved so far: Wails v3.0.0 official starter + GreetService binding builds pas
 | Policy-gate Go test failed after adding required policy revision | 1 | Add the missing revision to the test fixture and rerun the full Go suite |
 | Browser blocked file:// and localhost navigation | 1 | Use Playwright page.set_content() with inline local assets |
 | Playwright locator matched both nav and quick-access buttons | 1 | Target unique data-page selectors and rerun successfully |
-| Planning phase status markers initially included a list bullet | 1 | Corrected to the upstream `**Status:** value` format and manually revalidated all five phases |
+| Planning phase status markers initially included a list bullet | 1 | Corrected to the upstream **Status:** value format and manually revalidated all five phases |
+| Initial Wails build script passed the project folder as the CLI destination parent | 1 | Read the Wails init output, pass a workspace parent to -d, and rebuild the real app successfully on both OSes |
+| Go test source contained a literal newline inside a quoted format string | 1 | Escaped the newline and reran Go vet/tests/build on Ubuntu and Windows |
+| SQL splitter source template emitted malformed quote/newline rune literals | 1 | Replaced ambiguous escaped byte literals with numeric byte constants and reran the full Go matrix |
+| Windows Wails build printed a non-fatal "-VThe system cannot find the file specified." line | 1 | Native executable and binding generation still succeeded; source of the message is not yet identified and remains a tracked warning |
 
 ## Notes
 
