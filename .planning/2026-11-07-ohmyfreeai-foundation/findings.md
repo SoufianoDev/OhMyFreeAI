@@ -381,3 +381,14 @@
 - openSUSE dependency installation now completes and installs both `bash` and `Xvfb`, but the later built-in `sh` step cannot be resolved (`exec: "sh": executable file not found in $PATH`). The minimal image does not expose a stable `sh` command after its package transaction.
 - The initial package bootstrap successfully starts with `sh`; subsequent steps will now use `bash`, which the bootstrap explicitly installs. setup-python has been removed, so its earlier PATH mutation is no longer present.
 - openSUSE reached package installation but not pkg-config, compilation or smoke. It remains unverified.
+
+
+## Workflow incident review — 2026-11-07T19:13Z
+
+- Inspected GitHub Actions runs and job logs on `foundation/bootstrap`; the recent Linux distro failures are successive, distinct workflow bootstrap defects, not application compilation failures.
+- Run `42404677398` failed before package installation because the workflow supplied an invalid shell template (`/bin/sh`); no build or smoke test ran.
+- Run `42404735351` fixed the shell identifier sufficiently for seven distro lanes to proceed. Debian 13, Arch Linux rolling, Fedora 44 GTK4, and Ubuntu 24.04 GTK4 completed successfully; the openSUSE job failed after package installation because later runner steps attempted to execute `sh`, which was no longer available in that container's PATH. Its dependency installation did install Bash.
+- The current branch head `64bad8bfae11b5f67cf6fa55931aecaf857e66d4` changes the distro job default to Bash while retaining a bootstrap step that uses the available POSIX shell to install Bash on openSUSE. Run `42405097971` is testing that exact correction; it is queued/in progress at the time of review. Do not claim it passed until completed.
+- Earlier failures have separate fixes already present: Debian 12's toolcache Python required GLIBC 2.38 while Debian 12 provides 2.36 (use distro Python); GTK3 compatibility requires `-tags gtk3` for both Wails CLI and app; setup actions can alter pkg-config search paths (explicit distro paths); WebKit smoke on hosted runners fails bubblewrap network namespace creation (disable sandbox only in CI smoke subprocess, never production).
+- The repeated signal-10 WebKit/JSC warning was not the cause of the observed GTK SIGTRAP; the root cause was bubblewrap network namespace / D-Bus credential failure.
+- OpenSUSE remains the only demonstrated failure in run `42404735351`; other legacy GTK3 jobs were still running when inspected, so their result was not inferred.
