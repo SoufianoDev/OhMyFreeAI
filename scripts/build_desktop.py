@@ -83,7 +83,8 @@ def build(output_directory: Path) -> Path:
 
     with tempfile.TemporaryDirectory(prefix="wails-", dir=build_root) as temporary:
         temporary_root = Path(temporary)
-        project = temporary_root / "OhMyFreeAI"
+        project_parent = temporary_root / "workspace"
+        project = project_parent / "OhMyFreeAI"
 
         run(
             [
@@ -94,7 +95,7 @@ def build(output_directory: Path) -> Path:
                 "-t",
                 "vanilla-js",
                 "-d",
-                str(project),
+                str(project_parent),
                 "-mod",
                 MODULE_PATH,
                 "-skipgomodtidy",
