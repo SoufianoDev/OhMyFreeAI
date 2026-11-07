@@ -296,3 +296,13 @@
 
 - The POSIX bootstrap step installed Bash and confirmed `/usr/bin/Xvfb`, but a later GitHub Actions run step still failed with OCI `exec: "bash": executable file not found in $PATH`. The package manager reported Bash was already installed; the runner's subsequent container-shell resolution still did not find it.
 - Removed dependence on Bash entirely for the distro-container job by setting job-level `defaults.run.shell: sh`. All run blocks in this job use POSIX-compatible syntax. This is a CI container-shell compatibility fix, not an application defect.
+
+
+## Upstream Wails / JavaScriptCore signal investigation — 2026-11-07T18:53Z
+
+- Upstream WebKit source confirms JavaScriptCore uses SIGUSR1 (Linux signal 10) by default for GC thread suspend/resume. `JSC_SIGNAL_FOR_GC` is parsed as a numeric signal number using `sscanf("%d")`; a numeric value such as `12` is accepted, whereas the string `SIGUSR2` is not accepted by this parser.
+- Important: do not blindly set `JSC_SIGNAL_FOR_GC=12`. Wails v3 explicitly documents that it must not add `SA_ONSTACK` to SIGUSR1 because JSC owns that signal; forcing Go's alternate stack on it can break JSC GC synchronisation and freeze WebKit.
+- Wails v3.0.0 source already includes the upstream Linux signal mitigation: apply `SA_ONSTACK` to Go-required signals (including SIGSEGV/SIGBUS), exclude SIGUSR1, start a 50ms × 100 (5 second) signal-handler reapplication timer when the first WebView is created, and reapply on WebKit load-finished.
+- Relevant upstream changes: Wails commit `6329e9d` (periodic reapply for JSC lazy initialization) and `ef782b7` (do not force SA_ONSTACK on SIGUSR1). The exact v3.0.0 source contains both code paths. The current failure therefore cannot be attributed simply to missing upstream signal code; need inspect the complete first lines of the fatal report and determine whether the crash is a remaining timing/runtime issue or a different native fault.
+- The smoke helper currently reports only the tail of the native process log, which omitted the fatal error headline. Next change should include both the first and last sections of the captured log, then reproduce before changing JSC signal configuration.
+- Source: https://bugs.webkit.org/show_bug.cgi?id=220641 ; https://bugs.webkit.org/show_bug.cgi?id=221081 ; https://github.com/wailsapp/wails/commit/6329e9d2bec94a6916b9a700667b78a9569a3d9b ; https://github.com/wailsapp/wails/commit/ef782b77c892b6a7e45c3227f73fb0e20d0ed600 ; https://raw.githubusercontent.com/wailsapp/wails/v3.0.0/v3/pkg/application/linux_cgo.c
