@@ -24,11 +24,16 @@ class FrontendFoundationTests(unittest.TestCase):
         parser.feed(html)
         self.assertEqual(len(parser.ids), len(set(parser.ids)))
         for required in ("page-dashboard", "page-models", "page-runtime", "page-settings"):
-            self.assertIn("backup-export", parser.ids)
-            self.assertIn("backup-inspect", parser.ids)
-            self.assertIn("backup-status", parser.ids)
+            self.assertIn(required, parser.ids)
+        for required in ("backup-export", "backup-inspect", "backup-status", "backup-details"):
             self.assertIn(required, parser.ids)
         self.assertRegex(html, r'<html[^>]*lang="ar"[^>]*dir="rtl"')
+
+    def test_desktop_bridge_exposes_backup_actions(self):
+        source = (ROOT / "scripts" / "build_desktop.py").read_text(encoding="utf-8")
+        for method in ("ExportBackup", "InspectBackup"):
+            self.assertIn(method, source)
+        self.assertIn("Object.freeze({ GetSnapshot, SaveConfig, ExportBackup, InspectBackup })", source)
 
     def test_stylesheets_have_balanced_rule_blocks(self):
         for relative in ("frontend/styles/tokens.css", "frontend/styles/app.css"):
