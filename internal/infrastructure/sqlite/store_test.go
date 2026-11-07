@@ -536,3 +536,48 @@ func TestRestoreDatabaseRefusesNonSQLiteTarget(t *testing.T) {
 		t.Fatalf("unrelated target file changed: %q", actual)
 	}
 }
+
+
+func TestRestoreDatabaseRejectsCorruptSourceAndPreservesTarget(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	targetPath := filepath.Join(directory, "target.db")
+	targetStore, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("open target database: %v", err)
+	}
+	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate target database: %v", err)
+	}
+	expected := config.Defaults()
+	expected.Gateway.Port = 18084
+	if err := targetStore.Save(ctx, expected); err != nil {
+		t.Fatalf("save target configuration: %v", err)
+	}
+	if err := targetStore.Close(); err != nil {
+		t.Fatalf("close target database: %v", err)
+	}
+
+	corruptBackup := filepath.Join(directory, "corrupt.sqlite")
+	if err := os.WriteFile(corruptBackup, []byte("not a SQLite backup"), 0o600); err != nil {
+		t.Fatalf("write corrupt backup fixture: %v", err)
+	}
+	if _, err := RestoreDatabase(ctx, corruptBackup, targetPath, migrations.Files, "."); !errors.Is(err, ErrRestoreSourceInvalid) {
+		t.Fatalf("expected invalid-source error, got %v", err)
+	}
+
+	verifiedStore, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("reopen unchanged target database: %v", err)
+	}
+	defer verifiedStore.Close()
+	actual, err := verifiedStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load unchanged target configuration: %v", err)
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("target changed after rejected restore:
+ got: %#v
+want: %#v", actual, expected)
+	}
+}
