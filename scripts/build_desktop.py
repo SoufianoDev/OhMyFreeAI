@@ -15,7 +15,6 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = "github.com/SoufianoDev/OhMyFreeAI/desktop"
 ROOT_MODULE = "github.com/SoufianoDev/OhMyFreeAI"
-WAILS_VERSION = "v3.0.0"
 
 
 def run(command: list[str], cwd: Path) -> None:
@@ -133,7 +132,8 @@ def build(output_directory: Path) -> Path:
             raise RuntimeError("Wails build did not produce the OhMyFreeAI executable.")
 
         binary = sorted(binaries, key=lambda path: path.suffix.lower() == ".exe")[0]
-        destination = output_directory / binary.name
+        target_name = "OhMyFreeAI.exe" if os.name == "nt" else "OhMyFreeAI"
+        destination = output_directory / target_name
         shutil.copy2(binary, destination)
         return destination
 
