@@ -61,6 +61,11 @@
 - Project architecture baseline: Architecture Foundation v3.3 in project conversation context
 - Uploaded historical inputs: /mnt/data/SoufianoDev-Monitor-GUI-Remote-Complete.zip, /mnt/data/SoufianoDev-Monitor-GUI.zip, /mnt/data/fix-soufianodev-free-ai.py, /mnt/data/fix-soufianodev-sse-framing.py, /mnt/data/monitor-soufianodev-free-ai.py
 
+## Toolchain Findings
+
+- Official Go release history lists Go 1.27.3 as the latest stable patch available on 2026-11-07 (released 2026-10-19). The project module and CI target are set to Go 1.27.3. The local container remains on Go 1.23.2, so it cannot validate the declared module toolchain directly.
+- Official Wails v3.0.0 docs list v3 as stable and require Go 1.26+; Wails v3's setup wizard is experimental and primarily tested on Linux. The official JavaScript template is `vanilla-js`; exact command: `wails3 init -n myapp -t vanilla-js`.
+
 ## Implementation Findings
 
 - Added a Go 1.23 framework-independent core module. The Wails dependency is intentionally not added to the core while v2/v3 selection remains open.
