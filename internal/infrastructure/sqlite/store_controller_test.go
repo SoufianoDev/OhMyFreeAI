@@ -383,3 +383,72 @@ func TestStoreControllerReleasesSharedLeaseWhenOperationPanics(t *testing.T) {
 		t.Fatalf("close controller: %v", err)
 	}
 }
+
+func TestStoreControllerCanceledWriterStopsBlockingNewReaders(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	controller := NewStoreController(store)
+
+	firstEntered := make(chan struct{})
+	releaseFirst := make(chan struct{})
+	firstDone := make(chan error, 1)
+	go func() {
+		firstDone <- controller.WithShared(context.Background(), func(*Store) error {
+			close(firstEntered)
+			<-releaseFirst
+			return nil
+		})
+	}()
+	<-firstEntered
+
+	writerContext, cancelWriter := context.WithCancel(context.Background())
+	writerDone := make(chan error, 1)
+	go func() {
+		writerDone <- controller.WithExclusive(writerContext, func(current *Store) (*Store, error) {
+			return current, nil
+		})
+	}()
+	deadline := time.Now().Add(time.Second)
+	for {
+		controller.mu.Lock()
+		waiting := controller.waitingWriters
+		controller.mu.Unlock()
+		if waiting > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			cancelWriter()
+			t.Fatal("writer did not register before cancellation")
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	cancelWriter()
+	if err := <-writerDone; !errors.Is(err, context.Canceled) {
+		t.Fatalf("canceled writer error = %v, want context.Canceled", err)
+	}
+
+	secondEntered := make(chan struct{})
+	secondDone := make(chan error, 1)
+	go func() {
+		secondDone <- controller.WithShared(context.Background(), func(*Store) error {
+			close(secondEntered)
+			return nil
+		})
+	}()
+	select {
+	case <-secondEntered:
+	case <-time.After(time.Second):
+		t.Fatal("canceled writer continued blocking readers while another reader held the store")
+	}
+	if err := <-secondDone; err != nil {
+		t.Fatalf("second shared operation: %v", err)
+	}
+
+	close(releaseFirst)
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first shared operation: %v", err)
+	}
+	if err := controller.Close(context.Background()); err != nil {
+		t.Fatalf("close controller: %v", err)
+	}
+}
