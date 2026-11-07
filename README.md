@@ -10,7 +10,7 @@ OhMyFreeAI is a cross-platform desktop application focused on managing model art
 
 - Free-only. No paid hosting, model APIs, or mandatory paid dependencies.
 - Linux and Windows are first-class targets; macOS is deferred.
-- Go owns application logic and lifecycle.
+- Go 1.27.1 is the target toolchain; Go owns application logic and lifecycle.
 - Wails is a desktop-shell candidate; its major version is not locked until the Linux/Windows proof-of-concept passes.
 - Frontend: semantic HTML, CSS, and JavaScript ES modules, using Material Design 3 tokens and accessible interaction patterns.
 - SQLite is the planned application store.
