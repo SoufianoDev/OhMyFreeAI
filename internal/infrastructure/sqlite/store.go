@@ -36,6 +36,16 @@ type Store struct {
 // Open creates or opens a private local database file and configures every
 // connection with foreign-key enforcement and a bounded busy timeout.
 func Open(ctx context.Context, databasePath string) (*Store, error) {
+	return openStore(ctx, databasePath, true)
+}
+
+// OpenExisting opens a previously created database without creating its file
+// or parent directory and without changing their filesystem permissions.
+func OpenExisting(ctx context.Context, databasePath string) (*Store, error) {
+	return openStore(ctx, databasePath, false)
+}
+
+func openStore(ctx context.Context, databasePath string, create bool) (*Store, error) {
 	if databasePath == "" || strings.TrimSpace(databasePath) == "" || databasePath == ":memory:" {
 		return nil, ErrInvalidDatabasePath
 	}
@@ -54,24 +64,44 @@ func Open(ctx context.Context, databasePath string) (*Store, error) {
 		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
 			return nil, fmt.Errorf("%w: database path must be a regular file, not a symlink or special file", ErrInvalidDatabasePath)
 		}
-	} else if !errors.Is(err, os.ErrNotExist) {
+	} else if errors.Is(err, os.ErrNotExist) {
+		if !create {
+			return nil, os.ErrNotExist
+		}
+	} else {
 		return nil, fmt.Errorf("inspect SQLite database path: %w", err)
 	}
 
 	databaseDirectory := filepath.Dir(absolutePath)
-	if err := os.MkdirAll(databaseDirectory, 0o700); err != nil {
-		return nil, fmt.Errorf("create SQLite database directory: %w", err)
+	if create {
+		if err := os.MkdirAll(databaseDirectory, 0o700); err != nil {
+			return nil, fmt.Errorf("create SQLite database directory: %w", err)
+		}
+		if err := os.Chmod(databaseDirectory, 0o700); err != nil {
+			return nil, fmt.Errorf("restrict SQLite database directory permissions: %w", err)
+		}
 	}
-	if err := os.Chmod(databaseDirectory, 0o700); err != nil {
-		return nil, fmt.Errorf("restrict SQLite database directory permissions: %w", err)
+
+	flags := os.O_RDWR
+	if create {
+		flags |= os.O_CREATE
 	}
-	file, err := os.OpenFile(absolutePath, os.O_CREATE|os.O_RDWR, 0o600)
+	file, err := os.OpenFile(absolutePath, flags, 0o600)
 	if err != nil {
-		return nil, fmt.Errorf("create SQLite database file: %w", err)
+		return nil, fmt.Errorf("open SQLite database file: %w", err)
 	}
-	if err := file.Chmod(0o600); err != nil {
+	if info, statErr := file.Stat(); statErr != nil {
 		_ = file.Close()
-		return nil, fmt.Errorf("restrict SQLite database file permissions: %w", err)
+		return nil, fmt.Errorf("inspect opened SQLite database: %w", statErr)
+	} else if !info.Mode().IsRegular() {
+		_ = file.Close()
+		return nil, fmt.Errorf("%w: opened database is not a regular file", ErrInvalidDatabasePath)
+	}
+	if create {
+		if err := file.Chmod(0o600); err != nil {
+			_ = file.Close()
+			return nil, fmt.Errorf("restrict SQLite database file permissions: %w", err)
+		}
 	}
 	if err := file.Close(); err != nil {
 		return nil, fmt.Errorf("close SQLite database file: %w", err)
