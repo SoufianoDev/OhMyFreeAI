@@ -513,3 +513,7 @@
 
 
 - openSUSE Tumbleweed in run 42405729874 (without the later GITHUB_PATH restoration, but with setup-python removed) successfully passed the dependency bootstrap, checkout, Go/Node setup and pkg-config configuration, and reached Wails CLI install under built-in sh. This narrows the earlier shell lookup issue to the removed setup-python/toolcache environment. The newer PATH restoration remains an extra guard, not a proven requirement. openSUSE's build and smoke are still pending.
+
+
+- openSUSE Tumbleweed / GTK4-WebKitGTK 6.0 passed the full current two-stage bridge job in run 42405729874. Output confirmed two successful GetSnapshot calls and database reopen. This run used built-in sh successfully after setup-python had been removed; the additional PATH restoration was not needed for this pass.
+- Five of eight current lanes are green: Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Arch rolling and openSUSE. Three legacy GTK3 lanes remain in progress.
