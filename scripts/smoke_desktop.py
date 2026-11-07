@@ -57,9 +57,11 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                     print(f"WEBVIEW_GO_BRIDGE_PASS attempt={attempt}", flush=True)
                     return
                 if process.poll() is not None:
+                    output.flush()
+                    details = log_path.read_text(encoding="utf-8", errors="replace")[-5000:]
                     raise RuntimeError(
                         f"Desktop process exited before the frontend called GetSnapshot "
-                        f"(exit={process.returncode})."
+                        f"(exit={process.returncode}). Application output:\\n{details}"
                     )
                 time.sleep(0.2)
             raise RuntimeError("Timed out waiting for the frontend-to-Go GetSnapshot call.")
