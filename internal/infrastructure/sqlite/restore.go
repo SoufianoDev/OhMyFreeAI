@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -237,6 +238,11 @@ func validateRestoreTarget(path string) error {
 	if err == nil && !info.Mode().IsRegular() {
 		return ErrRestoreTargetInvalid
 	}
+	if err == nil {
+		if err := verifySQLiteFileHeader(path); err != nil {
+			return fmt.Errorf("%w: %v", ErrRestoreTargetInvalid, err)
+		}
+	}
 	return ensureNoSQLiteSidecars(path)
 }
 
@@ -304,4 +310,22 @@ func samePath(left, right string) bool {
 		return strings.EqualFold(left, right)
 	}
 	return left == right
+}
+
+
+func verifySQLiteFileHeader(path string) error {
+	file, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open database header: %w", err)
+	}
+	defer file.Close()
+
+	var header [16]byte
+	if _, err := io.ReadFull(file, header[:]); err != nil {
+		return fmt.Errorf("read database header: %w", err)
+	}
+	if string(header[:]) != "SQLite format 3\x00" {
+		return errors.New("file does not have the SQLite 3 database header")
+	}
+	return nil
 }
