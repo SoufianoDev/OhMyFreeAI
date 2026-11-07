@@ -186,3 +186,13 @@
 - `.planning/2026-11-07-ohmyfreeai-foundation/findings.md`
 - `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md`
 - `.planning/2026-11-07-ohmyfreeai-foundation/progress.md`
+
+
+## CI execution follow-up: 2026-11-07T17:11Z
+
+- Inspected GitHub Actions run and job logs instead of treating queued/failed states as generic.
+- The repository validation workflow completed successfully on Ubuntu 24.04: Go vet, Go tests, Go build, Python compile/tests, frontend JavaScript syntax and architecture-boundary check all passed on commit `47d0696`. Windows validation was still running at the last check.
+- The first SQLite evaluation attempts failed before compiling the test: Go reported a missing `go.sum` entry for the imported driver. This was a workflow bootstrap defect, not evidence of a SQLite driver runtime failure. The evaluation workflow was updated to run `go mod tidy` and `go mod verify` before `go test`; the new run must confirm this fix.
+- Wails native jobs reached toolchain/dependency installation on Ubuntu and Windows; native build and generated-binding steps had not yet completed at the last check.
+- Multiple push commits had queued redundant copies of the same workflows. Added per-workflow/per-branch GitHub Actions concurrency groups with cancel-in-progress to ensure the newest branch revision supersedes stale queued runs.
+- No driver or desktop framework has been selected. Continue from the latest run logs and preserve exact platform outcomes.

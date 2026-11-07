@@ -44,3 +44,8 @@ A separate nested Go module at `tests/sqlite-driver-eval` keeps experimental dri
 The shared smoke test checks open/ping, SQLite version reporting, WAL activation, per-connection foreign-key enforcement, transaction rollback, concurrent inserts across four held connections with a busy timeout, integrity_check, WAL checkpoint, close/reopen and a checkpointed database-file copy. It does not yet simulate abrupt process termination, test the complete production migration runner, or establish long-duration stress/performance results. The test is evidence for narrowing the driver choice, not a complete acceptance certificate.
 
 The workflow is added but must not be treated as passed until both OS jobs complete successfully. Driver selection remains Proposed until results and a follow-up review of locking, dependency/license inventory, packaging and recovery are recorded.
+
+
+## CI bootstrap note
+
+The first evaluation run stopped at module setup because the nested module had no committed `go.sum`. This was corrected in the workflow by running `go mod tidy` and `go mod verify` before the test command. Until a run using that corrected workflow passes, the earlier failure is classified as test-workflow setup failure, not a driver compatibility result.
