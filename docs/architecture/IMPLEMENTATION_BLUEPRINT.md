@@ -16,24 +16,24 @@
 
 ## Phase 2 — Feasibility proofs
 
-- Wails v3.0.0 Linux/Windows starter and generated-binding proof (passed); implement app adapter and validate packaging/distro coverage.
+- Wails v3.0.0 official starter and complete application-specific build passed on Ubuntu 24.04 and Windows; live WebView runtime call, packaging and distro coverage remain open.
 - Go core compile/test.
 - Official llama.cpp prebuilt distribution and backend compatibility.
-- SQLite driver modernc.org/sqlite v1.62.0 selected after Linux/Windows migration/locking smoke tests; implement production adapter and migration runner.
+- modernc.org/sqlite v1.62.0 selected and implemented in the production Store, ConfigRepository and transactional migration runner; crash recovery and backup API remain open.
 - Colab policy-compatible use case or explicit no-go.
 
 ## Phase 3 — Bootstrap
 
 - Go module and clean package layout.
 - Developer toolkit and CI.
-- Wails v3.0.0 desktop adapter with real service bindings and lifecycle integration.
+- Wails v3.0.0 desktop adapter with AppService GetSnapshot/SaveConfig bindings and generated native builds; live WebView invocation and full shutdown lifecycle still require tests.
 - Material 3 token system and minimal application shell.
 
 ## Phase 4 — Domain and persistence
 
 - Domain entities, typed errors and state machines.
-- SQLite schema and migrations.
-- Config validation and secret references.
+- SQLite schema, embedded forward migrations and transactional migration runner.
+- Config validation, persistence and secret references.
 
 ## Phase 5 — Process and security
 
