@@ -353,3 +353,6 @@
 - Added distinct AppService marker values for success and config-load failure. The Python smoke helper now prints captured application output on timeout and process exit, and reports an explicit GetSnapshot failure separately.
 - New Wails workflow run 42403217881 and Linux distro workflow run 42403217777 are pending/queued on the diagnostic commit. The root CI run is also queued.
 - No conclusion about the cause is drawn until the new smoke output is available.
+
+
+- openSUSE Tumbleweed package installation now succeeds and confirms Xvfb/WebKitGTK packages, but subsequent actions still failed to resolve Bash despite zypper reporting it installed. Removed the Bash dependency from workflow execution entirely: distro job run steps now use POSIX sh globally. The next matrix run will verify.
