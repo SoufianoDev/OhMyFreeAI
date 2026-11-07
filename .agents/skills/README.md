@@ -1,6 +1,6 @@
 # Project-scoped agent skills
 
-These skills are vendored so compatible coding agents can discover them after cloning the repository.
+These skills are vendored so compatible coding agents can discover them after cloning the repository. Planning with Files includes its shell and PowerShell lifecycle helpers, hook dependencies, templates and plan inventory reference.
 
 | Skill | Source | Version/scope | Application |
 |---|---|---|---|
