@@ -37,7 +37,8 @@ CREATE TABLE artifacts (
     source_uri_sanitized TEXT NOT NULL DEFAULT '',
     integrity_state TEXT NOT NULL CHECK (integrity_state IN ('unknown', 'pending', 'verified', 'failed')),
     created_at      TEXT NOT NULL,
-    UNIQUE (sha256)
+    UNIQUE (sha256),
+    UNIQUE (id, model_revision_id)
 );
 
 CREATE TABLE artifact_locations (
@@ -64,7 +65,7 @@ CREATE TABLE engine_installations (
 CREATE TABLE compatibility_assessments (
     id                          TEXT PRIMARY KEY,
     model_revision_id           TEXT NOT NULL REFERENCES model_revisions(id) ON DELETE RESTRICT,
-    artifact_id                 TEXT NOT NULL REFERENCES artifacts(id) ON DELETE RESTRICT,
+    artifact_id                 TEXT NOT NULL,
     engine_installation_id      TEXT NOT NULL REFERENCES engine_installations(id) ON DELETE RESTRICT,
     backend                     TEXT NOT NULL,
     runtime_fingerprint         TEXT NOT NULL,
@@ -79,7 +80,8 @@ CREATE TABLE compatibility_assessments (
     expires_at                  TEXT NOT NULL DEFAULT '',
     CHECK (status NOT IN ('supported', 'supported_with_limits') OR
         (artifact_integrity_verified = 1 AND engine_load_succeeded = 1 AND
-         health_check_passed = 1 AND inference_succeeded = 1))
+         health_check_passed = 1 AND inference_succeeded = 1)),
+    FOREIGN KEY (artifact_id, model_revision_id) REFERENCES artifacts(id, model_revision_id) ON DELETE RESTRICT
 );
 
 CREATE TABLE runtime_sessions (
