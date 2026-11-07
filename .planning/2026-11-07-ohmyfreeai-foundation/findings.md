@@ -637,3 +637,17 @@
 - Root CI run `42412587313` passed on Ubuntu and Windows, including Go vet/tests/build, Python tests, frontend JavaScript syntax and architecture checks.
 - Backup export/inspect are now exposed in the GUI. CLI commands and restore remain intentionally unimplemented. Restore must wait for coordinated Store close/reopen/reference replacement and rollback handling.
 - Current backup-enabled eight-distro retest is run `42412554358`. At the last check, four GTK4 lanes were building and the four remaining GTK3/openSUSE lanes were queued; do not mark this run green until all eight complete.
+
+
+## CLI backup export/inspect implementation — 2026-11-07T21:xxZ
+
+- Extended the framework-independent CLI parser with `backup export <file.omfaibackup>` and `backup inspect <file.omfaibackup>`. Unknown backup subcommands and malformed argument counts are rejected; no GUI fallback occurs.
+- Added an application-level `BackupOperations` port and `RunBackup` command handler. The CLI application package does not import infrastructure.
+- The desktop composition root wires the shared strict archive manager. Export uses `sqlite.OpenExisting`, which refuses missing DBs and does not create the DB/directory or change their permissions; it does not run migrations. Inspect invokes the read-only archive validator.
+- Added `sqlite.OpenExisting` and tests for missing-file/no-directory-creation and preservation of existing file permissions.
+- Expanded the actual native executable smoke to exercise both failure and success paths: export rejects first-run/no-database state, inspect rejects a missing archive, a migrated SQLite fixture exports successfully, the resulting ZIP contains exactly `manifest.json` and `state.sqlite`, inspect succeeds, a second export refuses overwrite without changing the existing archive, and the live DB remains present.
+- Root CI run `42415270003` passed Ubuntu and Windows on commit `640fc3f7` after parser/backup handler/SQLite changes. It predates the final end-to-end Python smoke additions and X-server readiness adjustment; the current root run for the final revision is pending.
+- The backup-enabled distro run `42412554358` passed seven lanes. Ubuntu 22.04 GTK3 built the native app and passed CLI smoke but failed twice waiting 30 seconds for the frontend-to-Go marker; captured app output was empty. This lane passed in earlier run `42405827037`. No GTK/WebKit root cause is established.
+- Hardened `scripts/smoke_desktop.py`: replace the fixed 500 ms Xvfb startup sleep with a bounded wait for the X11 Unix socket to accept connections, and capture Xvfb output in the diagnostic log. This is a test-harness robustness improvement, not a claim that it fixes the Ubuntu 22.04 issue.
+- Latest full validation after all CLI and smoke changes is tracked by run IDs `42415564618` (root CI), `42415564460` (Wails), and `42415564608` (eight-distro Linux matrix). Their results must be checked before marking this work verified.
+- Restore remains intentionally unavailable. `OpenExisting` and export do not establish a safe application-wide Store lifecycle for restoring while the GUI is open.
