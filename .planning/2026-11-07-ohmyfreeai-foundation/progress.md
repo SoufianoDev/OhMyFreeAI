@@ -644,3 +644,11 @@
 - CLI export never silently creates a first-run database and never runs migrations.
 - CLI inspect is read-only and validates full archive content; restore remains blocked until the GUI Store lifecycle can close, restore, reopen, swap repository references and roll back safely.
 - No Colab runtime activation, paid provider, branch merge or main-branch change.
+
+
+## Verification update — commit 569c0c69
+
+- Root CI run `42415564618` completed SUCCESS on both `ubuntu-latest` and `windows-latest`. This is the first full root CI result covering the CLI backup implementation, `sqlite.OpenExisting`, positive/negative backup CLI smoke helper compilation, and X-server readiness helper syntax/tests.
+- Wails native workflow `42415564460` is still building the actual application on Windows and Ubuntu 24.04. Native executable CLI and WebView/SQLite smoke results are not yet confirmed for this revision.
+- Eight-distro matrix `42415564608` is queued for the same revision. It includes the updated X11 readiness probe and full native backup CLI success-path smoke. Ubuntu 22.04 remains the key retest lane.
+- Root CI is green; do not infer native Wails or distro matrix success from it.
