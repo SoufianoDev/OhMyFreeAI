@@ -403,3 +403,6 @@
 - Removed the branch-wide concurrency lock that kept newer matrix runs pending behind stale queued runs.
 - Added `max-parallel: 4` to limit concurrent container jobs while allowing the current matrix to proceed.
 - New run 42404614411 is active: Arch Linux, Fedora 44 GTK4 and Ubuntu 24.04 are in progress; remaining distro jobs are queued.
+
+
+- The first matrix after the shell-template change failed immediately: GitHub Actions rejected the custom `/bin/sh -e {0}` value as an invalid shell option. Switched back to the supported built-in `sh` shell; setup-python has already been removed, so the prior PATH regression should no longer apply. No distro build ran in the rejected attempt.
