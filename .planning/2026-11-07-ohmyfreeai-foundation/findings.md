@@ -561,3 +561,14 @@
 - Added `internal/application/cli/dispatch_test.go` first. It defines the contract: no arguments launch GUI; `--help/-h`, `--version/-v`, and `doctor` dispatch without GUI; unknown commands and unexpected arguments are explicit errors.
 - Commit: `eb2f0b0196afa4e7b706f881233abb75e6ede0b0`.
 - CI run `42409735886` is executing on Ubuntu and Windows. RED evidence is pending; do not implement until the targeted compile/test failure is confirmed.
+
+
+## CLI dispatcher — RED confirmed, implementation added — 2026-11-07T20:12Z
+
+- RED was confirmed on the test-first commit: Ubuntu CI job `128515064532` failed at `go vet ./...` with the intended compile error `undefined: Parse` in `internal/application/cli/dispatch_test.go`. This was the missing dispatcher API, not an unrelated setup failure.
+- Added `internal/application/cli/dispatch.go`: empty args map to GUI; `--help/-h`, `--version/-v`, and `doctor` map to non-GUI commands; unknown commands and extra arguments return typed errors.
+- Integrated dispatch in `desktop-src/main.go.tmpl` before any database or Wails initialization. Help/version/doctor return without opening a window; unknown commands exit 2.
+- Doctor is read-only and reports platform, Go runtime, config path and database-file presence. It explicitly does not claim DB integrity, GPU, runtime or model readiness, and does not create the DB.
+- Updated `docs/architecture/CLI_ARCHITECTURE.md` to separate implemented commands from planned commands.
+- Implementation commits: `9c2d256` (dispatcher), `7c5352a` (desktop integration), `924c500` (CLI docs).
+- Root CI run `42409816192` passed Ubuntu; Windows is still running. Wails run `42409847974` is building the updated template on Ubuntu/Windows. GREEN is not yet certified until both finish.
