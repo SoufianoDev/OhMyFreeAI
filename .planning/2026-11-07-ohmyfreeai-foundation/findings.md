@@ -282,3 +282,11 @@
 - Added `bash` to the openSUSE package install list, then caught a bootstrap-order issue: GitHub Actions cannot invoke Bash to install Bash. The dependency-bootstrap step now explicitly uses POSIX `sh` and installs Bash for later steps. This is a container bootstrap issue; no application build was attempted in that job.
 - The smoke script now launches `Xvfb` directly, so it no longer depends on the distribution-specific xvfb-run wrapper.
 - The native Ubuntu WebView smoke attempt on commit `61702c24` exited with code 2 before the marker. The old log did not contain the application's captured output because the smoke helper did not print it on early exit. The helper now includes the last 5,000 characters of application output in this failure case; the next Wails run will establish the actual reason. Do not attribute exit code 2 to EGL/DRI3 without that evidence.
+
+
+## WebView bridge timeout diagnosis — 2026-11-07T18:49Z
+
+- Native Ubuntu Wails build on commit `7670fe25` passed, but the new direct-Xvfb smoke test timed out after 30 seconds without a marker. Unlike the previous run, the process stayed alive; this narrows the failure to a missing frontend-to-service completion marker, but does not by itself prove whether the JS module failed to load, the event handler failed, or the service call returned an error.
+- Updated the AppService marker protocol: successful snapshot load writes `GetSnapshot success`; a configuration-load failure writes `GetSnapshot failed: <error>`. The smoke test now rejects and prints an explicit service failure, and includes the captured application output on timeout or early exit.
+- The marker remains opt-in via `OMFAI_WEBVIEW_SMOKE_MARKER`; normal production runs are unaffected.
+- The next Wails run is the diagnostic gate. Do not claim the frontend bridge works until it produces the success marker twice.
