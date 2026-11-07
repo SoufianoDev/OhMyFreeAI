@@ -617,3 +617,10 @@
 
 - One attempt to append findings used a JavaScript template literal containing unescaped Markdown backticks and failed before a GitHub write. Retried with a line array; findings were saved successfully. No repository code was affected.
 - One initial Wails save-dialog implementation used a nonexistent fluent `SetTitle` method on SaveFileDialog. Verified against the pinned upstream source and corrected to `SaveFileWithOptions` before the successful Wails run.
+
+
+## Backup-enabled Linux matrix: first four lanes green
+
+- Follow-up check of run `42412554358`: Arch Linux rolling / GTK4, Debian 13 / GTK4, Fedora 44 / GTK4 and Ubuntu 24.04 / GTK4 all completed SUCCESS.
+- All four passed actual Wails desktop build, native CLI smoke, two-launch WebView-to-Go smoke and SQLite reopen.
+- Still queued at this check: openSUSE Tumbleweed / GTK4, Fedora 44 legacy GTK3, Debian 12 legacy GTK3 and Ubuntu 22.04 legacy GTK3. Do not mark the current eight-distro matrix complete yet.
