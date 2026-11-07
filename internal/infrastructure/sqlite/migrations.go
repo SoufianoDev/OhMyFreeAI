@@ -194,13 +194,13 @@ func splitSQLStatements(script string) ([]string, error) {
 			case char == '/' && next == '*':
 				state = blockComment
 				i++
-			case char == ''':
+			case char == 39:
 				state = singleQuoted
 				current.WriteByte(char)
 			case char == '"':
 				state = doubleQuoted
 				current.WriteByte(char)
-			case char == '`':
+			case char == 96:
 				state = backtickQuoted
 				current.WriteByte(char)
 			case char == '[':
@@ -216,11 +216,11 @@ func splitSQLStatements(script string) ([]string, error) {
 			var quote byte
 			switch state {
 			case singleQuoted:
-				quote = '''
+				quote = 39
 			case doubleQuoted:
 				quote = '"'
 			case backtickQuoted:
-				quote = '`'
+				quote = 96
 			}
 			if char == quote {
 				if next == quote {
@@ -236,10 +236,8 @@ func splitSQLStatements(script string) ([]string, error) {
 				state = normal
 			}
 		case lineComment:
-			if char == '
-' {
-				current.WriteByte('
-')
+			if char == 10 {
+				current.WriteByte(10)
 				state = normal
 			}
 		case blockComment:
