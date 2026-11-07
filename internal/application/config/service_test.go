@@ -16,7 +16,6 @@ type configRepoStub struct {
 func (r *configRepoStub) Load(context.Context) (domainconfig.Config, error) {
 	return domainconfig.Defaults(), nil
 }
-
 func (r *configRepoStub) Save(_ context.Context, cfg domainconfig.Config) error {
 	r.saved = cfg
 	r.saves++
