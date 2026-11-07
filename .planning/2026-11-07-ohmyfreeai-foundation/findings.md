@@ -279,6 +279,6 @@
 ## Minimal openSUSE container shell issue — 2026-11-07T18:46Z
 
 - After correcting the GTK/WebKit package names and replacing xvfb-run with direct Xvfb, openSUSE Tumbleweed reached the action setup stage but failed before running the dependency script: the minimal container image does not include `bash`, which GitHub Actions uses as the default shell for Linux run steps.
-- Added `bash` to the openSUSE package install list. This is a container bootstrap issue; no application build was attempted in that job.
+- Added `bash` to the openSUSE package install list, then caught a bootstrap-order issue: GitHub Actions cannot invoke Bash to install Bash. The dependency-bootstrap step now explicitly uses POSIX `sh` and installs Bash for later steps. This is a container bootstrap issue; no application build was attempted in that job.
 - The smoke script now launches `Xvfb` directly, so it no longer depends on the distribution-specific xvfb-run wrapper.
 - The native Ubuntu WebView smoke attempt on commit `61702c24` exited with code 2 before the marker. The old log did not contain the application's captured output because the smoke helper did not print it on early exit. The helper now includes the last 5,000 characters of application output in this failure case; the next Wails run will establish the actual reason. Do not attribute exit code 2 to EGL/DRI3 without that evidence.
