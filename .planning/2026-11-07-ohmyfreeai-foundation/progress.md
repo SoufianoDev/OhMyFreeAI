@@ -388,3 +388,11 @@
 - The workflow now verifies exact pkg-config modules and prepends distro-native pkg-config directories after setup actions.
 - Replaced shell lookup with the explicit /bin/sh command template across the distro matrix to avoid openSUSE container PATH resolution problems.
 - Next verification run is 42404224038 (Linux distribution compatibility); no matrix lane is marked green until build + two-launch WebView bridge smoke pass.
+
+
+## Native Wails WebView smoke passed — 2026-11-07T19:04Z
+
+- Wails run 42404058636 is fully green: Windows native build/executable verification passed; Ubuntu 24.04 build and executable verification passed.
+- The Ubuntu WebView smoke produced `WEBVIEW_GO_BRIDGE_PASS attempt=1`, `WEBVIEW_GO_BRIDGE_PASS attempt=2`, and `WEBVIEW_REOPEN_PASS`. This verifies the actual generated JS-to-Go call and a second application startup against the persisted SQLite state.
+- The smoke helper sets WebKit sandbox-disable and GTK accessibility variables only for CI subprocesses due to runner namespace restrictions. No production environment/config was changed.
+- The Linux distro matrix remains the outstanding verification gate.
