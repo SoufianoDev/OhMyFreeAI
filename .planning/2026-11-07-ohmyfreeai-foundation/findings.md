@@ -572,3 +572,11 @@
 - Updated `docs/architecture/CLI_ARCHITECTURE.md` to separate implemented commands from planned commands.
 - Implementation commits: `9c2d256` (dispatcher), `7c5352a` (desktop integration), `924c500` (CLI docs).
 - Root CI run `42409816192` passed Ubuntu; Windows is still running. Wails run `42409847974` is building the updated template on Ubuntu/Windows. GREEN is not yet certified until both finish.
+
+
+## CLI parser cross-platform unit tests passed — 2026-11-07T20:14Z
+
+- Root CI run `42409816192` completed SUCCESS on both `ubuntu-latest` and `windows-latest`. It includes `go vet ./...`, `go test ./...`, Go build, Python tests, frontend syntax and architecture checks.
+- This is GREEN evidence for the framework-independent CLI parser and unit tests. It does not yet verify the generated Wails executable's command dispatch.
+- Added `scripts/smoke_cli.py` to exercise the actual native executable's help/version/doctor/unknown-command behavior, enforce exit codes, and prove doctor does not create application state.
+- Wired native CLI smoke into Wails Linux/Windows workflow and all eight Linux distro lanes. Latest relevant runs: Wails `42409974970`, Linux distro `42410021330`, root CI `42410030822`; results pending.
