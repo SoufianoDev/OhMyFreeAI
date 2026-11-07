@@ -313,3 +313,75 @@ func rewriteArchive(t *testing.T, sourcePath, destinationPath string, mutate fun
 		t.Fatalf("close rewritten archive file: %v", err)
 	}
 }
+
+
+func TestExtractArchiveRejectsPathTraversalEntry(t *testing.T) {
+	ctx := context.Background()
+	store, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "state.db"))
+	if err != nil {
+		t.Fatalf("open SQLite store: %v", err)
+	}
+	defer store.Close()
+	if err := store.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate SQLite store: %v", err)
+	}
+	manager := Manager{ApplicationVersion: "0.1.0", Migrations: migrations.Files, MigrationDir: "."}
+	archivePath := filepath.Join(t.TempDir(), "safe.omfaibackup")
+	if err := manager.Create(ctx, store, archivePath); err != nil {
+		t.Fatalf("create valid backup archive: %v", err)
+	}
+
+	traversalPath := filepath.Join(t.TempDir(), "traversal.omfaibackup")
+	rewriteArchiveEntryName(t, archivePath, traversalPath, databaseName, "../state.sqlite")
+	extractedPath := filepath.Join(t.TempDir(), "should-not-exist.sqlite")
+	if _, err := extractArchive(ctx, traversalPath, extractedPath); !errors.Is(err, ErrInvalidBackupArchive) {
+		t.Fatalf("expected path-traversal rejection, got %v", err)
+	}
+	if _, err := os.Stat(extractedPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("path-traversal archive unexpectedly extracted a file, stat error: %v", err)
+	}
+}
+
+func rewriteArchiveEntryName(t *testing.T, sourcePath, destinationPath, oldName, newName string) {
+	t.Helper()
+	source, err := zip.OpenReader(sourcePath)
+	if err != nil {
+		t.Fatalf("open source archive: %v", err)
+	}
+	defer source.Close()
+	output, err := os.OpenFile(destinationPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil {
+		t.Fatalf("create rewritten archive: %v", err)
+	}
+	writer := zip.NewWriter(output)
+	for _, entry := range source.File {
+		reader, err := entry.Open()
+		if err != nil {
+			t.Fatalf("open archive entry: %v", err)
+		}
+		data, err := io.ReadAll(reader)
+		_ = reader.Close()
+		if err != nil {
+			t.Fatalf("read archive entry: %v", err)
+		}
+		name := entry.Name
+		if name == oldName {
+			name = newName
+		}
+		header := &zip.FileHeader{Name: name, Method: zip.Deflate}
+		header.SetMode(0o600)
+		entryWriter, err := writer.CreateHeader(header)
+		if err != nil {
+			t.Fatalf("create rewritten archive entry: %v", err)
+		}
+		if _, err := entryWriter.Write(data); err != nil {
+			t.Fatalf("write rewritten archive entry: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close rewritten archive: %v", err)
+	}
+	if err := output.Close(); err != nil {
+		t.Fatalf("close rewritten archive file: %v", err)
+	}
+}
