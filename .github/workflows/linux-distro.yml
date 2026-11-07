@@ -165,10 +165,38 @@ jobs:
         with:
           python-version: "3.13"
 
-      - name: Install pinned Wails CLI
-        shell: bash
+      - name: Configure native pkg-config search paths
+        env:
+          DISTRO_FAMILY: ${{ matrix.family }}
+          BUILD_STACK: ${{ matrix.stack }}
         run: |
-          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+          case "$DISTRO_FAMILY" in
+            debian) system_pc="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig" ;;
+            fedora|suse) system_pc="/usr/lib64/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig" ;;
+            arch) system_pc="/usr/lib/pkgconfig:/usr/share/pkgconfig" ;;
+            *) echo "Unknown distro family: $DISTRO_FAMILY" >&2; exit 2 ;;
+          esac
+          echo "PKG_CONFIG_PATH=$system_pc:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
+          case "$BUILD_STACK" in
+            gtk4-webkit6)
+              pkg-config --modversion gtk4
+              pkg-config --modversion webkitgtk-6.0
+              ;;
+            legacy-gtk3-webkit41)
+              pkg-config --modversion gtk+-3.0
+              pkg-config --modversion webkit2gtk-4.1
+              ;;
+          esac
+
+      - name: Install pinned Wails CLI
+        env:
+          WAILS_BUILD_TAGS: ${{ matrix.build_tags }}
+        run: |
+          if [ -n "$WAILS_BUILD_TAGS" ]; then
+            go install -tags "$WAILS_BUILD_TAGS" github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+          else
+            go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+          fi
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
       - name: Build the actual OhMyFreeAI desktop application
