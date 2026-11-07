@@ -70,6 +70,10 @@ jobs:
       - name: Test Go packages
         run: go test ./...
 
+      - name: Test Go packages with race detector (Linux)
+        if: runner.os == 'Linux'
+        run: go test -race ./...
+
       - name: Build Go packages
         run: go build ./...
 
