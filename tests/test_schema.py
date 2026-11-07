@@ -4,6 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "migrations" / "001_initial.sql"
+DOWN = ROOT / "migrations" / "001_initial.down.sql"
 
 
 class InitialSchemaTests(unittest.TestCase):
@@ -93,6 +94,13 @@ class InitialSchemaTests(unittest.TestCase):
             self.db.execute(
                 "INSERT INTO compatibility_assessments(id,model_revision_id,artifact_id,engine_installation_id,backend,runtime_fingerprint,status,artifact_integrity_verified,engine_load_succeeded,health_check_passed,inference_succeeded,tested_at) VALUES('c1','m2','a1','e1','cpu','cpu-test','unsupported',0,0,0,0,'now')"
             )
+
+    def test_development_down_migration_drops_schema(self):
+        self.db.executescript(DOWN.read_text(encoding="utf-8"))
+        tables = {row[0] for row in self.db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        )}
+        self.assertFalse(tables)
 
 
 if __name__ == "__main__":
