@@ -1,0 +1,47 @@
+name: SQLite driver evaluation
+
+on:
+  push:
+    branches:
+      - "foundation/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  driver-matrix:
+    name: ${{ matrix.driver.name }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+        driver:
+          - name: modernc
+            module_name: modernc.org/sqlite
+            driver_name: sqlite
+          - name: ncruces
+            module_name: github.com/ncruces/go-sqlite3
+            driver_name: sqlite3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - name: Evaluate driver
+        working-directory: tests/sqlite-driver-eval
+        env:
+          OMFAI_SQLITE_DRIVER: ${{ matrix.driver.driver_name }}
+        run: |
+          go test -v -count=1 ./...
