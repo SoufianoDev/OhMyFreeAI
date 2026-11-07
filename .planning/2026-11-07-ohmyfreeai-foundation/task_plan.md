@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Define the SQLite schema/migration contract and evaluate a Go SQLite driver against Linux/Windows and free-only constraints; keep the persistence adapter isolated.
+Implement a driver-isolated SQLite adapter/migration runner once the Go 1.26 toolchain is available; in parallel, close the Wails Linux/Windows proof-of-concept and Colab policy feasibility gates.
 
 ## Current Phase
 
