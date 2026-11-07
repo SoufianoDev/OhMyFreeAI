@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Continue from the implemented Wails v3.0.0 shell and modernc.org/sqlite v1.62.0 persistence adapter. Next add a live WebView-to-Go invocation test, validate the JavaScriptCore signal setting on Wails v3, add abrupt-crash recovery and SQLite backup API/restore, then finish packaging, Linux distro coverage and full diff review.
+Continue from the implemented Wails v3.0.0 shell and modernc.org/sqlite v1.62.0 persistence adapter. Next complete the live WebView-to-Go/signal smoke test, package the verified SQLite snapshot into the .omfaibackup format with a strict manifest/checksum validator, add abrupt-crash recovery tests, then finish packaging, Linux distro coverage and full diff review.
 
 ## Current Phase
 
@@ -62,7 +62,10 @@ Phase 4
 - [ ] Run documentation/link validation and review all source changes
 - [x] Perform a read-only static audit of the supplied prototype archives and Python patch/monitor scripts; record hashes, preserved invariants and risks in docs/architecture/PROTOTYPE_AUDIT.md
 - [ ] Revalidate current Colab /props and /v1/models behavior, model-specific Q8_0/262144 compatibility and the live SSE path before enabling remote inference
-- [ ] Add actual desktop WebView-to-Go invocation, crash-recovery and production backup/restore tests
+- [x] Add SQLite online backup/restore primitives with integrity, foreign-key, migration-history, cancellation, no-overwrite, target-safety and rollback tests on Ubuntu and Windows
+- [ ] Package snapshots into .omfaibackup with a strict manifest, checksums, fixed entry names and archive-size/path-traversal protections
+- [ ] Complete actual desktop WebView-to-Go invocation and JavaScriptCore signal smoke tests; the Wails workflow now runs these on Ubuntu
+- [ ] Add abrupt-process crash/reopen recovery tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
 
@@ -80,7 +83,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows, with one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView invocation testing, Wails v3 JavaScriptCore signal validation, abrupt-crash recovery, SQLite backup/restore API, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, broader Linux distro coverage and packaging/uninstall. Colab remote-inference activation remains policy-gated.
+Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows, with one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView/signal smoke verification, .omfaibackup archive/manifest/checksum wrapper, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, broader Linux distro coverage and packaging/uninstall. Colab remote-inference activation remains policy-gated.
 
 ## Decisions Made
 
