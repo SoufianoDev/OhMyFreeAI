@@ -18,7 +18,7 @@ The caller must use a dedicated local application-data directory. UNC paths are 
 
 ## Migration contract
 
-Migrations are embedded in the migrations package and are append-only in production. Each forward migration and its schema_migrations row are committed in the same transaction. The runner rejects gaps and untracked migration history and skips .down.sql files.
+Migrations are embedded in the migrations package and are append-only in production. Each forward migration and its schema_migrations row are committed in the same transaction. The runner rejects gaps, non-contiguous applied history and untracked migration history and skips .down.sql files.
 
 The current statement splitter handles quoted values/identifiers and SQL comments. It does not support trigger bodies containing internal semicolons. Keep production migrations free of such triggers until a SQLite-aware parser is adopted.
 
