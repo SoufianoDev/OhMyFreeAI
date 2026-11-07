@@ -68,10 +68,19 @@ def attach_generated_binding(project: Path) -> None:
         relative = "./" + relative
 
     bridge = (
-        f'import {{ GetSnapshot, SaveConfig }} from "{relative}";\n'
-        'import "../app.js";\n'
-        'window.OhMyFreeAI = Object.freeze({ GetSnapshot, SaveConfig });\n'
-        'window.dispatchEvent(new Event("ohmyfreeai:bridge-ready"));\n'
+        f'import {{ GetSnapshot, SaveConfig }} from "{relative}";\\n'
+        'window.OhMyFreeAI = Object.freeze({ GetSnapshot, SaveConfig });\\n'
+        'const firstSnapshot = Promise.resolve().then(() => GetSnapshot());\\n'
+        'import("../app.js").then(async () => {\\n'
+        '  try {\\n'
+        '    const snapshot = await firstSnapshot;\\n'
+        '    await GetSnapshot();\\n'
+        '    window.dispatchEvent(new CustomEvent("ohmyfreeai:bridge-ready", { detail: snapshot }));\\n'
+        '  } catch (error) {\\n'
+        '    window.dispatchEvent(new CustomEvent("ohmyfreeai:bridge-error", { detail: error }));\\n'
+        '    console.error("Could not initialize the native core:", error);\\n'
+        '  }\\n'
+        '}).catch(error => console.error("Could not load the OhMyFreeAI frontend module:", error));\\n'
     )
     (source_dir / "main.js").write_text(bridge, encoding="utf-8")
 
