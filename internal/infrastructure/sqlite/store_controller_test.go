@@ -452,3 +452,57 @@ func TestStoreControllerCanceledWriterStopsBlockingNewReaders(t *testing.T) {
 		t.Fatalf("close controller: %v", err)
 	}
 }
+
+func TestStoreControllerCanceledCloseLeavesStoreAvailable(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	controller := NewStoreController(store)
+
+	sharedEntered := make(chan struct{})
+	releaseShared := make(chan struct{})
+	sharedDone := make(chan error, 1)
+	go func() {
+		sharedDone <- controller.WithShared(context.Background(), func(*Store) error {
+			close(sharedEntered)
+			<-releaseShared
+			return nil
+		})
+	}()
+	<-sharedEntered
+
+	closeContext, cancelClose := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancelClose()
+	if err := controller.Close(closeContext); !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("canceled close error = %v, want context deadline exceeded", err)
+	}
+
+	// A canceled shutdown must relinquish writer preference and leave the
+	// still-open Store published; otherwise the application can deadlock or
+	// become unavailable after a user cancels shutdown.
+	secondReaderEntered := make(chan struct{})
+	secondReaderDone := make(chan error, 1)
+	go func() {
+		secondReaderDone <- controller.WithShared(context.Background(), func(got *Store) error {
+			if got != store {
+				t.Error("controller published an unexpected Store after canceled close")
+			}
+			close(secondReaderEntered)
+			return nil
+		})
+	}()
+	select {
+	case <-secondReaderEntered:
+	case <-time.After(time.Second):
+		t.Fatal("canceled close continued blocking shared operations")
+	}
+	if err := <-secondReaderDone; err != nil {
+		t.Fatalf("shared operation after canceled close: %v", err)
+	}
+
+	close(releaseShared)
+	if err := <-sharedDone; err != nil {
+		t.Fatalf("original shared operation: %v", err)
+	}
+	if err := controller.Close(context.Background()); err != nil {
+		t.Fatalf("close controller after canceled close: %v", err)
+	}
+}
