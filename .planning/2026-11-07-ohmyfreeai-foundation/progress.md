@@ -510,3 +510,6 @@
 
 
 - Ubuntu 24.04 GTK4/WebKitGTK 6.0 passed the latest two-stage bridge run as well. Four current-run lanes are green: Ubuntu 24.04, Debian 13, Fedora 44 GTK4 and Arch rolling.
+
+
+- openSUSE Tumbleweed in run 42405729874 (without the later GITHUB_PATH restoration, but with setup-python removed) successfully passed the dependency bootstrap, checkout, Go/Node setup and pkg-config configuration, and reached Wails CLI install under built-in sh. This narrows the earlier shell lookup issue to the removed setup-python/toolcache environment. The newer PATH restoration remains an extra guard, not a proven requirement. openSUSE's build and smoke are still pending.
