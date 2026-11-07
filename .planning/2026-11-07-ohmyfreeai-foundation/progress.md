@@ -700,3 +700,14 @@
 - Fix any test, race, vet, or cross-platform failures before proceeding.
 - Add controller-mediated backup export and rewire Wails/CLI composition so no long-lived service caches a raw Store.
 - Add further tests for repository operations and operation-drain behavior before beginning the durable restore journal.
+
+## Continuation: Store lifecycle integration hardening — 2026-11-07T22:35Z
+
+- Confirmed the Wails integration workflow 42419830292 completed successfully on Windows and Ubuntu 24.04. Windows native build, CLI dispatch and executable verification passed. Ubuntu native build, CLI dispatch, executable verification, live WebView-to-Go invocation and SQLite reopen passed.
+- Confirmed Linux distribution workflow 42419830259 completed successfully on all eight lanes, including Ubuntu 22.04 legacy GTK3/WebKit2GTK 4.1. This resolves the earlier in-progress Ubuntu 22.04 lane; the run is green.
+- Re-read the current StoreController, Wails composition root, AppService and CLI backup composition. Configuration now uses the controller as its repository; GUI and CLI backup export hold shared leases for the complete Manager.Create call; Wails AppService retains the controller rather than a raw Store; app shutdown drains through StoreController.Close.
+- Found a safety gap in WithExclusive: if a destructive callback closed the current Store and then failed, the controller returned the error while retaining the closed Store pointer. Changed the contract so the callback must return the safe Store to expose even on error. A verified rollback Store is published before returning the operation error; returning nil fails the controller closed.
+- Added tests for publishing a verified rollback Store after an exclusive-operation error and for fail-closed behavior when no safe Store can be returned.
+- Commits: e8806c338590cfd6904d170cd2a4433535508e35 (controller fix), f6cc74d7d1a82e8bc5c684f6d3ab5ea56609c72f (failure-path tests), 41b009e8a29e6c471b6d41bd0ca58e29d22459f4 (plan update).
+- New root CI run 42421277886 and Linux matrix run 42421277879 were queued for the latest test commit f6cc74d. These results have not yet been observed; do not claim the new failure-path tests passed until root CI completes.
+- Restore remains disabled. Remaining Store work: deterministic concurrent configuration/backup lease-drain tests, race/stress coverage, durable journal, staging verification, atomic publication, rollback and startup crash recovery.
