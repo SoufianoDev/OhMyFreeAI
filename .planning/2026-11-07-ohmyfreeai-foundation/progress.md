@@ -131,3 +131,31 @@
 - `.planning/2026-11-07-ohmyfreeai-foundation/findings.md` (Wails research)
 - `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md` (next step and checklist)
 - `.planning/2026-11-07-ohmyfreeai-foundation/progress.md` (this log)
+
+
+## Continuation session: 2026-11-07T17:05Z
+
+### Resumed state
+- Re-read the active foundation task plan, progress log, findings, and current Wails workflow before continuing.
+- Confirmed the active branch head was `caa004cd39d3f073e477da65926d63dbb088d5b4`; no newer branch commits existed at session start.
+- Queried commit status and workflow-run lookup for the Wails workflow commits. Both returned no status checks and no workflow runs, so there is still no observed CI result.
+
+### Work completed
+- Reviewed official Wails v3 method-binding documentation and the vanilla project structure.
+- Extended `.github/workflows/wails-poc.yml` on both Ubuntu 24.04 and Windows runners to run `wails3 generate bindings`, locate the generated GreetService JavaScript module, and assert that the `Greet` method is exposed before building the native executable.
+- Kept the Wails template generated in a temporary runner directory; no generated demo app or Wails dependency was added to the production Go module.
+- Updated the active task plan and findings with the exact scope and limitations of this binding smoke test.
+
+### Verification and limitations
+- GitHub accepted the workflow and planning updates on `foundation/bootstrap`.
+- Workflow source was fetched back and inspected after the edit; both OS branches contain the binding-generation and assertion steps.
+- Commit status lookup for the prior Wails commits returned empty status arrays; workflow-run lookup returned empty lists. The new commits have not yet been observed running. CI is **not verified green**.
+- This test checks binding generation and exported method presence, then builds the native app. It does not launch a GUI or execute the JS-to-Go call in a live WebView.
+- Wails remains an unselected candidate pending successful Ubuntu and Windows CI jobs.
+- No production runtime, Colab launcher, historical Python scripts, or user live session was modified.
+
+### Files changed in this continuation
+- `.github/workflows/wails-poc.yml`
+- `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md`
+- `.planning/2026-11-07-ohmyfreeai-foundation/findings.md`
+- `.planning/2026-11-07-ohmyfreeai-foundation/progress.md`
