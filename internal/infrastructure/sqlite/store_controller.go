@@ -16,9 +16,10 @@ var (
 	ErrStoreUnavailable        = errors.New("SQLite store is unavailable")
 )
 
-// StoreController is the sole owner of the active Store. Shared operations
+// StoreController coordinates access to the active Store. Shared operations
 // drain before an exclusive operation begins; waiting writers prevent reader
-// starvation. Callers must not retain the Store passed to an operation.
+// starvation. The composition root must retain this controller, not the Store;
+// callers must not retain the Store passed to an operation.
 type StoreController struct {
 	mu            sync.Mutex
 	store         *Store
@@ -209,6 +210,9 @@ func (c *StoreController) WithExclusive(ctx context.Context, operation func(*Sto
 // Load and Save make StoreController a stable configuration repository. Each
 // operation holds its lease for the full SQLite call.
 func (c *StoreController) Load(ctx context.Context) (domainconfig.Config, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var result domainconfig.Config
 	err := c.WithShared(ctx, func(store *Store) error {
 		var err error
@@ -219,6 +223,9 @@ func (c *StoreController) Load(ctx context.Context) (domainconfig.Config, error)
 }
 
 func (c *StoreController) Save(ctx context.Context, cfg domainconfig.Config) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	return c.WithShared(ctx, func(store *Store) error {
 		return store.Save(ctx, cfg)
 	})
