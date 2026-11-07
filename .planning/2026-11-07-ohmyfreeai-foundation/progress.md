@@ -589,3 +589,7 @@
 - Ubuntu also passed the live two-stage WebView-to-Go bridge and SQLite reopen smoke.
 - Root CI run 42410030822 passed Ubuntu and Windows.
 - All eight Linux distro lanes now have the CLI smoke wired in the workflow, but run 42410214638 is queued; do not mark that matrix complete yet.
+
+
+- Diagnosed a failure in older distro run 42409848051: Ubuntu 22.04 GTK3 built but timed out waiting for GetSnapshot; app output was empty. This same lane passed in run 42405827037, so root cause is not established and the failure appears intermittent/environment-sensitive. No speculative code change made.
+- Current CLI-enabled distro rerun 42410214638 is the authoritative retest; its Ubuntu 22.04 result is pending.
