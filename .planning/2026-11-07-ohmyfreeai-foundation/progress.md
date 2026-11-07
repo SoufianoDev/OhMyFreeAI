@@ -345,3 +345,11 @@
 
 
 - Follow-up correction: the openSUSE dependency step itself cannot use Bash before Bash is installed. Changed that bootstrap step to POSIX `sh` and retained Bash installation for subsequent GitHub Actions steps. The next matrix run will validate this ordering.
+
+
+## WebView bridge timeout follow-up — 2026-11-07T18:49Z
+
+- The direct-Xvfb Wails build and executable verification passed on Ubuntu 24.04. The WebView smoke process stayed alive but did not produce the marker within 30 seconds; the test failed, so live JS-to-Go invocation remains unverified.
+- Added distinct AppService marker values for success and config-load failure. The Python smoke helper now prints captured application output on timeout and process exit, and reports an explicit GetSnapshot failure separately.
+- New Wails workflow run 42403217881 and Linux distro workflow run 42403217777 are pending/queued on the diagnostic commit. The root CI run is also queued.
+- No conclusion about the cause is drawn until the new smoke output is available.
