@@ -185,6 +185,9 @@ func (m Manager) Create(ctx context.Context, store *sqlite.Store, destinationPat
 		return fmt.Errorf("verify completed backup archive: %w", err)
 	}
 	_ = os.Remove(verifiedSnapshot)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	if _, err := os.Lstat(absoluteDestination); err == nil {
 		return ErrBackupArchiveExists
