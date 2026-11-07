@@ -201,6 +201,38 @@ func (m Manager) Create(ctx context.Context, store *sqlite.Store, destinationPat
 	return nil
 }
 
+// Inspect validates the complete archive and returns its manifest without
+// changing the live application database. Extraction is isolated in a
+// temporary directory that is removed before the method returns.
+func (m Manager) Inspect(ctx context.Context, archivePath string) (Manifest, error) {
+	var empty Manifest
+	if err := ctx.Err(); err != nil {
+		return empty, err
+	}
+	if err := validateArchiveExtension(archivePath); err != nil {
+		return empty, err
+	}
+	absoluteArchive, err := filepath.Abs(archivePath)
+	if err != nil {
+		return empty, fmt.Errorf("resolve backup archive: %w", err)
+	}
+	stagingDirectory, err := os.MkdirTemp("", ".ohmyfreeai-backup-inspect-*")
+	if err != nil {
+		return empty, fmt.Errorf("create backup inspection directory: %w", err)
+	}
+	defer os.RemoveAll(stagingDirectory)
+
+	snapshotPath := filepath.Join(stagingDirectory, databaseName)
+	manifest, err := extractArchive(ctx, absoluteArchive, snapshotPath)
+	if err != nil {
+		return empty, err
+	}
+	if err := ctx.Err(); err != nil {
+		return empty, err
+	}
+	return manifest, nil
+}
+
 func (m Manager) Restore(ctx context.Context, archivePath, targetDatabasePath string) (string, error) {
 	if m.Migrations == nil {
 		return "", ErrBackupManagerConfig
