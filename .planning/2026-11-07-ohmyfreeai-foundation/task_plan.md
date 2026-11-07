@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Continue from the implemented Wails v3.0.0 shell and modernc.org/sqlite v1.62.0 persistence adapter. Next complete the live WebView-to-Go/signal smoke test, package the verified SQLite snapshot into the .omfaibackup format with a strict manifest/checksum validator, add abrupt-crash recovery tests, then finish packaging, Linux distro coverage and full diff review.
+The latest Wails smoke run failed because its stdout-based readiness assertion did not observe the AppService call; replace it with the opt-in GetSnapshot marker and inspect the new Wails + 8-distro CI runs. Then complete the .omfaibackup archive/manifest/checksum validator, abrupt-crash recovery tests, packaging and full diff review.
 
 ## Current Phase
 
@@ -64,7 +64,9 @@ Phase 4
 - [ ] Revalidate current Colab /props and /v1/models behavior, model-specific Q8_0/262144 compatibility and the live SSE path before enabling remote inference
 - [x] Add SQLite online backup/restore primitives with integrity, foreign-key, migration-history, cancellation, no-overwrite, target-safety and rollback tests on Ubuntu and Windows
 - [ ] Package snapshots into .omfaibackup with a strict manifest, checksums, fixed entry names and archive-size/path-traversal protections
-- [ ] Complete actual desktop WebView-to-Go invocation and JavaScriptCore signal smoke tests; the Wails workflow now runs these on Ubuntu
+- [ ] Complete actual desktop WebView-to-Go invocation and JavaScriptCore signal smoke tests; the new opt-in marker and Xvfb software-rendering test must pass on native Ubuntu and the distro matrix
+- [x] Define explicit Linux distribution targets and add GTK4/WebKitGTK 6.0 plus legacy GTK3/WebKit2GTK 4.1 build/runtime smoke matrix (Ubuntu 24.04, Debian 13, Fedora 44, Arch, openSUSE Tumbleweed, Ubuntu 22.04, Debian 12, Rocky 9)
+- [ ] Verify all eight Linux distro jobs pass; distinguish container userland coverage from bare-metal certification
 - [ ] Add abrupt-process crash/reopen recovery tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
@@ -83,7 +85,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows, with one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView/signal smoke verification, .omfaibackup archive/manifest/checksum wrapper, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, broader Linux distro coverage and packaging/uninstall. Colab remote-inference activation remains policy-gated.
+Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows. A previous Ubuntu WebView smoke check failed to observe its stdout marker; a new explicit frontend-to-Go marker and eight-distro Linux container matrix have been committed and are awaiting CI results. The app has one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView/signal smoke verification, .omfaibackup archive/manifest/checksum wrapper, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, broader Linux distro coverage and packaging/uninstall. Colab remote-inference activation remains policy-gated.
 
 ## Decisions Made
 
@@ -94,6 +96,7 @@ Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.0
 | Preserve the Colab + llama.cpp + Gateway + OpenCode path until audited | It is the only proven direction in the existing project history |
 | Backup extension/name is omfaibackup | Explicit user decision |
 | Use Planning with Files structure under .planning | Persistent task state, isolated from future tasks |
+| Use native Ubuntu/Windows CI plus distro-container compatibility lanes | Ubuntu 24.04, Debian 13, Fedora 44, Arch rolling and openSUSE Tumbleweed exercise GTK4/WebKitGTK 6.0; Ubuntu 22.04, Debian 12 and Rocky 9 exercise the Wails v3.0.x legacy GTK3/WebKit2GTK 4.1 path. Container results are not bare-metal certification |
 | Select Wails v3.0.0 as the desktop shell | The actual OhMyFreeAI app, AppService binding and Vite production bundle build on Ubuntu 24.04 and Windows; live WebView invocation and packaging remain unverified |
 | Select modernc.org/sqlite v1.62.0 for the SQLite adapter | Both CGO-free candidates passed Linux/Windows smoke tests and the initial migration; modernc avoids the WASM VFS and documented per-connection memory overhead of ncruces |
 | Do not claim the skill is installed in the agent runtime | The available environment has no writable agent-home mount; repository vendoring is the durable project-level route |
@@ -114,6 +117,7 @@ Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.0
 | Initial Wails build script passed the project folder as the CLI destination parent | 1 | Read the Wails init output, pass a workspace parent to -d, and rebuild the real app successfully on both OSes |
 | Go test source contained a literal newline inside a quoted format string | 1 | Escaped the newline and reran Go vet/tests/build on Ubuntu and Windows |
 | SQL splitter source template emitted malformed quote/newline rune literals | 1 | Replaced ambiguous escaped byte literals with numeric byte constants and reran the full Go matrix |
+| Wails smoke run 42399602513 failed its Ubuntu WebView readiness assertion after 12 seconds; output only showed a DRI3/EGL warning | 1 | Do not assume the warning is causal. Replace stdout grep with an explicit opt-in marker written by GetSnapshot, force software rendering under Xvfb, and wait for the actual JS-to-Go invocation |
 | Windows Wails build printed a non-fatal "-VThe system cannot find the file specified." line | 1 | Native executable and binding generation still succeeded; source of the message is not yet identified and remains a tracked warning |
 
 ## Notes
