@@ -45,7 +45,7 @@ def doctor(_: argparse.Namespace) -> int:
     match = re.search(r"go(\d+)\.(\d+)\.(\d+)", go_output)
     if match:
         current = tuple(int(part) for part in match.groups())
-        target = (1, 27, 1)
+        target = (1, 27, 3)
         state = "meets target" if current >= target else "below project target 1.27.3"
         print(f"Go target {target[0]}.{target[1]}.{target[2]}: {state}")
     print("No dependencies were installed or changed.")
