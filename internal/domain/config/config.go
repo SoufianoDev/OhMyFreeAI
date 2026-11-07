@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/url"
+	"strings"
 )
 
 const CurrentSchemaVersion = 1
@@ -64,8 +66,11 @@ func (c Config) Validate() error {
 	if !validPort(c.Gateway.Port) || !validPort(c.Engine.ServerPort) {
 		return fmt.Errorf("%w: ports must be between 1 and 65535", ErrInvalidConfig)
 	}
-	if c.Gateway.Enabled && c.Gateway.AuthSecretRef == "" {
-		return fmt.Errorf("%w: enabled Gateway requires an OS secret reference", ErrInvalidConfig)
+	if c.Gateway.Enabled && !validSecretReference(c.Gateway.AuthSecretRef) {
+		return fmt.Errorf("%w: enabled Gateway requires a valid OS secret reference", ErrInvalidConfig)
+	}
+	if c.Gateway.Port == c.Engine.ServerPort {
+		return fmt.Errorf("%w: Gateway and engine ports must differ", ErrInvalidConfig)
 	}
 	if c.Runtime.Provider != "" && c.Runtime.Provider != "colab" {
 		return fmt.Errorf("%w: unsupported runtime provider %q", ErrInvalidConfig, c.Runtime.Provider)
@@ -80,3 +85,19 @@ func (c Config) Validate() error {
 }
 
 func validPort(port int) bool { return port >= 1 && port <= 65535 }
+
+func validSecretReference(reference string) bool {
+	if reference == "" || strings.TrimSpace(reference) != reference {
+		return false
+	}
+	u, err := url.Parse(reference)
+	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return false
+	}
+	switch u.Scheme {
+	case "os-keychain", "secret-service", "windows-credential", "macos-keychain":
+		return true
+	default:
+		return false
+	}
+}
