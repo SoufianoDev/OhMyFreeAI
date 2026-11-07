@@ -442,9 +442,7 @@ func TestRestoreDatabaseRestoresSnapshotAndPreservesRollback(t *testing.T) {
 		t.Fatalf("load restored configuration: %v", err)
 	}
 	if !reflect.DeepEqual(restoredConfig, sourceConfig) {
-		t.Fatalf("restored configuration mismatch:
- got: %#v
-want: %#v", restoredConfig, sourceConfig)
+		t.Fatalf("restored configuration mismatch:\n got: %#v\nwant: %#v", restoredConfig, sourceConfig)
 	}
 	if err := restoredStore.Close(); err != nil {
 		t.Fatalf("close restored database: %v", err)
@@ -463,9 +461,7 @@ want: %#v", restoredConfig, sourceConfig)
 		t.Fatalf("load preserved configuration: %v", err)
 	}
 	if !reflect.DeepEqual(previousConfig, targetConfig) {
-		t.Fatalf("rollback configuration mismatch:
- got: %#v
-want: %#v", previousConfig, targetConfig)
+		t.Fatalf("rollback configuration mismatch:\n got: %#v\nwant: %#v", previousConfig, targetConfig)
 	}
 }
 
