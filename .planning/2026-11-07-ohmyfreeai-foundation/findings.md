@@ -600,3 +600,11 @@
 - Root CI run `42410030822` completed SUCCESS on Ubuntu and Windows.
 - The remaining CLI verification is the eight-distro Linux matrix, now configured to execute the native CLI smoke in every lane (run `42410214638`, queued at this update).
 - Wails workflow: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42409974970
+
+## Backup UI integration constraints — 2026-11-07T20:18Z
+
+- The existing archive manager supports Create and Restore but has no public Inspect method. A safe Inspect implementation can extract to a private temporary directory using the same strict validator, verify the SQLite snapshot/checksum/schema, return only manifest metadata, and remove the temporary snapshot.
+- Critical restore lifecycle constraint: sqlite.RestoreDatabase explicitly requires the target Store to be closed. The Wails app currently opens one Store for the full GUI lifetime and AppService.configuration.Repository points directly at it. Calling Restore from the current AppService would be unsafe; the application needs an owned Store lifecycle/reopen/swap abstraction and rollback handling before restore can be exposed.
+- Export and Inspect do not require replacing the live DB and can be delivered first. Restore remains intentionally blocked until the lifecycle is implemented and tested.
+- Pinned Wails v3.0.0 native file dialogs are available via application.Get().Dialog.SaveFile() / OpenFile(), with SetFilename, AddFilter, and PromptForSingleSelection; verified from the exact v3.0.0 source/tutorial. Do not use browser file-path inputs for backup selection.
+- This preserves the .omfaibackup contract: archive contains app metadata/config DB only; no model weights, engine binaries, credentials or runtime process state.
