@@ -262,3 +262,15 @@
 - Latest root CI run `42399602407` passed on Ubuntu and Windows. Both completed Go vet/tests/build, Python syntax/tests, frontend syntax and architecture-boundary checks.
 - Correction to previous test design: replace fragile stdout grep with an explicit opt-in marker written by AppService.GetSnapshot only when `OMFAI_WEBVIEW_SMOKE_MARKER` is set. CI waits for this marker, proving the JS-triggered Go method ran. Use software rendering/Xvfb and repeat startup to check DB reopen.
 - Sources: https://v3.wails.io/faq/ ; https://wails.io/quick-start/installation/ ; https://wails.io/guides/build/linux/
+
+
+## Distro CI package bootstrap failures — 2026-11-07T18:41Z
+
+- First matrix attempt `42402466122` exposed package-name assumptions before checkout/build:
+  - Ubuntu 24.04 and Debian 13 do not provide the package name `libegl1-mesa`; use the runtime package `libegl1` (Mesa DRI remains `libgl1-mesa-dri`).
+  - openSUSE Tumbleweed's current WebKitGTK 6 development package is `webkitgtk4-devel`, not `webkitgtk-6_0-devel`. It provides pkg-config module `webkitgtk-6.0`.
+  - Rocky Linux 9 provides WebKit2GTK 4.0 (`webkit2gtk3`) rather than the required 4.1 ABI; it is not a valid Wails v3.0.x GTK3 compatibility lane. Removed Rocky 9 instead of forcing an unsupported ABI.
+- Corrected the matrix: default GTK4 stack on Ubuntu 24.04, Debian 13, Fedora 44, Arch rolling, openSUSE Tumbleweed; legacy GTK3/WebKit2GTK 4.1 on Ubuntu 22.04, Debian 12 and Fedora 44. This keeps eight jobs and tests both supported Fedora stacks on the same current Fedora release.
+- Official Fedora package metadata lists `webkit2gtk4.1-devel` for Fedora 44; openSUSE Tumbleweed OSS package metadata lists `webkitgtk4-devel`. Rocky Linux 9 repository metadata and Wails compatibility notes show the available 4.0 package does not satisfy the 4.1 legacy ABI.
+- These were workflow dependency-install failures, not application compile/runtime failures. The jobs never reached checkout or build; no distro compatibility conclusion can be drawn from them.
+- Additional source links: https://packages.fedoraproject.org/pkgs/webkitgtk/webkit2gtk4.1-devel/fedora-44.html ; https://pkgdex.org/opensuse/tumbleweed/x86_64/oss/webkitgtk4-devel-2.54.1-3.1.rpm.html ; https://download.rockylinux.org/pub/rocky/9/devel/x86_64/os/Packages/w/
