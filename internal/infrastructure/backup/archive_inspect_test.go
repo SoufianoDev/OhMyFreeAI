@@ -15,6 +15,13 @@ import (
 func TestManagerInspectReturnsValidatedManifestWithoutChangingLiveDatabase(t *testing.T) {
 	ctx := context.Background()
 	root := t.TempDir()
+	inspectionTempRoot := filepath.Join(root, "inspection-tmp")
+	if err := os.Mkdir(inspectionTempRoot, 0o700); err != nil {
+		t.Fatalf("create isolated inspection temp root: %v", err)
+	}
+	t.Setenv("TMPDIR", inspectionTempRoot)
+	t.Setenv("TMP", inspectionTempRoot)
+	t.Setenv("TEMP", inspectionTempRoot)
 	databasePath := filepath.Join(root, "state.db")
 	store, err := sqlite.Open(ctx, databasePath)
 	if err != nil {
@@ -56,6 +63,13 @@ func TestManagerInspectReturnsValidatedManifestWithoutChangingLiveDatabase(t *te
 	}
 	if err := store.Close(); err != nil {
 		t.Fatalf("close SQLite store: %v", err)
+	}
+	remaining, err := os.ReadDir(inspectionTempRoot)
+	if err != nil {
+		t.Fatalf("inspect temporary directory after inspection: %v", err)
+	}
+	if len(remaining) != 0 {
+		t.Fatalf("inspection left temporary files behind: %v", remaining)
 	}
 }
 
