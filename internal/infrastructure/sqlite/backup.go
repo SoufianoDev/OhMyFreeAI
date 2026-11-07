@@ -273,3 +273,28 @@ func removeSQLiteFiles(path string) {
 		_ = os.Remove(candidate)
 	}
 }
+
+
+// SnapshotSchemaVersion validates a self-contained SQLite snapshot and returns
+// its contiguous applied migration version.
+func SnapshotSchemaVersion(ctx context.Context, path string) (int, error) {
+	if err := verifyBackupDatabase(ctx, path); err != nil {
+		return 0, err
+	}
+	db, err := sql.Open(driverName, readOnlyDataSourceName(path))
+	if err != nil {
+		return 0, fmt.Errorf("open SQLite snapshot schema history: %w", err)
+	}
+	defer db.Close()
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+
+	hasHistory, version, err := currentMigrationVersion(ctx, db)
+	if err != nil {
+		return 0, fmt.Errorf("read SQLite snapshot schema version: %w", err)
+	}
+	if !hasHistory || version < 1 {
+		return 0, fmt.Errorf("%w: snapshot has no applied schema version", ErrBackupIntegrity)
+	}
+	return version, nil
+}
