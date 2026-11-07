@@ -268,3 +268,57 @@ func TestStoreControllerCloseDrainsLeasesAndRejectsFutureOperations(t *testing.T
 		t.Fatalf("second close error = %v, want ErrStoreUnavailable", err)
 	}
 }
+
+func TestStoreControllerPublishesVerifiedReplacementWhenExclusiveOperationFails(t *testing.T) {
+	oldStore := newLifecycleTestStore(t, "old.db")
+	newStore := newLifecycleTestStore(t, "rollback.db")
+	controller := NewStoreController(oldStore)
+	operationErr := errors.New("restore publication failed; rollback verified")
+
+	err := controller.WithExclusive(context.Background(), func(current *Store) (*Store, error) {
+		if current != oldStore {
+			t.Fatal("exclusive operation received an unexpected current store")
+		}
+		if closeErr := current.Close(); closeErr != nil {
+			return nil, closeErr
+		}
+		return newStore, operationErr
+	})
+	if !errors.Is(err, operationErr) {
+		t.Fatalf("exclusive operation error = %v, want original operation error", err)
+	}
+
+	if err := controller.WithShared(context.Background(), func(current *Store) error {
+		if current != newStore {
+			t.Fatal("controller exposed the closed pre-restore store instead of the verified rollback store")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("shared operation after failed restore: %v", err)
+	}
+	if err := controller.Close(context.Background()); err != nil {
+		t.Fatalf("close controller: %v", err)
+	}
+}
+
+func TestStoreControllerFailsClosedWhenExclusiveOperationReturnsNoSafeStore(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	controller := NewStoreController(store)
+	operationErr := errors.New("rollback could not be verified")
+
+	err := controller.WithExclusive(context.Background(), func(current *Store) (*Store, error) {
+		if closeErr := current.Close(); closeErr != nil {
+			return nil, closeErr
+		}
+		return nil, operationErr
+	})
+	if !errors.Is(err, operationErr) {
+		t.Fatalf("exclusive operation error = %v, want original operation error", err)
+	}
+	if err := controller.WithShared(context.Background(), func(*Store) error {
+		t.Fatal("shared operation ran despite the controller having no verified active store")
+		return nil
+	}); !errors.Is(err, ErrStoreUnavailable) {
+		t.Fatalf("shared operation error = %v, want ErrStoreUnavailable", err)
+	}
+}
