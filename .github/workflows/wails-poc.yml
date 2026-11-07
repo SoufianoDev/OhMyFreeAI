@@ -1,0 +1,73 @@
+name: Wails v3 platform proof
+
+on:
+  push:
+    branches:
+      - "foundation/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-build:
+    name: Wails v3.0.0 / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.27.3"
+          cache: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install Linux desktop build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev
+
+      - name: Install pinned Wails CLI
+        shell: bash
+        run: |
+          go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Generate official vanilla JavaScript starter
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/omfai-wails-proof"
+          cd "$RUNNER_TEMP/omfai-wails-proof"
+          wails3 init -n omfai-wails-poc -t vanilla-js
+
+      - name: Build official starter on native runner
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/omfai-wails-proof/omfai-wails-poc"
+          wails3 build
+
+      - name: Verify executable was produced
+        shell: bash
+        run: |
+          cd "$RUNNER_TEMP/omfai-wails-proof/omfai-wails-poc"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            test -f "bin/omfai-wails-poc.exe"
+          else
+            test -f "bin/omfai-wails-poc"
+          fi
