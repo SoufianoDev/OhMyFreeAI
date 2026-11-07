@@ -29,7 +29,7 @@ The root Go module pins modernc.org/sqlite v1.62.0 and commits go.mod/go.sum. CI
 
 The production adapter lives in internal/infrastructure/sqlite:
 - Store.Open creates/opens a file-backed database, rejects in-memory paths, database-file symlinks and Windows UNC paths, and configures WAL, foreign_keys=ON on every connection, busy_timeout=5000 and synchronous=FULL.
-- Store.Migrate applies embedded forward migrations in order, skips .down.sql files, rejects version gaps/untracked history and commits each migration with its schema_migrations record in one transaction.
+- Store.Migrate applies embedded forward migrations in order, skips .down.sql files, rejects version gaps, non-contiguous applied history and untracked history and commits each migration with its schema_migrations record in one transaction.
 - The ConfigRepository adapter returns defaults when no settings row exists and validates configuration before an atomic upsert. Persisted data contains secret references, not secret values.
 - Tests cover migration idempotence, rollback, version gaps, config round-trip and rejection, file permissions, WAL and connection-scoped PRAGMAs on four simultaneously held connections.
 
