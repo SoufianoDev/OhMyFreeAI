@@ -274,3 +274,11 @@
 - Official Fedora package metadata lists `webkit2gtk4.1-devel` for Fedora 44; openSUSE Tumbleweed OSS package metadata lists `webkitgtk4-devel`. Rocky Linux 9 repository metadata and Wails compatibility notes show the available 4.0 package does not satisfy the 4.1 legacy ABI.
 - These were workflow dependency-install failures, not application compile/runtime failures. The jobs never reached checkout or build; no distro compatibility conclusion can be drawn from them.
 - Additional source links: https://packages.fedoraproject.org/pkgs/webkitgtk/webkit2gtk4.1-devel/fedora-44.html ; https://pkgdex.org/opensuse/tumbleweed/x86_64/oss/webkitgtk4-devel-2.54.1-3.1.rpm.html ; https://download.rockylinux.org/pub/rocky/9/devel/x86_64/os/Packages/w/
+
+
+## Minimal openSUSE container shell issue — 2026-11-07T18:46Z
+
+- After correcting the GTK/WebKit package names and replacing xvfb-run with direct Xvfb, openSUSE Tumbleweed reached the action setup stage but failed before running the dependency script: the minimal container image does not include `bash`, which GitHub Actions uses as the default shell for Linux run steps.
+- Added `bash` to the openSUSE package install list. This is a container bootstrap issue; no application build was attempted in that job.
+- The smoke script now launches `Xvfb` directly, so it no longer depends on the distribution-specific xvfb-run wrapper.
+- The native Ubuntu WebView smoke attempt on commit `61702c24` exited with code 2 before the marker. The old log did not contain the application's captured output because the smoke helper did not print it on early exit. The helper now includes the last 5,000 characters of application output in this failure case; the next Wails run will establish the actual reason. Do not attribute exit code 2 to EGL/DRI3 without that evidence.
