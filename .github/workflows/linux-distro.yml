@@ -84,12 +84,12 @@ jobs:
 
     steps:
       - name: Install native desktop build and virtual-display dependencies
-        shell: bash
+        shell: sh
         env:
           DISTRO_FAMILY: ${{ matrix.family }}
           BUILD_STACK: ${{ matrix.stack }}
         run: |
-          set -euo pipefail
+          set -eu
           case "$DISTRO_FAMILY:$BUILD_STACK" in
             debian:gtk4-webkit6)
               apt-get update
