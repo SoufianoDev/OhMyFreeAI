@@ -52,6 +52,13 @@ def go_command(subcommand: str, _: argparse.Namespace) -> int:
     return run(["go", subcommand, "./..."])
 
 
+def test(_: argparse.Namespace) -> int:
+    go_status = go_command("test", _)
+    if go_status != 0:
+        return go_status
+    return run([sys.executable, "-m", "unittest", "discover", "-s", "tests", "-v"])
+
+
 def fmt(_: argparse.Namespace) -> int:
     if not shutil.which("gofmt"):
         print("gofmt is required for this command.", file=sys.stderr)
@@ -88,7 +95,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("doctor", help="inspect local tools without installing anything").set_defaults(func=doctor)
-    sub.add_parser("test", help="run Go tests").set_defaults(func=lambda a: go_command("test", a))
+    sub.add_parser("test", help="run Go and Python standard-library tests").set_defaults(func=test)
     sub.add_parser("build", help="compile Go packages without producing a release package").set_defaults(func=lambda a: go_command("build", a))
     sub.add_parser("fmt", help="format Go source files with gofmt").set_defaults(func=fmt)
     sub.add_parser("arch-check", help="check required docs and domain import boundaries").set_defaults(func=arch_check)
