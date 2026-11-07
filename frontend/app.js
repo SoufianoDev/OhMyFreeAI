@@ -20,7 +20,12 @@ const translations = {
     policyDetails: "تقيّد Google بعض أنماط التحكم عن بُعد وتجاوز واجهة الدفتر وتقديم خدمات الويب على بيئات Colab المُدارة المجانية. لذلك لا يمكن تفعيل مسار خادم استدلال بعيد قبل مراجعة نمط الاستخدام المحدد والتأكد من توافقه.",
     policySource: "المصدر: شروط وأسئلة Colab الرسمية.", resourceSnapshot: "لقطة الموارد", resourceUnavailable: "لا توجد بيانات GPU أو RAM أو مساحة قرص موثقة. لا يتم افتراض نوع GPU أو توفره.",
     appearance: "المظهر", appearanceSub: "اختر المظهر الفاتح أو الداكن.", light: "فاتح", dark: "داكن", language: "اللغة",
-    languageSub: "العربية والإنجليزية مع اتجاه تخطيط صحيح."
+    languageSub: "العربية والإنجليزية مع اتجاه تخطيط صحيح.",
+    backupTitle: "النسخ الاحتياطي", backupDescription: "صدّر إعدادات التطبيق وبياناته المحلية، أو افحص نسخة موجودة قبل الاستعادة.",
+    backupExport: "تصدير نسخة احتياطية", backupInspect: "فحص نسخة احتياطية", backupExporting: "جارٍ إنشاء النسخة الاحتياطية…",
+    backupExported: "تم إنشاء النسخة: ", backupInspecting: "جارٍ التحقق من النسخة…", backupCanceled: "تم إلغاء العملية.",
+    backupInspected: "النسخة صالحة. تفاصيلها:", backupVersion: "إصدار التطبيق", backupSchema: "إصدار قاعدة البيانات",
+    backupCreated: "تاريخ الإنشاء", backupSize: "حجم قاعدة البيانات", backupFailed: "فشلت العملية. راجع السجل التشخيصي."
   },
   en: {
     workspace: "Workspace", dashboard: "Dashboard", models: "Models", runtime: "Runtime", preferences: "Preferences",
@@ -41,7 +46,12 @@ const translations = {
     policyDetails: "Google restricts certain remote-control patterns, notebook UI bypasses and web-service offerings on free managed Colab runtimes. A remote inference server flow cannot be enabled until the exact usage pattern is reviewed and confirmed compliant.",
     policySource: "Source: official Colab terms and FAQ.", resourceSnapshot: "Resource snapshot", resourceUnavailable: "No verified GPU, RAM or disk data is available. No accelerator type or availability is assumed.",
     appearance: "Appearance", appearanceSub: "Choose light or dark appearance.", light: "Light", dark: "Dark", language: "Language",
-    languageSub: "Arabic and English with correct layout direction."
+    languageSub: "Arabic and English with correct layout direction.",
+    backupTitle: "Backups", backupDescription: "Export local application settings and data, or validate an existing archive before restore.",
+    backupExport: "Export backup", backupInspect: "Inspect backup", backupExporting: "Creating backup…",
+    backupExported: "Backup created: ", backupInspecting: "Validating archive…", backupCanceled: "Operation canceled.",
+    backupInspected: "Backup is valid. Details:", backupVersion: "Application version", backupSchema: "Database schema",
+    backupCreated: "Created", backupSize: "Database size", backupFailed: "Operation failed. Check diagnostic logs."
   }
 };
 
@@ -109,6 +119,74 @@ document.querySelectorAll("[data-page]").forEach((button) => button.addEventList
 document.querySelectorAll("[data-open-page]").forEach((button) => button.addEventListener("click", () => showPage(button.dataset.openPage)));
 document.getElementById("theme-toggle").addEventListener("click", () => applyTheme(theme === "light" ? "dark" : "light"));
 document.getElementById("language-toggle").addEventListener("click", () => applyLanguage(language === "ar" ? "en" : "ar"));
+
+const backupStatus = document.getElementById("backup-status");
+const backupDetails = document.getElementById("backup-details");
+
+function setBackupStatus(message, isError = false) {
+  backupStatus.hidden = false;
+  backupStatus.textContent = message;
+  backupStatus.dataset.state = isError ? "error" : "normal";
+}
+
+function formatBackupSize(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+document.getElementById("backup-export").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  backupDetails.hidden = true;
+  setBackupStatus(translations[language].backupExporting);
+  try {
+    const result = await window.OhMyFreeAI.ExportBackup();
+    if (result.canceled) setBackupStatus(translations[language].backupCanceled);
+    else setBackupStatus(translations[language].backupExported + result.fileName);
+  } catch (error) {
+    console.error("Backup export failed:", error);
+    setBackupStatus(translations[language].backupFailed, true);
+  } finally {
+    button.disabled = false;
+  }
+});
+
+document.getElementById("backup-inspect").addEventListener("click", async (event) => {
+  const button = event.currentTarget;
+  button.disabled = true;
+  backupDetails.hidden = true;
+  setBackupStatus(translations[language].backupInspecting);
+  try {
+    const result = await window.OhMyFreeAI.InspectBackup();
+    if (result.canceled) {
+      setBackupStatus(translations[language].backupCanceled);
+    } else {
+      setBackupStatus(translations[language].backupInspected);
+      const rows = [
+        [translations[language].backupVersion, result.applicationVersion],
+        [translations[language].backupSchema, String(result.schemaVersion)],
+        [translations[language].backupCreated, new Date(result.createdAt).toLocaleString(language)],
+        [translations[language].backupSize, formatBackupSize(result.databaseSizeBytes)]
+      ];
+      backupDetails.replaceChildren(...rows.map(([label, value]) => {
+        const row = document.createElement("div");
+        const key = document.createElement("span");
+        const content = document.createElement("strong");
+        key.textContent = label;
+        content.textContent = value;
+        row.append(key, content);
+        return row;
+      }));
+      backupDetails.hidden = false;
+    }
+  } catch (error) {
+    console.error("Backup inspection failed:", error);
+    setBackupStatus(translations[language].backupFailed, true);
+  } finally {
+    button.disabled = false;
+  }
+});
 document.querySelectorAll("[data-theme-choice]").forEach((button) => button.addEventListener("click", () => applyTheme(button.dataset.themeChoice)));
 document.querySelectorAll("[data-language-choice]").forEach((button) => button.addEventListener("click", () => applyLanguage(button.dataset.languageChoice)));
 applyLanguage(language);
