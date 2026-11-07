@@ -8,6 +8,7 @@ on:
       - 'desktop-src/**'
       - 'frontend/**'
       - 'scripts/build_desktop.py'
+      - 'scripts/smoke_desktop.py'
       - 'go.mod'
       - 'go.sum'
       - 'internal/**'
@@ -77,53 +78,7 @@ jobs:
 
       - name: Smoke-test native WebView bridge and database reopen (Linux)
         if: runner.os == 'Linux'
-        shell: bash
-        run: |
-          set -euo pipefail
-          first_log="$RUNNER_TEMP/ohmyfreeai-webview-smoke.log"
-          set +e
-          timeout --signal=TERM --kill-after=5s 12s xvfb-run -a ./dist/OhMyFreeAI >"$first_log" 2>&1
-          first_status=$?
-          set -e
-          cat "$first_log"
-          if [[ "$first_status" -ne 124 && "$first_status" -ne 0 && "$first_status" -ne 137 ]]; then
-            echo "Native application exited unexpectedly: $first_status"
-            exit "$first_status"
-          fi
-          grep -q "native snapshot ready" "$first_log"
-
-          second_log="$RUNNER_TEMP/ohmyfreeai-webview-reopen.log"
-          set +e
-          timeout --signal=TERM --kill-after=5s 12s xvfb-run -a ./dist/OhMyFreeAI >"$second_log" 2>&1
-          second_status=$?
-          set -e
-          cat "$second_log"
-          if [[ "$second_status" -ne 124 && "$second_status" -ne 0 && "$second_status" -ne 137 ]]; then
-            echo "Native application failed to reopen after termination: $second_status"
-            exit "$second_status"
-          fi
-          grep -q "native snapshot ready" "$second_log"
-
-          if grep -q "Overriding existing handler for signal 10" "$first_log" "$second_log"; then
-            signal_log="$RUNNER_TEMP/ohmyfreeai-webview-signal12.log"
-            set +e
-            timeout --signal=TERM --kill-after=5s 12s xvfb-run -a env JSC_SIGNAL_FOR_GC=12 ./dist/OhMyFreeAI >"$signal_log" 2>&1
-            signal_status=$?
-            set -e
-            cat "$signal_log"
-            if [[ "$signal_status" -ne 124 && "$signal_status" -ne 0 && "$signal_status" -ne 137 ]]; then
-              echo "Native application failed with JSC_SIGNAL_FOR_GC=12: $signal_status"
-              exit "$signal_status"
-            fi
-            grep -q "native snapshot ready" "$signal_log"
-            if grep -q "Overriding existing handler for signal 10" "$signal_log"; then
-              echo "JSC_SIGNAL_FOR_GC=12 did not resolve the JavaScriptCore signal warning."
-              exit 1
-            fi
-            echo "JSC_SIGNAL_FOR_GC=12 resolved the JavaScriptCore signal warning."
-          else
-            echo "No JavaScriptCore signal 10 warning reproduced."
-          fi
+        run: python scripts/smoke_desktop.py dist/OhMyFreeAI
 
       - name: Verify native executable (Windows)
         if: runner.os == 'Windows'
