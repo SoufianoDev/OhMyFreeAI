@@ -22,6 +22,13 @@ Migrations are embedded in the migrations package and are append-only in product
 
 The current statement splitter handles quoted values/identifiers and SQL comments. It does not support trigger bodies containing internal semicolons. Keep production migrations free of such triggers until a SQLite-aware parser is adopted.
 
+## Backup and restore
+
+- Store.BackupTo creates a consistent snapshot through modernc's SQLite online backup API. It does not copy the live database file or WAL sidecar.
+- The snapshot is verified with PRAGMA integrity_check, foreign_key_check and contiguous schema_migrations history before atomic publication. Existing destinations are not overwritten; the snapshot file is mode 0600 on Unix.
+- RestoreDatabase verifies the source before touching the target, restores into a temporary database, applies forward migrations, verifies the result, checkpoints/closes it, and atomically replaces the target. The previous database is retained as a rollback file.
+- The caller must close all target database connections before restore. Active SQLite sidecars are treated as a busy target. The API accepts a raw SQLite snapshot; the complete .omfaibackup archive/manifest wrapper is not implemented yet.
+
 ## Deliberate omissions
 
-This adapter does not yet implement the SQLite online backup API, restore verification, abrupt-process crash tests, long-duration stress tests, filesystem-type detection or schema migration checksums. Production backup/restore must not be implemented as an uncoordinated copy of the live database file.
+Abrupt-process crash tests, long-duration stress tests, filesystem-type detection, schema migration checksums, full .omfaibackup archive validation and clean-uninstall data handling remain open. Production backup/restore must not be implemented as an uncoordinated copy of the live database file.
