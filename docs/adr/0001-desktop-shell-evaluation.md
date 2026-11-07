@@ -5,26 +5,40 @@
 
 ## Context
 
-The product requires a Go core and a native desktop shell for Linux and Windows. Wails is a candidate, but the previous prototype uses Wails v2.10.2, which is not a current baseline. Official documentation now presents Wails v3.0.0 as stable and recommends it for new projects. Wails v3 requires Go 1.26+ and GTK4/WebKitGTK 6.0 on Linux by default; older distro stacks require a temporary legacy build tag. Wails v2 continues to receive critical updates and documents Go 1.21+ and GTK3/WebKit dependencies.
+The product requires a Go core and a native desktop shell for Linux and Windows. Wails v3.0.0 is the selected stable baseline for new applications. It requires Go 1.26+ and GTK4/WebKitGTK 6.0 on the default Linux build path. The project toolchain target is Go 1.27.3.
 
-The project toolchain target is Go 1.27.3, which exceeds the documented Wails v3 Go 1.26+ requirement. GitHub Actions verified the pinned Wails v3.0.0 official vanilla-js starter on Ubuntu 24.04 and Windows using Go 1.27.3 and Node 22. The test generated the official GreetService JavaScript binding, asserted the exported Greet method, built the native executable and checked the output file on each OS.
+The initial official vanilla-js starter and generated binding proof passed on Ubuntu 24.04 and Windows. The application-specific integration has now also been built on both platforms using the official Wails template.
 
 ## Decision
 
 Select **Wails v3.0.0** as the desktop shell for the Linux and Windows application.
 
-The native proof passed on both Ubuntu 24.04 and Windows. The Linux baseline is Ubuntu 24.04 with GTK4 and WebKitGTK 6.0 development/runtime dependencies; the Windows proof uses the hosted WebView2 environment. This does not establish support for older Linux distributions or macOS.
+The repository keeps the framework boundary narrow:
+- Go source templates live in desktop-src/ and are copied into a generated Wails project.
+- scripts/build_desktop.py creates the official vanilla-js template in a temporary workspace, overlays the actual app source and frontend, adds a local replace to the root Go module, generates bindings and builds the native executable.
+- The root Go module remains free of Wails dependencies; domain/application code does not import Wails.
+- The app registers one AppService with GetSnapshot and SaveConfig. The generated binding pass reported 1 service, 2 methods and 7 models.
+- The frontend calls GetSnapshot and only displays native connectivity after that call resolves.
 
-The Go domain and application layers remain independent of Wails. Wails belongs only in the desktop/platform adapter. The actual application service registration, WebView invocation, lifecycle/shutdown integration, native process/terminal integration, packaging and uninstall still require implementation and dedicated tests. The proof built the official starter, not the complete OhMyFreeAI application.
+Application-specific Wails run 42396866046 passed on ubuntu-24.04 and windows-latest. Both generated bindings, built the Vite production bundle and produced the expected native executable.
+
+## Verified baseline and remaining gates
+
+- Ubuntu 24.04 with GTK4 and WebKitGTK 6.0 development packages is the only Linux build baseline certified so far.
+- Windows native executable build passed on the hosted WebView2 environment.
+- The CI build verifies service binding generation and native compilation; it does not yet launch the WebView and assert a live call at runtime.
+- Process ownership, graceful shutdown/cancellation, terminal integration, packaging, installer/uninstall, and older Linux distribution support remain open.
+- macOS remains deferred.
+- The Windows Wails build printed a non-fatal "-VThe system cannot find the file specified." line before its Taskfile steps. Binding generation, Vite build and executable creation still succeeded. The origin is not yet established.
 
 ## Consequences
 
-- Keep Wails imports at the desktop/platform boundary; do not leak framework types into domain/application packages.
-- Add the Wails Go dependency as part of the actual desktop adapter implementation, not to domain packages.
-- Ubuntu 24.04 is the only Linux baseline certified so far; older distro compatibility and packaging remain open.
-- The old monitor GUI is an audit reference, not the UI design baseline.
+- Keep Wails imports at the desktop/platform boundary.
+- Keep the official Wails template and version pinned in the build workflow.
+- Do not equate a successful native build with a runtime or packaging certificate.
+- The old monitor GUI remains an audit reference, not the UI design baseline.
 
 Sources:
 - https://wails.io/getting-started/installation/
 - https://v3.wails.io/faq/
-- https://v2.wails.io/docs/gettingstarted/installation/
+- https://github.com/wailsapp/wails/tree/v3.0.0/v3/internal/templates
