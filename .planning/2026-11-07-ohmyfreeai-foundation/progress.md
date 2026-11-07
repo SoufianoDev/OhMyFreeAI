@@ -501,3 +501,6 @@
 - The new two-stage bridge test passed twice on Ubuntu: WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2; WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2; WEBVIEW_REOPEN_PASS.
 - This confirms the initial Go call, successful dynamic import of app.js, second Go call and SQLite reopen on GTK4/WebKitGTK 6.0.
 - The same code is now being tested across all eight distro lanes in run 42405827037, including the openSUSE PATH correction.
+
+
+- Arch Linux rolling passed the latest two-stage bridge retest in run 42405827037: both GetSnapshot calls succeeded before/after UI-module import and database reopen passed. Output: WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2, attempt=2 calls=2, WEBVIEW_REOPEN_PASS.
