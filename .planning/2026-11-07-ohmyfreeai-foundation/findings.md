@@ -512,3 +512,11 @@
 - Output: `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, `WEBVIEW_REOPEN_PASS`.
 - This also confirms the earlier shell issue disappeared once setup-python was removed; the extra PATH restoration is not required for this successful run.
 - Five current two-stage lanes are now green: Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Arch rolling and openSUSE Tumbleweed. The three legacy GTK3 lanes remain in progress.
+
+
+## Ubuntu 22.04 and Fedora 44 legacy GTK3 passes — 2026-11-07T19:35Z
+
+- Ubuntu 22.04 / GTK3 + WebKit2GTK 4.1 passed the full build and two-stage WebView bridge/database-reopen smoke in run `42405729874`.
+- Fedora 44 legacy GTK3 / WebKit2GTK 4.1 also passed the full build and two-stage smoke in the same run.
+- Both emitted `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, and `WEBVIEW_REOPEN_PASS`.
+- This validates the legacy GTK3 lane on both Ubuntu 22.04 and Fedora 44, including the refactored bridge bootstrap. Debian 12 legacy GTK3 is the only remaining job in this run.
