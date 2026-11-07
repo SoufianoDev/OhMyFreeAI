@@ -406,3 +406,6 @@
 
 
 - The first matrix after the shell-template change failed immediately: GitHub Actions rejected the custom `/bin/sh -e {0}` value as an invalid shell option. Switched back to the supported built-in `sh` shell; setup-python has already been removed, so the prior PATH regression should no longer apply. No distro build ran in the rejected attempt.
+
+
+- A follow-up run showed the dependency-install step still explicitly used the unsupported `/bin/sh` shell even though job defaults were corrected. Aligned the step to built-in `sh`; no distro setup/build was attempted in that run.
