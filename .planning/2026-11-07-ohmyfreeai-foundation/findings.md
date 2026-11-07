@@ -452,3 +452,11 @@
 - Added `tests/test_smoke_desktop.py` with valid single/multiple call counts and malformed marker cases.
 - A follow-up escaping issue in the regex initially made it match a literal backslash-n; corrected the pattern to match the actual newline written by Go. Current code is at commit `70546dd5462692a8e3d2e8183815983b13cec52c`.
 - CI, Wails and Linux distro workflows for that commit are queued; do not mark this correction verified until those runs complete.
+
+
+## Wails bridge bootstrap sequencing — 2026-11-07T19:23Z
+
+- Latest application build script now generates a bridge bootstrap that starts one native `GetSnapshot` call before dynamically importing `app.js`, then calls `GetSnapshot` again after the UI module loads and dispatches `ohmyfreeai:bridge-ready` with the first snapshot. This is intended to isolate the Ubuntu 22.04 GTK3/WebKit2GTK bridge timing issue.
+- Commit `f189e0b1` updates the smoke helper to require the marker count to reach 2 for each launch (one call before UI import, one after). The helper still resets the marker before each of its two process launches.
+- Marker parser tests were added in `tests/test_smoke_desktop.py`; they validate the counted marker format, not the native Wails bridge itself.
+- Runs `42405729818` (CI), `42405729902` (Wails) and `42405729874` (Linux distro matrix) are the latest verification set and are queued/pending at this point.
