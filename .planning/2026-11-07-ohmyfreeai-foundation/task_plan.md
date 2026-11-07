@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Implement the GUI-default application CLI dispatcher (`--help`, `--version`, `doctor`) using TDD; unknown commands must exit without launching the GUI. Then design and wire safe `.omfaibackup` inspect/export/restore flows, respecting the open-database lifecycle. Keep Colab remote inference policy-gated.
+Verify the native CLI smoke on Ubuntu/Windows and the eight Linux distro lanes. If green, mark CLI complete, then design the backup application boundary around the open SQLite database lifecycle before implementing inspect/export/restore. Keep Colab remote inference policy-gated.
 
 ## Current Phase
 
@@ -72,7 +72,8 @@ Phase 4
 - [ ] Validate WebKit's production sandbox on a real Linux host; container CI explicitly does not certify sandbox behavior
 - [x] Define explicit Linux distribution targets and add GTK4/WebKitGTK 6.0 plus legacy GTK3/WebKit2GTK 4.1 build/runtime smoke matrix (Ubuntu 24.04, Debian 13, Fedora 44, Arch, openSUSE Tumbleweed, Ubuntu 22.04, Debian 12, Fedora 44 legacy)
 - [x] Verify all eight Linux distro jobs pass in run 42405827037; distinguish container userland coverage from bare-metal certification
-- [ ] Add GUI-default CLI dispatch (`--help`, `--version`, `doctor`; unknown commands must not open GUI)
+- [x] Implement framework-independent GUI-default CLI parser with typed unknown-command/extra-argument errors and unit tests
+- [ ] Verify the built native executable handles `--help`, `--version`, `doctor`, unknown commands and read-only doctor behavior on Linux/Windows and all eight Linux distro lanes
 - [ ] Add abrupt-process crash/reopen recovery tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
