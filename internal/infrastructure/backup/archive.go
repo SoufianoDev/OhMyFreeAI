@@ -68,6 +68,9 @@ func (m Manager) Create(ctx context.Context, store *sqlite.Store, destinationPat
 	if store == nil || strings.TrimSpace(m.ApplicationVersion) == "" || m.Migrations == nil {
 		return ErrBackupManagerConfig
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := validateArchiveExtension(destinationPath); err != nil {
 		return err
 	}
@@ -113,6 +116,9 @@ func (m Manager) Create(ctx context.Context, store *sqlite.Store, destinationPat
 	digest, size, err := hashFile(ctx, snapshotPath)
 	if err != nil {
 		return fmt.Errorf("hash SQLite snapshot: %w", err)
+	}
+	if size == 0 || size > maxDatabaseBytes {
+		return fmt.Errorf("%w: hashed SQLite snapshot size exceeds the archive limit", ErrInvalidBackupArchive)
 	}
 
 	manifest := Manifest{
@@ -202,6 +208,9 @@ func (m Manager) Restore(ctx context.Context, archivePath, targetDatabasePath st
 	absoluteArchive, err := filepath.Abs(archivePath)
 	if err != nil {
 		return "", fmt.Errorf("resolve backup archive: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
 	absoluteTarget, err := filepath.Abs(targetDatabasePath)
 	if err != nil {
