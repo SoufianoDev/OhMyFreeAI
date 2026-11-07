@@ -371,3 +371,11 @@
 - openSUSE's later CLI step explicitly overrode the job's POSIX shell with Bash. Removed the override; all distro job commands now use POSIX sh.
 - Added explicit system pkg-config paths after setup-python and validation of the exact GTK/WebKit pkg-config modules before installing the Wails CLI. This catches missing headers at the dependency stage rather than later.
 - Modern GTK4 jobs reached the actual executable smoke test but crashed with a native Go stack; the diagnostic headline is not yet available from that run. Latest smoke helper emits head+tail and will be inspected on the next run.
+
+
+## Definitive WebKit sandbox diagnosis and CI-only workaround — 2026-11-07T19:00Z
+
+- Retrieved the full fatal headline from Wails run 42403772084. Root cause is WebKit bubblewrap sandbox setup inside the GitHub-hosted runner: `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`; its D-Bus credential/proxy connection then fails and GTK terminates with SIGTRAP/Go exit 2.
+- The earlier signal-10 warning is not causal for this failure. No JSC signal override was added.
+- Added `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` and `GTK_A11Y=none` strictly to the smoke subprocess environment. This bypasses a sandbox requirement unavailable in GitHub's restricted namespace, only for CI. It is not stored in product configuration, launch scripts or release builds.
+- Updated desktop build documentation to explicitly state that this CI smoke validates WebView startup, JS-to-Go, and database reopen but does not validate the WebKit sandbox itself. A separate host-level security check remains required.
