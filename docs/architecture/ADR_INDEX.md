@@ -12,4 +12,5 @@
 ## Build and implementation guides
 
 - [Native desktop build](DESKTOP_BUILD.md)
+- [Historical prototype audit](PROTOTYPE_AUDIT.md)
 - [Implementation blueprint](IMPLEMENTATION_BLUEPRINT.md)
