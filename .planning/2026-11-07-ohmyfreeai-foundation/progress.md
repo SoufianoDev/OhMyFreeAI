@@ -419,3 +419,6 @@
 
 
 - Ubuntu 24.04 / GTK4-WebKitGTK 6.0 has also passed the distro-container job in run 42404735351, including both WebView-to-Go markers and DB reopen. Debian 13 and Ubuntu 24.04 are now green; six other distro lanes remain.
+
+
+- openSUSE Tumbleweed now completes package installation, but subsequent steps cannot resolve the built-in `sh` command after the package transaction. The bootstrap itself runs under sh and installs Bash; changed post-bootstrap job steps to use Bash (setup-python is no longer present). openSUSE did not reach pkg-config/build/smoke in this attempt.
