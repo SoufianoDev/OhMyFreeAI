@@ -64,6 +64,8 @@ function applyLanguage(next) {
   });
   document.getElementById("language-toggle").textContent = next === "ar" ? "EN" : "ع";
   document.querySelector(".sidebar").setAttribute("aria-label", next === "ar" ? "التنقل الرئيسي" : "Main navigation");
+  const activePage = document.querySelector(".page.is-visible");
+  if (activePage) showPage(activePage.id.replace("page-", ""));
 }
 
 function applyTheme(next) {
