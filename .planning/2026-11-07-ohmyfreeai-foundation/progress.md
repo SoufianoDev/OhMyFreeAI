@@ -663,3 +663,12 @@
 - Updated the smoke harness to use a 60-second deadline, print a launch/progress marker, wait for the X11 socket to be ready, and retain Xvfb output. The 60-second change is in the newer commit `c4d7bf5c`; its full CI/Wails/distro workflows are queued/pending.
 - Root CI `42415564618` is SUCCESS on Ubuntu and Windows for commit `569c0c69`.
 - Linux distro matrix `42415564608` for commit `569c0c69` is running; the next authoritative matrix is the current-branch run after the 60-second harness adjustment.
+
+
+## WebView timing hardening and restore lifecycle design
+
+- Root CI run `42415960280` completed SUCCESS on Ubuntu and Windows for commit `c4d7bf5c`.
+- The preceding Wails run `42415564460` completed SUCCESS on both platforms. Ubuntu's live bridge smoke took about 26 seconds per launch; both launches eventually produced the required two Go calls and SQLite reopen passed. This gives direct evidence that the previous 30-second per-launch deadline was too close to the observed startup latency.
+- Raised the native WebView smoke deadline to 60 seconds, added explicit launch/first-call progress markers, retained the X11 socket readiness probe and captured Xvfb logs. The final 60-second version is in commit `c4d7bf5c`; current Wails retest `42415960222` is running and current eight-distro matrix `42415960198` is queued.
+- Added `docs/architecture/RESTORE_LIFECYCLE.md` and linked it from ADR_INDEX and SECURITY_AND_RECOVERY. It specifies a stable Store controller, shared/exclusive lifecycle leases, durable phase journal, staged restore verification, atomic publish, rollback, startup crash recovery and failure-injection tests.
+- Explicitly documented why restore remains disabled: current AppService and appconfig repository retain direct `*sqlite.Store` references; the infrastructure restore primitive has no durable transaction journal or application-level reopen/swap/rollback coordination.
