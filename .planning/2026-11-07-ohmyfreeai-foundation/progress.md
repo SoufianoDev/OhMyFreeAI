@@ -721,3 +721,13 @@
 - Previous revision root CI `42426918154`: Ubuntu completed SUCCESS; Windows was canceled when newer commits superseded it. SQLite, Wails and distro jobs were also superseded/canceled or still running. Use the newest runs above as authoritative.
 - No race-detector result has been observed yet. The stress test is committed, but it is not a substitute for `go test -race`.
 - Next: inspect current CI results; add end-to-end tests proving configuration Save/Load and backup archive creation retain shared leases for their entire operations; then add the durable journal only after lifecycle behavior is fully verified. Restore remains disabled.
+
+## Continuation: race CI and config repository verification — 2026-11-07T23:51Z
+
+- Added a Linux-only `go test -race ./...` step to the main Go CI workflow (`.github/workflows/ci.yml`). This runs after ordinary Go tests and before build; Windows retains its native validation path.
+- Added `TestStoreControllerConfigRepositoryRoundTrip`, verifying the controller's real `ports.ConfigRepository` Save/Load delegation persists and returns the validated configuration and closes through the controller.
+- Re-inspected composition roots: Wails `SaveConfig` delegates to the configuration service backed by StoreController; Wails and CLI backup export wrap the full `Manager.Create` call in `WithShared`. Restore is not exposed in GUI/CLI.
+- Commit `83a0f7c81e2a56facad2f902dc54a30506daa259` contains the config repository round-trip test. Race CI workflow change is commit `185549356aafab17b5a6644a08a2d0177733b2a4`.
+- Current revision workflows: root CI `42427135468`, SQLite driver evaluation `42427135523`, Wails `42427135536`, Linux distribution matrix `42427135457`. At the time of this entry, jobs were pending/queued; no success is claimed.
+- Older workflow runs for superseded commits were still queued/in progress and are not authoritative. Await the current revision results.
+- Next: inspect CI/race output; add a deterministic backup lease-drain integration test if a stable test seam is available; then implement durable restore journal and startup recovery only after the controller suite is green. Restore remains disabled.
