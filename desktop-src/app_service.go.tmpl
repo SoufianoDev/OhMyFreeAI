@@ -57,10 +57,14 @@ func (s *AppService) ExportBackup() (BackupExportResult, error) {
 	if s == nil || s.store == nil || s.backupManager.Migrations == nil {
 		return BackupExportResult{}, fmt.Errorf("backup export is unavailable")
 	}
-	dialog := application.Get().Dialog.SaveFile().
-		SetTitle("Export OhMyFreeAI backup").
-		SetFilename("OhMyFreeAI-Backup-" + time.Now().Format("2006-01-02") + backup.ArchiveExtension).
-		AddFilter("OhMyFreeAI backup", "*"+backup.ArchiveExtension)
+	dialog := application.Get().Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
+		Title:    "Export OhMyFreeAI backup",
+		Filename: "OhMyFreeAI-Backup-" + time.Now().Format("2006-01-02") + backup.ArchiveExtension,
+		Filters: []application.FileFilter{{
+			DisplayName: "OhMyFreeAI backup",
+			Pattern:     "*" + backup.ArchiveExtension,
+		}},
+	})
 	path, err := dialog.PromptForSingleSelection()
 	if err != nil {
 		return BackupExportResult{}, fmt.Errorf("select backup destination: %w", err)
