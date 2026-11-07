@@ -151,3 +151,12 @@ func (s *Store) Close() error {
 	}
 	return nil
 }
+
+
+// DatabasePath returns the absolute path owned by this Store.
+func (s *Store) DatabasePath() string {
+	if s == nil {
+		return ""
+	}
+	return s.path
+}
