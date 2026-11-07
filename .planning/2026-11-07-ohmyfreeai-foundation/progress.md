@@ -363,3 +363,11 @@
 - Confirmed from the exact Wails v3.0.0 source that it already includes the periodic SA_ONSTACK repair and the WebKit load-finished repair, and intentionally excludes SIGUSR1 from SA_ONSTACK.
 - Confirmed from upstream WebKit source that JSC_SIGNAL_FOR_GC accepts a numeric signal ID (not the symbolic name SIGUSR2) and that JSC uses SIGUSR1 by default. Do not add a signal override until the fatal error's exact signal/headline is known; it may be harmful or irrelevant.
 - The current smoke output includes a native Go stack and register dump, but the diagnostic excerpt starts too late to show the fatal headline. Next step is to emit both head and tail of the captured application log, then diagnose from the exact signal message.
+
+
+## GTK stack selection and pkg-config fixes — 2026-11-07T18:57Z
+
+- The 0ea0680e distro run showed that legacy GTK3 images were trying to compile the Wails CLI itself with the default GTK4 stack. Updated CLI installation to use `go install -tags gtk3` for legacy lanes, matching the application build tag.
+- openSUSE's later CLI step explicitly overrode the job's POSIX shell with Bash. Removed the override; all distro job commands now use POSIX sh.
+- Added explicit system pkg-config paths after setup-python and validation of the exact GTK/WebKit pkg-config modules before installing the Wails CLI. This catches missing headers at the dependency stage rather than later.
+- Modern GTK4 jobs reached the actual executable smoke test but crashed with a native Go stack; the diagnostic headline is not yet available from that run. Latest smoke helper emits head+tail and will be inspected on the next run.
