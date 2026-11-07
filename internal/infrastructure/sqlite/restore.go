@@ -86,7 +86,7 @@ func RestoreDatabase(ctx context.Context, sourcePath, targetPath string, migrati
 		}
 	}()
 
-	temporaryStore, err := Open(ctx, temporaryPath)
+	temporaryStore, err := OpenExisting(ctx, temporaryPath)
 	if err != nil {
 		return "", fmt.Errorf("open temporary SQLite restore database: %w", err)
 	}
