@@ -287,3 +287,13 @@
 - Confirmed the core safety invariant: remote telemetry polling defers while a matching colab exec is active. The SSE patch's key correction is preserving blank lines, because they delimit SSE events.
 - Found concrete risks: the Q8_0 patch overwrites runtime.env with only two keys; the SSE patch is not transactional and has no rollback after restart/test failure; PID-only process checks are identity-unsafe; monitor history/log reads are unbounded; the Python history file does not enforce private permissions; the Wails v2 monitor is Linux-only and uses a UI style that should not be reused.
 - Documented all risks and unverified runtime assumptions in docs/architecture/PROTOTYPE_AUDIT.md. The old Wails v2 JSC_SIGNAL_FOR_GC=12 workaround is not carried into Wails v3 until tested against the actual GTK4/WebKitGTK 6 runtime.
+
+
+## SQLite online backup and restore primitives: 2026-11-07
+
+- Added Store.BackupTo using modernc.org/sqlite v1.62.0's NewBackup/Step/Finish API through database/sql.Conn.Raw. All driver-connection use remains inside the Raw callback.
+- Snapshot publication uses a temporary file in the destination directory, mode 0600, integrity_check, foreign_key_check, contiguous migration-history validation, file sync and rename. Existing destinations are refused; BUSY/LOCKED are retried with context cancellation.
+- Added RestoreDatabase using NewRestore/Step/Finish. It verifies the source before touching the target, restores into a temporary database, applies forward migrations, verifies integrity, checkpoints and closes it, rejects active sidecars/non-SQLite targets, and preserves an existing database as a rollback file.
+- Added tests for snapshot round-trip, file permissions, no-overwrite, cancellation, corrupted migration history, schema newer than the application, restore rollback preservation, active-target refusal, non-SQLite-target refusal and corrupt-source preservation.
+- Root CI run 42398884244 passed on Ubuntu 24.04 and Windows with the backup/restore tests. SQLite driver evaluation run 42398884345 passed all modernc/ncruces × Ubuntu/Windows combinations.
+- The raw SQLite snapshot primitive is not yet the complete user-facing .omfaibackup format. Archive manifest/checksum, strict ZIP entry validation and archive restore orchestration remain open.
