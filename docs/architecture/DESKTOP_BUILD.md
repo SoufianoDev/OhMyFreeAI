@@ -58,3 +58,8 @@ The pinned Wails v3.0.0 proof now has a separate distro-container matrix. The ma
 The GTK3 compatibility lane is specific to Wails v3.0.x; upstream schedules removal of the legacy stack in v3.1. These jobs run in distribution containers on GitHub-hosted Linux runners. They validate distro userland package availability, compilation, dynamic linking at launch, the virtual-display WebView and the Go service bridge; they are not bare-metal tests of every desktop environment, GPU driver, Wayland compositor, installer or update path.
 
 The native Ubuntu 24.04 and Windows jobs remain separate. Passing a distro container job does not replace native Windows verification or certify all hardware configurations.
+
+
+### CI sandbox boundary
+
+The Xvfb smoke test sets `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` and `GTK_A11Y=none` only in the child process environment used by GitHub Actions. GitHub-hosted/container runners deny the network-namespace operation required by WebKit's bubblewrap sandbox (`RTM_NEWADDR: Operation not permitted`), which otherwise makes the WebKit process fail before the application bridge can be tested. The sandbox-disable variable is explicitly documented by upstream WebKit as dangerous and is not written to application configuration, packaged launchers, or production runtime defaults. The CI smoke therefore verifies window startup, frontend loading, Go bridge invocation and database reopen, but does not certify WebKit sandbox operation; sandbox validation remains a separate host-level security test.
