@@ -44,17 +44,17 @@ type BackupInspectionSnapshot struct {
 type AppService struct {
 	configuration appconfig.Service
 	backupManager backup.Manager
-	store         *sqlite.Store
+	storeController *sqlite.StoreController
 }
 
-func NewAppService(configuration appconfig.Service, backupManager backup.Manager, store *sqlite.Store) *AppService {
-	return &AppService{configuration: configuration, backupManager: backupManager, store: store}
+func NewAppService(configuration appconfig.Service, backupManager backup.Manager, storeController *sqlite.StoreController) *AppService {
+	return &AppService{configuration: configuration, backupManager: backupManager, storeController: storeController}
 }
 
 // ExportBackup uses a native save dialog and writes a verified .omfaibackup
 // archive without overwriting an existing file.
 func (s *AppService) ExportBackup() (BackupExportResult, error) {
-	if s == nil || s.store == nil || s.backupManager.Migrations == nil {
+	if s == nil || s.storeController == nil || s.backupManager.Migrations == nil {
 		return BackupExportResult{}, fmt.Errorf("backup export is unavailable")
 	}
 	dialog := application.Get().Dialog.SaveFileWithOptions(&application.SaveFileDialogOptions{
@@ -75,7 +75,9 @@ func (s *AppService) ExportBackup() (BackupExportResult, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if err := s.backupManager.Create(ctx, s.store, path); err != nil {
+	if err := s.storeController.WithShared(ctx, func(store *sqlite.Store) error {
+		return s.backupManager.Create(ctx, store, path)
+	}); err != nil {
 		return BackupExportResult{}, fmt.Errorf("export backup: %w", err)
 	}
 	return BackupExportResult{FileName: filepath.Base(path)}, nil
