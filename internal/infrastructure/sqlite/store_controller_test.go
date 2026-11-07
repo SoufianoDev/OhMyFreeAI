@@ -322,3 +322,30 @@ func TestStoreControllerFailsClosedWhenExclusiveOperationReturnsNoSafeStore(t *t
 		t.Fatalf("shared operation error = %v, want ErrStoreUnavailable", err)
 	}
 }
+
+
+func TestStoreControllerFailsClosedWhenExclusiveOperationPanics(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	controller := NewStoreController(store)
+
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != "injected destructive panic" {
+				t.Fatalf("panic = %v, want injected destructive panic", recovered)
+			}
+		}()
+		_ = controller.WithExclusive(context.Background(), func(current *Store) (*Store, error) {
+			if err := current.Close(); err != nil {
+				t.Fatalf("close current store: %v", err)
+			}
+			panic("injected destructive panic")
+		})
+	}()
+
+	if err := controller.WithShared(context.Background(), func(*Store) error {
+		t.Fatal("shared operation ran after exclusive callback panicked")
+		return nil
+	}); !errors.Is(err, ErrStoreUnavailable) {
+		t.Fatalf("shared operation error = %v, want ErrStoreUnavailable", err)
+	}
+}
