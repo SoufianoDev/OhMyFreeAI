@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Implement a driver-isolated SQLite adapter/migration runner once the Go 1.26 toolchain is available; in parallel, close the Wails Linux/Windows proof-of-concept and Colab policy feasibility gates.
+Run the Wails v3.0.0 vanilla-js proof-of-concept on Linux and Windows using Go 1.27.3; then decide the shell version and implement the SQLite driver adapter after its cross-platform matrix passes.
 
 ## Current Phase
 
