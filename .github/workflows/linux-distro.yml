@@ -22,10 +22,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   linux-distro:
     name: ${{ matrix.distro }} / ${{ matrix.stack }}
@@ -38,6 +34,7 @@ jobs:
         shell: /bin/sh -e {0}
     strategy:
       fail-fast: false
+      max-parallel: 4
       matrix:
         include:
           # Current GTK4 + WebKitGTK 6.0 baseline.
