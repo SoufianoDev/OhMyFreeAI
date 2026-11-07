@@ -507,3 +507,6 @@
 
 
 - The latest two-stage bridge matrix has revalidated Debian 13, Fedora 44 GTK4 and Arch rolling end-to-end. All three pass application build, two GetSnapshot calls around UI-module import, and SQLite reopen.
+
+
+- Ubuntu 24.04 GTK4/WebKitGTK 6.0 passed the latest two-stage bridge run as well. Four current-run lanes are green: Ubuntu 24.04, Debian 13, Fedora 44 GTK4 and Arch rolling.
