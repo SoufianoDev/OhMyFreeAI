@@ -147,72 +147,13 @@ jobs:
             bash_path="$(command -v bash || true)"
             if [ -z "$bash_path" ]; then
               for candidate in /usr/bin/bash /bin/bash /usr/local/bin/bash; do
-                if [ -x "$candidate" ]; then
-                  bash_path="$candidate"
-                  break
-                fi
+                if [ -x "$candidate" ]; then bash_path="$candidate"; break; fi
               done
             fi
             if [ -z "$bash_path" ] || [ ! -x "$bash_path" ]; then
               echo "Bash package is present but no executable can be resolved." >&2
               rpm -q bash >&2 || true
-              rpm -ql bash >&2 | grep '/bash
-      - name: Checkout
-        uses: actions/checkout@v7.0.1
-
-      - name: Set up Go
-        uses: actions/setup-go@v7.0.0
-        with:
-          go-version: "1.27.3"
-          cache: false
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v7.1.0
-        with:
-          node-version: "22"
-
-      - name: Configure native pkg-config search paths
-        env:
-          DISTRO_FAMILY: ${{ matrix.family }}
-          BUILD_STACK: ${{ matrix.stack }}
-        run: |
-          case "$DISTRO_FAMILY" in
-            debian) system_pc="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig" ;;
-            fedora|suse) system_pc="/usr/lib64/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig" ;;
-            arch) system_pc="/usr/lib/pkgconfig:/usr/share/pkgconfig" ;;
-            *) echo "Unknown distro family: $DISTRO_FAMILY" >&2; exit 2 ;;
-          esac
-          echo "PKG_CONFIG_PATH=$system_pc:${PKG_CONFIG_PATH:-}" >> "$GITHUB_ENV"
-          case "$BUILD_STACK" in
-            gtk4-webkit6)
-              pkg-config --modversion gtk4
-              pkg-config --modversion webkitgtk-6.0
-              ;;
-            legacy-gtk3-webkit41)
-              pkg-config --modversion gtk+-3.0
-              pkg-config --modversion webkit2gtk-4.1
-              ;;
-          esac
-
-      - name: Install pinned Wails CLI
-        env:
-          WAILS_BUILD_TAGS: ${{ matrix.build_tags }}
-        run: |
-          if [ -n "$WAILS_BUILD_TAGS" ]; then
-            go install -tags "$WAILS_BUILD_TAGS" github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
-          else
-            go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
-          fi
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
-      - name: Build the actual OhMyFreeAI desktop application
-        env:
-          WAILS_BUILD_TAGS: ${{ matrix.build_tags }}
-        run: python3 scripts/build_desktop.py --output-dir dist
-
-      - name: Launch twice and verify the live WebView-to-Go bridge
-        run: python3 scripts/smoke_desktop.py dist/OhMyFreeAI
- || true
+              rpm -ql bash >&2 | grep 'bash' || true
               exit 1
             fi
             printf 'Verified Bash executable: %s\n' "$bash_path"
