@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - "foundation/**"
+    paths:
+      - 'migrations/**'
+      - 'internal/infrastructure/sqlite/**'
+      - 'tests/sqlite-driver-eval/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/sqlite-driver-eval.yml'
   pull_request:
     branches:
       - main
