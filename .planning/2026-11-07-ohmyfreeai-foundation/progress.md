@@ -45,6 +45,19 @@
   - Ran Go tests and build successfully in an isolated local module matching the committed domain foundation.
   - Ran Python syntax validation, developer command help, doctor, test/build delegation and architecture-check logic on local test fixtures.
   - Preserved historical launcher/monitor scripts unchanged; did not run them against the user's live machine.
+  - Added a bilingual responsive Material 3 web shell with Arabic RTL default, English LTR, light/dark theme controls, Dashboard/Models/Runtime/Settings pages, policy warning, and honest empty states.
+  - Fixed language switching so the active page title is refreshed after changing locale.
+  - Added a fail-closed runtime policy assessment port and connection use case; tests prove the connector is never called before a scoped, revisioned HTTPS approval.
+  - Added the shared Planning with Files pointer at .planning/.active_plan for the single named plan.
+  - Verified the static UI with Node syntax check and Python HTML parsing; no duplicate IDs were found.
+  - Verified the local Go mirror with go test ./... and go build ./...; all current packages passed.
+  - Verified Python syntax and developer command smoke tests. The architecture checker was exercised against a local fixture, not a full remote checkout.
+  - Wails v3 PoC remains blocked by Go 1.23.2 (v3 docs require Go 1.26+), missing Wails CLI/GTK/WebKit dependencies and no Windows host. No dependencies were installed.
+
+### Errors and corrections in this session
+  - Bulk skill vendoring exceeded the Code Mode tool-call limit; some initial files were created before interruption. Reconciled by fetching existing files and creating only the missing files in smaller batches.
+  - GitHub create-file returned HTTP 422 because a path already existed from the partial batch; fetched its SHA and updated it instead of retrying create.
+  - A policy-gate test initially failed after adding a required policy revision; updated the test fixture and reran all Go tests successfully.
 
 ## Test Results
 
