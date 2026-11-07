@@ -222,3 +222,49 @@ func TestStoreControllerPublishesReplacementOnlyUnderExclusiveLease(t *testing.T
 		t.Fatalf("close replacement store: %v", err)
 	}
 }
+
+
+func TestStoreControllerCloseDrainsLeasesAndRejectsFutureOperations(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	controller := NewStoreController(store)
+
+	entered := make(chan struct{})
+	releaseShared := make(chan struct{})
+	sharedDone := make(chan error, 1)
+	go func() {
+		sharedDone <- controller.WithShared(context.Background(), func(got *Store) error {
+			if got != store {
+				t.Errorf("shared lease returned an unexpected store")
+			}
+			close(entered)
+			<-releaseShared
+			return nil
+		})
+	}()
+	<-entered
+
+	closeDone := make(chan error, 1)
+	go func() { closeDone <- controller.Close(context.Background()) }()
+	select {
+	case err := <-closeDone:
+		t.Fatalf("controller closed while a shared lease was active: %v", err)
+	case <-time.After(40 * time.Millisecond):
+	}
+
+	close(releaseShared)
+	if err := <-sharedDone; err != nil {
+		t.Fatalf("shared operation: %v", err)
+	}
+	if err := <-closeDone; err != nil {
+		t.Fatalf("controller close: %v", err)
+	}
+	if err := controller.WithShared(context.Background(), func(*Store) error {
+		t.Fatal("shared callback ran after controller close")
+		return nil
+	}); !errors.Is(err, ErrStoreUnavailable) {
+		t.Fatalf("operation after close error = %v, want ErrStoreUnavailable", err)
+	}
+	if err := controller.Close(context.Background()); !errors.Is(err, ErrStoreUnavailable) {
+		t.Fatalf("second close error = %v, want ErrStoreUnavailable", err)
+	}
+}
