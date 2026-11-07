@@ -5,6 +5,20 @@ on:
     branches:
       - main
       - "foundation/**"
+    paths:
+      - '**/*.go'
+      - '**/*.py'
+      - '**/*.js'
+      - '**/*.html'
+      - '**/*.css'
+      - 'go.mod'
+      - 'go.sum'
+      - 'migrations/**'
+      - 'internal/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'frontend/**'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches:
       - main
