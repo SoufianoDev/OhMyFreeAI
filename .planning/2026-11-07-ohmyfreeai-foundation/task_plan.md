@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Verify the native CLI smoke across all eight Linux distro lanes. If green, close CLI verification, then implement the read-only backup inspect and export application boundary. Keep restore separate until coordinated SQLite close/reopen/rollback lifecycle is proven. Keep Colab remote inference policy-gated.
+CLI smoke is verified on all eight Linux distro lanes. Read-only archive inspection, native export/inspect dialogs and bilingual settings UI are implemented; verify the current eight-distro retest for this backup-enabled revision. Next: add safe CLI export/inspect entry points, then design coordinated SQLite close/reopen/rollback before exposing restore. Keep Colab remote inference policy-gated.
 
 ## Current Phase
 
@@ -64,7 +64,7 @@ Phase 4
 - [ ] Revalidate current Colab /props and /v1/models behavior, model-specific Q8_0/262144 compatibility and the live SSE path before enabling remote inference
 - [x] Add SQLite online backup/restore primitives with integrity, foreign-key, migration-history, cancellation, no-overwrite, target-safety and rollback tests on Ubuntu and Windows
 - [x] Implement strict .omfaibackup snapshot archive with manifest, SHA-256, fixed entries, size limits and path-traversal protections; round-trip, rollback, checksum, overwrite and cancellation tests pass on Linux/Windows
-- [ ] Wire backup export/inspect/restore into the application layer, native file dialogs, GUI and CLI
+- [x] Implement read-only Manager.Inspect with isolated temporary extraction, full manifest/checksum/schema validation and cleanup tests\n- [x] Wire backup export/inspect into the Wails service using native file dialogs and bilingual settings UI\n- [ ] Add backup export/inspect CLI commands and a coordinated Store lifecycle before enabling restore
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
 - [x] Revalidate the refactored two-stage bridge bootstrap on native Ubuntu; run 42405729902 passed with two GetSnapshot calls per launch and DB reopen
 - [x] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs (run 42405827037)
@@ -74,7 +74,7 @@ Phase 4
 - [x] Verify all eight Linux distro jobs pass in run 42405827037; distinguish container userland coverage from bare-metal certification
 - [x] Implement framework-independent GUI-default CLI parser with typed unknown-command/extra-argument errors and unit tests
 - [x] Verify the built native executable handles `--help`, `--version`, `doctor`, unknown commands and read-only doctor behavior on Ubuntu 24.04 and Windows (Wails run 42409974970)
-- [ ] Verify the same native CLI smoke on all eight Linux distro lanes (run 42410214638)
+- [x] Verify native CLI smoke on all eight Linux distro lanes (run 42410214638)
 - [ ] Add abrupt-process crash/reopen recovery tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
@@ -93,7 +93,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Resolved so far: Wails v3.0.0 native builds pass on Ubuntu 24.04 and Windows. Root CI and the Wails platform workflow passed at commit f189e0b1; the latest Linux distro workflow run 42405827037 passed all eight jobs at commit 001533d8b07cb699b3515db04382a4e8fcb35e90. Every distro job built the application, verified two native GetSnapshot calls per launch around frontend module import, and verified SQLite reopen. The CI-only WebKit sandbox bypass remains confined to smoke-test subprocesses; real-host production sandbox validation remains open. The production modernc.org/sqlite v1.62.0 Store, migrations, config repository, online backup/restore primitives and strict `.omfaibackup` archive manager are implemented and tested on Linux/Windows. Still open: GUI-default app CLI, application/UI/CLI backup integration, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review. Colab remote-inference activation remains policy-gated.
+Resolved so far: Wails v3.0.0 native builds pass on Ubuntu 24.04 and Windows. CLI dispatch and its native executable smoke pass on both platforms and all eight Linux distro lanes (run 42410214638). The backup-enabled revision builds on Ubuntu/Windows; Windows native executable smoke passes, and Ubuntu passes CLI plus two-stage WebView-to-Go calls and SQLite reopen (run 42412554344). Root CI passes on Ubuntu/Windows (run 42412587313). The read-only `Manager.Inspect` validates the complete archive in temporary storage, removes it afterwards, and does not modify the live DB; export/inspect are wired to native Wails dialogs and bilingual Settings controls. Current eight-distro retest for this revision is run 42412554358; at the latest check four GTK4 jobs were building and four GTK3/openSUSE jobs were queued. The CI-only WebKit sandbox bypass remains confined to smoke-test subprocesses; real-host production sandbox validation remains open. Still open: CLI backup commands, coordinated Store lifecycle and restore integration, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review. Colab remote-inference activation remains policy-gated.
 
 ## Decisions Made
 
