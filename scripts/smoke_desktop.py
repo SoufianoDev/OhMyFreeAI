@@ -52,7 +52,9 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
             while time.monotonic() < deadline:
                 if marker.is_file():
                     value = marker.read_text(encoding="utf-8")
-                    if value != "GetSnapshot invoked\n":
+                    if value.startswith("GetSnapshot failed:"):
+                        raise RuntimeError(value.strip())
+                    if value != "GetSnapshot success\n":
                         raise RuntimeError(f"Unexpected WebView marker: {value!r}")
                     print(f"WEBVIEW_GO_BRIDGE_PASS attempt={attempt}", flush=True)
                     return
@@ -64,7 +66,9 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                         f"(exit={process.returncode}). Application output:\\n{details}"
                     )
                 time.sleep(0.2)
-            raise RuntimeError("Timed out waiting for the frontend-to-Go GetSnapshot call.")
+            output.flush()
+            details = log_path.read_text(encoding="utf-8", errors="replace")[-5000:]
+            raise RuntimeError("Timed out waiting for the frontend-to-Go GetSnapshot call. Application output:\\n" + details)
         finally:
             if process is not None and process.poll() is None:
                 process.terminate()
