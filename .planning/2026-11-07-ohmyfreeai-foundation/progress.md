@@ -99,3 +99,35 @@
 | What's the goal? | Establish a verified foundation for OhMyFreeAI without violating free-only constraints |
 | What have I learned? | See findings.md |
 | What have I done? | Branch created, repository inspected, planning artifacts established |
+
+
+## Continuation session: 2026-11-07T16:52Z
+
+### Resumed state
+- Read the selected plan, findings, progress, and vendored Planning with Files v3.28.1 skill before implementation.
+- Reconfirmed the active task is the existing `.planning/2026-11-07-ohmyfreeai-foundation` plan; no competing plan was created.
+- Re-read the official Wails v3 installation, first-app, and build documentation using Exa. Research notes were recorded in findings.md before implementation.
+
+### Work completed
+- Added `.github/workflows/wails-poc.yml`.
+- The workflow pins Wails CLI to v3.0.0 and Go to 1.27.3.
+- Added native build jobs for Ubuntu 24.04 and Windows latest.
+- Linux job installs GCC/build tools, GTK4 and WebKitGTK 6.0 development packages.
+- Each runner generates the official `vanilla-js` starter using `wails3 init`, runs `wails3 build`, and checks for the expected native executable.
+- Kept this as a generated temporary CI proof rather than committing generated starter files or adding Wails dependencies to the framework-independent core.
+- Corrected Windows workflow steps to use PowerShell and a Windows-native temporary path rather than relying on Bash path conversion.
+- Updated task_plan.md: the workflow addition is complete, but Wails selection remains gated on successful native CI results.
+
+### Verification and limitations
+- GitHub connector accepted the workflow and planning updates on `foundation/bootstrap`.
+- No GitHub Actions result has yet been observed for the new Wails workflow. The workflow is **added, not yet passed**.
+- The proof covers official template generation and native compilation only. It does not yet verify OhMyFreeAI Go service bindings, app lifecycle integration, packaging, or supported Linux distributions beyond Ubuntu 24.04.
+- The local execution environment still cannot run the current Go 1.27.3 module or Wails v3 because its Go toolchain is 1.23.2 and it lacks the required Linux GUI development stack and a Windows host.
+- No SQLite driver was selected; the cross-platform driver test matrix remains open.
+- No changes were made to the user's historical Colab launcher/scripts or live runtime.
+
+### Files changed in this continuation
+- `.github/workflows/wails-poc.yml` (new)
+- `.planning/2026-11-07-ohmyfreeai-foundation/findings.md` (Wails research)
+- `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md` (next step and checklist)
+- `.planning/2026-11-07-ohmyfreeai-foundation/progress.md` (this log)
