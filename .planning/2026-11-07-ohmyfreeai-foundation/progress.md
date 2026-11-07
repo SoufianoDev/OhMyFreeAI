@@ -530,3 +530,10 @@
 - Each job built the actual desktop app, launched it twice under Xvfb, recorded two successful GetSnapshot bridge calls, and verified SQLite reopen.
 - Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405729874
 - Production WebKit sandbox remains enabled. The CI-only sandbox-disable variable is restricted to smoke-test subprocesses because GitHub's runner lacks bubblewrap network-namespace permissions. Bare-metal sandbox verification remains open.
+
+
+## Latest Linux matrix revision fully green — 2026-11-07T19:37Z
+
+- Follow-up run 42405827037 (including the openSUSE PATH guard) also completed SUCCESS for all eight distro/stack jobs.
+- Each job passed native package bootstrap, pkg-config verification, Wails CLI installation, actual app build, two-stage JS-to-Go smoke and SQLite reopen.
+- This verifies the latest workflow revision. Run: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405827037
