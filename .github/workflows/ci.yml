@@ -1,0 +1,62 @@
+name: OhMyFreeAI CI
+
+on:
+  push:
+    branches:
+      - main
+      - "foundation/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Vet Go packages
+        run: go vet ./...
+
+      - name: Test Go packages
+        run: go test ./...
+
+      - name: Build Go packages
+        run: go build ./...
+
+      - name: Compile Python developer tooling
+        run: python -m py_compile scripts/dev.py
+
+      - name: Run Python tests
+        run: python -m unittest discover -s tests -v
+
+      - name: Check frontend JavaScript syntax
+        run: node --check frontend/app.js
+
+      - name: Check architecture boundaries
+        run: python scripts/dev.py arch-check
