@@ -21,7 +21,7 @@ Phase 3
 - [x] Inspect required Material Design and Kotlin Compose Kit skill repositories
 - [x] Inspect the supplied prototype archives and Python scripts before adopting any behavior
 - [x] Record findings and source boundaries
-- **Status:** complete
+**Status:** complete
 
 ### Phase 2: Planning & Structure
 
@@ -30,7 +30,7 @@ Phase 3
 - [x] Define module boundaries, ports/adapters, runtime lifecycle, and state contracts
 - [x] Define compatibility layers including Colab resource fit and verification levels
 - [x] Define omfaibackup format and backward-compatibility policy
-- **Status:** complete
+**Status:** complete
 
 ### Phase 3: Implementation
 
@@ -39,21 +39,21 @@ Phase 3
 - [ ] Add the Wails feasibility proof without committing to it before Linux/Windows validation
 - [x] Establish the initial bilingual Material 3 web shell using the repository's Material Design skill
 - [x] Preserve historical Colab scripts and launcher behavior unchanged; keep remote-inference activation policy-gated
-- **Status:** in_progress
+**Status:** in_progress
 
 ### Phase 4: Testing & Verification
 
 - [ ] Run repository, documentation, Go, and Python checks available in this environment
 - [ ] Verify the original prototype path and identify unverified assumptions
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
-- **Status:** pending
+**Status:** pending
 
 ### Phase 5: Delivery
 
 - [ ] Review branch diff and ensure no unrelated/destructive changes
 - [ ] Summarize implemented foundation, verification, and remaining blockers
 - [ ] Provide the branch and next concrete engineering step
-- **Status:** pending
+**Status:** pending
 
 ## Key Questions
 
