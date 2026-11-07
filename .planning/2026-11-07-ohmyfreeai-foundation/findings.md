@@ -358,3 +358,9 @@
 - The latest eight-distro run failed immediately on all six started jobs with GitHub Actions `Invalid shell option`: `/bin/sh -e {0}` was not accepted as a valid shell template by the runner.
 - Replaced it with the supported built-in shell identifier `sh`. The previous missing-shell issue occurred while setup-python altered the container environment; setup-python has since been removed in favor of system Python, so the built-in shell should now resolve from the distro PATH.
 - No dependency installation, compilation or app smoke test was attempted in that failed run.
+
+
+## Explicit bootstrap-step shell mismatch — 2026-11-07T19:08Z
+
+- The next matrix run still failed immediately with `Invalid shell option`. Inspection found the job default had been changed to built-in `sh`, but the dependency-install step retained an explicit `shell: /bin/sh`, which GitHub Actions rejects.
+- Aligned that explicit step with the supported `shell: sh` identifier. No package/build/smoke step ran in the rejected jobs.
