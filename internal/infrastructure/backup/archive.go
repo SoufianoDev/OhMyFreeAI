@@ -252,8 +252,11 @@ func extractArchive(ctx context.Context, archivePath, snapshotPath string) (Mani
 
 	entries := make(map[string]*zip.File, 2)
 	for _, entry := range reader.File {
-		if entry.FileInfo().IsDir() || entry.Mode()&os.ModeSymlink != 0 {
-			return manifest, fmt.Errorf("%w: directories and symlinks are forbidden", ErrInvalidBackupArchive)
+		if entry.FileInfo().IsDir() || !entry.Mode().IsRegular() || entry.Mode()&os.ModeSymlink != 0 {
+			return manifest, fmt.Errorf("%w: only regular files are allowed", ErrInvalidBackupArchive)
+		}
+		if entry.Flags&1 != 0 {
+			return manifest, fmt.Errorf("%w: encrypted entries are not supported", ErrInvalidBackupArchive)
 		}
 		if entry.Method != zip.Store && entry.Method != zip.Deflate {
 			return manifest, fmt.Errorf("%w: unsupported compression method", ErrInvalidBackupArchive)
