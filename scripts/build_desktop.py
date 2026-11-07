@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -75,8 +76,10 @@ def attach_generated_binding(project: Path) -> None:
     (source_dir / "main.js").write_text(bridge, encoding="utf-8")
 
 
-def build(output_directory: Path) -> Path:
+def build(output_directory: Path, build_tags: str = "") -> Path:
     require_tools()
+    if build_tags and not re.fullmatch(r"[A-Za-z0-9_,]+", build_tags):
+        raise ValueError("Build tags may contain only letters, digits, underscores and commas.")
     build_root = ROOT / ".build"
     build_root.mkdir(parents=True, exist_ok=True)
     output_directory.mkdir(parents=True, exist_ok=True)
@@ -119,7 +122,10 @@ def build(output_directory: Path) -> Path:
 
         run(["wails3", "generate", "bindings"], cwd=project)
         attach_generated_binding(project)
-        run(["wails3", "build"], cwd=project)
+        build_command = ["wails3", "build"]
+        if build_tags:
+            build_command.extend(["-tags", build_tags])
+        run(build_command, cwd=project)
 
         binary_directory = project / "bin"
         if not binary_directory.is_dir():
@@ -142,6 +148,11 @@ def build(output_directory: Path) -> Path:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
+        "--build-tags",
+        default=os.environ.get("WAILS_BUILD_TAGS", ""),
+        help="Optional Go build tags, e.g. gtk3 for older Linux WebKitGTK 4.1 distributions.",
+    )
+    parser.add_argument(
         "--output-dir",
         type=Path,
         default=ROOT / "dist",
@@ -150,7 +161,7 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        output = build(args.output_dir.resolve())
+        output = build(args.output_dir.resolve(), args.build_tags)
     except subprocess.CalledProcessError as error:
         print(f"Desktop build failed with exit code {error.returncode}.", file=sys.stderr)
         return error.returncode or 1
