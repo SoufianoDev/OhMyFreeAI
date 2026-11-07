@@ -53,7 +53,15 @@ func (s *AppService) GetSnapshot() (DashboardSnapshot, error) {
 	// The opt-in marker lets CI prove that the frontend actually invoked this
 	// Go method through the generated Wails bridge. It is inert in normal runs.
 	if marker := os.Getenv("OMFAI_WEBVIEW_SMOKE_MARKER"); marker != "" {
-		if err := os.WriteFile(marker, []byte("GetSnapshot success\n"), 0o600); err != nil {
+		count := 1
+		if previous, readErr := os.ReadFile(marker); readErr == nil {
+			var priorCount int
+			if _, scanErr := fmt.Sscanf(string(previous), "GetSnapshot success count=%d", &priorCount); scanErr == nil {
+				count = priorCount + 1
+			}
+		}
+		value := fmt.Sprintf("GetSnapshot success count=%d\\n", count)
+		if err := os.WriteFile(marker, []byte(value), 0o600); err != nil {
 			return DashboardSnapshot{}, fmt.Errorf("write WebView smoke marker: %w", err)
 		}
 	}
