@@ -66,6 +66,16 @@
 - Official Go release history lists Go 1.27.3 as the latest stable patch available on 2026-11-07 (released 2026-10-19). The project module and CI target are set to Go 1.27.3. The local container remains on Go 1.23.2, so it cannot validate the declared module toolchain directly.
 - Official Wails v3.0.0 docs list v3 as stable and require Go 1.26+; Wails v3's setup wizard is experimental and primarily tested on Linux. The official JavaScript template is `vanilla-js`; exact command: `wails3 init -n myapp -t vanilla-js`.
 
+## Engineering Skills Applied
+
+- Planning with Files v3.28.1 was vendored with its shell/PowerShell helpers, templates, plan inventory and hook dependencies. The active plan pointer is .planning/.active_plan. Native validation scripts are not executable from this connector-only environment; the plan structure was manually checked and the status-marker issue was corrected.
+- Read and vendored the relevant ECC MIT-licensed skills: Go patterns, Go testing, database migrations, security review and TDD workflow. The original MIT license is retained under .agents/skills/ecc/LICENSE.
+- Applied Go patterns through small application ports, standard-library-only domain logic, typed sentinel errors and wrapped adapter errors.
+- Applied Go testing and migration guidance through isolated unit tests, schema constraints, an explicit development-only down migration and immutable forward migration policy.
+- Applied security review by rejecting raw Gateway tokens, restricting secret references to OS-store URI schemes, rejecting credential-bearing/query-bearing policy source URLs, and enforcing loopback-only Gateway configuration.
+- Applied TDD with an actual RED/GREEN cycle for the security hardening and SHA-256 validation changes. The initial bootstrap code was implemented before its first tests; it is not retroactively claimed as TDD.
+- Material Design 3 and Kotlin Compose Kit guidance were read and applied only where appropriate. Compose guidance was limited to component ownership; no Kotlin runtime was added.
+
 ## Implementation Findings
 
 - Added a Go 1.23 framework-independent core module. The Wails dependency is intentionally not added to the core while v2/v3 selection remains open.
