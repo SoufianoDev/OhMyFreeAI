@@ -475,3 +475,12 @@
 - Root CI run `42405729818` passed on Ubuntu and Windows after the two-stage bridge refactor, confirming Python tooling, architecture checks and test suite remain green.
 - Wails v3 run `42405729902` Windows native build and executable verification passed with the new generated bridge bootstrap. Ubuntu build is still in progress and must complete its WebView smoke.
 - Linux distro matrix run `42405827037` includes the openSUSE PATH fix and the two-stage bridge code; all eight jobs are currently queued behind available hosted runners.
+
+
+## Two-stage native bridge bootstrap passed — 2026-11-07T19:26Z
+
+- Wails run `42405729902` completed successfully on Windows and Ubuntu 24.04 after the bridge refactor.
+- Ubuntu smoke output: `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, `WEBVIEW_REOPEN_PASS`.
+- The two calls prove the generated entry point reaches Go before UI-module import and again after the dynamic import resolves. The frontend receives the first snapshot through the event detail.
+- This confirms the new bootstrap on the default GTK4/WebKitGTK 6.0 lane. Legacy GTK3 lanes are still pending revalidation in the distro matrix.
+- Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405729902
