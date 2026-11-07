@@ -349,3 +349,37 @@ func TestStoreControllerFailsClosedWhenExclusiveOperationPanics(t *testing.T) {
 		t.Fatalf("shared operation error = %v, want ErrStoreUnavailable", err)
 	}
 }
+
+
+func TestStoreControllerReleasesSharedLeaseWhenOperationPanics(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	controller := NewStoreController(store)
+
+	func() {
+		defer func() {
+			if recovered := recover(); recovered != "injected shared panic" {
+				t.Fatalf("panic = %v, want injected shared panic", recovered)
+			}
+		}()
+		_ = controller.WithShared(context.Background(), func(*Store) error {
+			panic("injected shared panic")
+		})
+	}()
+
+	exclusiveRan := false
+	if err := controller.WithExclusive(context.Background(), func(current *Store) (*Store, error) {
+		exclusiveRan = true
+		if current != store {
+			t.Fatal("exclusive operation received unexpected store after shared panic")
+		}
+		return current, nil
+	}); err != nil {
+		t.Fatalf("exclusive operation after shared panic: %v", err)
+	}
+	if !exclusiveRan {
+		t.Fatal("exclusive operation was blocked by a leaked shared lease")
+	}
+	if err := controller.Close(context.Background()); err != nil {
+		t.Fatalf("close controller: %v", err)
+	}
+}
