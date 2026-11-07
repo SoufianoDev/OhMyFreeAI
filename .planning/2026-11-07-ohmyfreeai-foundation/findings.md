@@ -411,3 +411,11 @@
 
 - Fedora 44 legacy GTK3/WebKit2GTK 4.1 passed the full Wails CLI + application build and two-launch WebView-to-Go/SQLite reopen smoke in run `42404735351`. Output included both bridge pass markers and `WEBVIEW_REOPEN_PASS`.
 - This verifies the Wails v3.0.x legacy GTK3 build tag on a current Fedora release, not only the default GTK4 path.
+
+
+## Follow-up on openSUSE shell lookup — 2026-11-07T19:17Z
+
+- The eight-distro run `42405097971` disproved the assumption that installing Bash alone made the built-in `bash` shell resolvable: openSUSE reports `bash is already installed`, package installation completes, then the next container step fails with `exec: "bash": executable file not found in $PATH`.
+- The bootstrap step itself runs successfully under `sh`; it confirms GTK/WebKit pkg-config commands, but the runner cannot resolve Bash for the next step. The next correction must inspect `PATH`, `command -v bash`, and known executable locations inside the bootstrap step, then append the verified Bash directory to `GITHUB_PATH`. If no executable exists, fail with diagnostic package-file output instead of proceeding.
+- The new backup cancellation fix and its test passed the full Linux and Windows `OhMyFreeAI CI` run `42405330049` (Go vet, Go tests, build, Python tests, JS syntax and architecture checks). This verifies the code change on both operating systems.
+- Wails and distro matrix runs for commit `8a8a5707` are still running/queued; no further platform pass is inferred.
