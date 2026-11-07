@@ -31,3 +31,23 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# OhMyFreeAI generated and local state
+/bin/
+/build/
+/dist/
+/node_modules/
+/frontend/dist/
+/frontend/.vite/
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.pid
+*.omfaibackup
+*.bak-*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.DS_Store
+Thumbs.db
