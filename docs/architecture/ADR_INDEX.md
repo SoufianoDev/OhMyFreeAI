@@ -11,6 +11,8 @@
 
 ## Build and implementation guides
 
+- [Crash-safe SQLite restore lifecycle](RESTORE_LIFECYCLE.md)
+
 - [Native desktop build](DESKTOP_BUILD.md)
 - [Historical prototype audit](PROTOTYPE_AUDIT.md)
 - [Implementation blueprint](IMPLEMENTATION_BLUEPRINT.md)
