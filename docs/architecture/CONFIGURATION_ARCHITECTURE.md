@@ -2,7 +2,7 @@
 
 ## Sources and precedence
 
-Defaults -> application config file -> environment overrides -> explicit command-line overrides. The effective configuration is validated before services start.
+Defaults -> persisted SQLite settings -> environment overrides -> explicit command-line overrides. The effective configuration is validated before services start.
 
 ## Rules
 
