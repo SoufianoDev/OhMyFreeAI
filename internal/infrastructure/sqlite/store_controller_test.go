@@ -552,7 +552,8 @@ func TestStoreControllerConcurrentLeaseStress(t *testing.T) {
 					if got != store {
 						violations.Add(1)
 					}
-					if activeReaders.Load() != 0 || activeWriters.Add(1) != 1 {
+					writerCount := activeWriters.Add(1)
+					if activeReaders.Load() != 0 || writerCount != 1 {
 						violations.Add(1)
 					}
 					runtime.Gosched()
