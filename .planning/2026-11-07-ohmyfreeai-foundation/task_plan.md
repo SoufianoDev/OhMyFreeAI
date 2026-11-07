@@ -6,11 +6,11 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Publish the core architecture and policy documents, then establish the Go core/tooling skeleton without prematurely selecting a Wails major version.
+Build the initial accessible Material 3 web shell on top of the framework-independent Go domain foundation; then run the local verification suite.
 
 ## Current Phase
 
-Phase 2
+Phase 3
 
 ## Phases
 
@@ -25,19 +25,19 @@ Phase 2
 
 ### Phase 2: Planning & Structure
 
-- [ ] Establish architecture documentation and repository conventions
-- [ ] Vendor Planning with Files v3.28.1, Material 3 v1.1.1, and Compose component-design guidance under .agents/skills/
-- [ ] Define module boundaries, ports/adapters, runtime lifecycle, and state contracts
-- [ ] Define compatibility layers including Colab resource fit and verification levels
-- [ ] Define omfaibackup format and backward-compatibility policy
-- **Status:** pending
+- [x] Establish architecture documentation and repository conventions
+- [x] Vendor Planning with Files v3.28.1, Material 3 v1.1.1, and Compose component-design guidance under .agents/skills/
+- [x] Define module boundaries, ports/adapters, runtime lifecycle, and state contracts
+- [x] Define compatibility layers including Colab resource fit and verification levels
+- [x] Define omfaibackup format and backward-compatibility policy
+- **Status:** complete
 
 ### Phase 3: Implementation
 
-- [ ] Add the Go application skeleton and developer toolkit only after feasibility checks
+- [x] Add the framework-independent Go domain foundation and standard-library developer toolkit
 - [ ] Add the Wails feasibility proof without committing to it before Linux/Windows validation
 - [ ] Establish UI foundations using the repository's Material Design skill
-- [ ] Preserve the existing free Colab execution path pending audit
+- [x] Preserve historical Colab scripts and launcher behavior unchanged; keep remote-inference activation policy-gated
 - **Status:** pending
 
 ### Phase 4: Testing & Verification
