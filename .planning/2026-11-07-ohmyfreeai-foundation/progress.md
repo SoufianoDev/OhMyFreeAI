@@ -159,3 +159,30 @@
 - `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md`
 - `.planning/2026-11-07-ohmyfreeai-foundation/findings.md`
 - `.planning/2026-11-07-ohmyfreeai-foundation/progress.md`
+
+
+## Continuation session: 2026-11-07T17:05Z — SQLite evaluation
+
+### Work completed
+- Re-evaluated current official driver metadata and documentation for modernc, ncruces and mattn.
+- Kept production dependency selection unapproved. modernc remains first evaluation candidate; ncruces is the comparison candidate; mattn remains a CGO fallback due GCC/Windows packaging overhead.
+- Added nested module `tests/sqlite-driver-eval` with pinned modernc v1.62.0 and ncruces v0.37.0 test dependencies. These do not enter the production `go.mod`.
+- Added shared `database/sql` smoke coverage for WAL, per-connection foreign keys, rollback, concurrent writes, integrity checks, WAL checkpoint, close/reopen and a checkpointed database-file copy.
+- Added `.github/workflows/sqlite-driver-eval.yml` with a 2×2 matrix: modernc/ncruces × Ubuntu 24.04/Windows latest. It tidies/verifies the nested module and runs the same test against each driver.
+- Updated ADR 0004 with the test harness scope and its explicit limitations; updated findings and the active plan.
+
+### Verification and limitations
+- Fetched the committed workflow, module and test source back from GitHub and reviewed the contents.
+- The test harness and workflow are committed, but no matrix result has been observed yet. Do not mark either driver as passing or select it for production.
+- The smoke test does not simulate abrupt process termination, does not run the production migration runner, and is not a performance benchmark.
+- No local execution was claimed: the available shell toolchain is Go 1.23.2, while both selected candidate versions require Go 1.26.0. Native Linux/Windows GitHub Actions is the intended verification environment.
+- The current Wails and SQLite workflows are separate, both use free GitHub-hosted runners, and neither changes the historical Colab runtime or adds paid infrastructure.
+
+### Files changed in this continuation
+- `.github/workflows/sqlite-driver-eval.yml` (new)
+- `tests/sqlite-driver-eval/go.mod` (new isolated module)
+- `tests/sqlite-driver-eval/driver_test.go` (new)
+- `docs/adr/0004-sqlite-driver-evaluation.md`
+- `.planning/2026-11-07-ohmyfreeai-foundation/findings.md`
+- `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md`
+- `.planning/2026-11-07-ohmyfreeai-foundation/progress.md`
