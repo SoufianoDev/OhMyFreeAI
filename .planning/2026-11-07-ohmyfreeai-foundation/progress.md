@@ -569,3 +569,8 @@
 - Added a standard-library native executable smoke helper covering --help, --version, doctor, unknown command exit code, and a check that doctor creates no application config directory.
 - Added the CLI smoke to the native Wails Linux/Windows workflow and all eight Linux distro lanes; added py_compile coverage for the helper.
 - Native Wails run 42409974970 and Linux distro run 42410021330 are pending. Do not close CLI task until those executable-level tests pass.
+
+
+- Latest native Wails run 42409974970 has completed Linux dependency bootstrap and pinned Wails installation and is building the updated application; the CLI smoke steps are queued immediately after build.
+- Linux distro run 42410021330 includes the new native CLI smoke in all eight lanes. Four GTK4 lanes are installing/building while legacy GTK3/openSUSE lanes are queued.
+- Root CI run 42410030822 passed Ubuntu; Windows has completed its validation steps and is finalizing. This run also compiles scripts/smoke_cli.py.
