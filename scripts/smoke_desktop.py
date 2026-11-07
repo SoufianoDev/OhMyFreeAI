@@ -78,11 +78,11 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                         call_count = parse_snapshot_marker(value)
                     except ValueError as error:
                         raise RuntimeError(f"Unexpected WebView marker: {value!r}") from error
-                    print(
-                        f"WEBVIEW_GO_BRIDGE_PASS attempt={attempt} calls={call_count}",
-                        flush=True,
-                    )
-                    return
+                    if call_count == 2:
+                        print(f"WEBVIEW_GO_BRIDGE_PASS attempt={attempt} calls={call_count}", flush=True)
+                        return
+                    if call_count != 1:
+                        raise RuntimeError(f"Expected one initial bridge call before UI import, got {call_count}.")
                 if process.poll() is not None:
                     output.flush()
                     details = diagnostic_excerpt(log_path)
