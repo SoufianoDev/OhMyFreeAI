@@ -484,3 +484,10 @@
 - The two calls prove the generated entry point reaches Go before UI-module import and again after the dynamic import resolves. The frontend receives the first snapshot through the event detail.
 - This confirms the new bootstrap on the default GTK4/WebKitGTK 6.0 lane. Legacy GTK3 lanes are still pending revalidation in the distro matrix.
 - Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405729902
+
+
+## Two-stage bridge retest on Arch Linux — 2026-11-07T19:29Z
+
+- Arch Linux rolling / GTK4-WebKitGTK 6.0 passed the latest two-stage bridge smoke in run `42405827037`.
+- Output: `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, `WEBVIEW_REOPEN_PASS`.
+- This confirms the two-stage frontend bootstrap works on Arch as well as native Ubuntu. Other lanes in the latest run remain in progress/queued.
