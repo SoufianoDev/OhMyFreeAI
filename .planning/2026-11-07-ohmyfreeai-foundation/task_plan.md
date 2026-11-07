@@ -38,7 +38,7 @@ Phase 4
 - [x] Add validated versioned configuration defaults, repository port and application service
 - [x] Add SQLite initial/up and development-only down migrations with schema integrity tests
 - [x] Add Linux/Windows GitHub Actions validation workflow
-- [x] Add a pinned Wails v3.0.0 official vanilla-js starter build proof to GitHub Actions; do not lock the app to Wails until native jobs pass
+- [x] Add a pinned Wails v3.0.0 official vanilla-js starter build proof to GitHub Actions
 - [x] Extend the Wails proof to generate and assert the starter's Go-to-JavaScript GreetService binding on both native runners
 - [x] Select Wails v3.0.0 after official and application-specific builds passed on Ubuntu 24.04 and Windows
 - [x] Add the actual Wails AppService with GetSnapshot and SaveConfig methods; generate and verify the JavaScript binding
@@ -55,9 +55,10 @@ Phase 4
 
 - [x] Run repository Go vet/tests/build, Python tests, frontend syntax and architecture checks on Ubuntu and Windows via GitHub Actions
 - [x] Evaluate modernc and ncruces on Ubuntu and Windows, including the production initial migration SQL
-- [x] Test the production SQLite adapter, migration rollback/idempotence, config round-trip, file permissions and per-connection PRAGMAs on Ubuntu and Windows
+- [x] Test the production SQLite adapter, migration rollback/idempotence, version-gap and corrupt-history rejection, config round-trip, file permissions and per-connection PRAGMAs on Ubuntu and Windows
 - [x] Build the complete Wails application on Ubuntu and Windows; generate 1 service, 2 methods and 7 models, produce the Vite production bundle and verify the native executable
 - [x] Pin and verify Go dependency lockfiles in CI
+- [x] Upgrade GitHub Actions to Node 24-compatible releases; latest core, SQLite and Wails workflows pass without the Node 20 deprecation warning
 - [ ] Run documentation/link validation and review all source changes
 - [ ] Verify the original prototype path and identify unverified assumptions
 - [ ] Add actual desktop WebView-to-Go invocation, crash-recovery and production backup/restore tests
