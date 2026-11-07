@@ -36,6 +36,8 @@ Phase 3
 
 - [x] Add the framework-independent Go domain foundation and standard-library developer toolkit
 - [x] Add validated versioned configuration defaults, repository port and application service
+- [x] Add SQLite initial/up and development-only down migrations with schema integrity tests
+- [x] Add Linux/Windows GitHub Actions validation workflow
 - [ ] Add the Wails feasibility proof without committing to it before Linux/Windows validation
 - [x] Establish the initial bilingual Material 3 web shell using the repository's Material Design skill
 - [x] Preserve historical Colab scripts and launcher behavior unchanged; keep remote-inference activation policy-gated
