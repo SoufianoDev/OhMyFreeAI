@@ -553,3 +553,11 @@
 - Corrected the stale Phase 4 checklist and summary: all eight Linux distro smoke lanes are complete; bare-metal WebKit sandbox remains open.
 - Inspected current desktop entrypoint, AppService, application config service, backup archive manager, and developer CLI. The desktop entrypoint still unconditionally starts GUI; there is no application CLI dispatcher.
 - Applied ECC TDD workflow: added dispatch tests before implementation (commit eb2f0b0). Expected contract covers GUI default, help/version/doctor, unknown commands and unexpected args. CI run 42409735886 is pending/in progress; wait for actual RED evidence before implementation.
+
+
+## 2026-11-07T20:12Z — CLI dispatcher implementation
+
+- Confirmed the intended TDD RED: test-first CI job 128515064532 failed because Parse was undefined in the new dispatch tests.
+- Implemented the command parser and integrated it before GUI/database startup in the Wails entrypoint. Added read-only doctor diagnostics and updated CLI architecture documentation.
+- Verification in progress: root CI run 42409816192 (Ubuntu passed; Windows running); Wails native build run 42409847974 (Ubuntu and Windows building).
+- Next: inspect both platform results and any failures. Do not mark CLI complete on the parser unit tests alone; the generated Wails application must compile with the new entrypoint on both platforms.
