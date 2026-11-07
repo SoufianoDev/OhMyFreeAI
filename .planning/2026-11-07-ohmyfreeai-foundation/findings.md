@@ -314,3 +314,15 @@
 - openSUSE Tumbleweed still invoked Bash for the Wails CLI step because that step explicitly set `shell: bash`, overriding job defaults. Removed the explicit Bash shell; the whole job uses POSIX `sh`.
 - Debian 13's dev package was installed, but Go's pkg-config invocation could not locate `webkitgtk-6.0.pc`; setup-python had changed `PKG_CONFIG_PATH`. Added distro-specific system pkg-config directories after setup-python and explicit checks for both GTK and WebKit modules before building.
 - Modern GTK4 jobs (Arch, Fedora 44, Ubuntu 24.04, Debian 13) reached the smoke step but exited with a Go/native stack dump. The previous smoke helper output omitted the fatal headline; the latest helper now prints both head and tail, so the next run can identify the exact signal. Do not mark these app smoke tests passed.
+
+
+## Definitive WebKit smoke failure root cause — 2026-11-07T19:00Z
+
+- Full native Ubuntu smoke log from Wails run `42403772084`:
+  - `bwrap: loopback: Failed RTM_NEWADDR: Operation not permitted`
+  - `Connection: failed to receive credentials ... read zero bytes`
+  - GTK emitted a fatal error and Go reported `SIGTRAP: trace trap`, `signal arrived during cgo execution`, exit code 2.
+- This establishes the actual failure: WebKit's bubblewrap sandbox cannot create the required network namespace/loopback interface under GitHub-hosted runner restrictions. The failed sandbox launch breaks the D-Bus credential/proxy channel and triggers GTK's fatal trap. The signal-10 message is a warning, not the root cause in this run; do not set `JSC_SIGNAL_FOR_GC` to mask it.
+- Upstream WebKit explicitly provides `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` for debugging when sandbox setup is unavailable. Added this variable and `GTK_A11Y=none` only to the temporary child-process environment of `scripts/smoke_desktop.py`; no production config, launcher or installer receives it.
+- Documentation now states the CI boundary: bridge/window/reopen smoke is exercised, but sandbox behavior is not certified by these restricted CI runners and must be validated separately on a real host.
+- Source: https://github.com/WebKit/WebKit/pull/8591 ; https://github.com/WebKit/WebKit/blob/main/Source/WebKit/UIProcess/Launcher/glib/BubblewrapLauncher.cpp
