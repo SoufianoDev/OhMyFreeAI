@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"sync"
+
+	domainconfig "github.com/SoufianoDev/OhMyFreeAI/internal/domain/config"
 )
 
 var (
@@ -187,8 +189,8 @@ func (c *StoreController) WithExclusive(ctx context.Context, operation func(*Sto
 
 // Load and Save make StoreController a stable configuration repository. Each
 // operation holds its lease for the full SQLite call.
-func (c *StoreController) Load(ctx context.Context) (Config, error) {
-	var result Config
+func (c *StoreController) Load(ctx context.Context) (domainconfig.Config, error) {
+	var result domainconfig.Config
 	err := c.WithShared(ctx, func(store *Store) error {
 		var err error
 		result, err = store.Load(ctx)
@@ -197,7 +199,7 @@ func (c *StoreController) Load(ctx context.Context) (Config, error) {
 	return result, err
 }
 
-func (c *StoreController) Save(ctx context.Context, cfg Config) error {
+func (c *StoreController) Save(ctx context.Context, cfg domainconfig.Config) error {
 	return c.WithShared(ctx, func(store *Store) error {
 		return store.Save(ctx, cfg)
 	})
