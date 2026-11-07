@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	moderncsqlite "modernc.org/sqlite"
@@ -71,10 +72,7 @@ func (s *Store) BackupTo(ctx context.Context, destinationPath string) error {
 		}
 	}()
 
-	destinationURI, err := backupDataSourceName(temporaryPath)
-	if err != nil {
-		return err
-	}
+	destinationURI := backupDataSourceName(temporaryPath)
 
 	sourceConnection, err := s.db.Conn(ctx)
 	if err != nil {
@@ -158,7 +156,7 @@ func (s *Store) BackupTo(ctx context.Context, destinationPath string) error {
 	return nil
 }
 
-func backupDataSourceName(absolutePath string) (string, error) {
+func backupDataSourceName(absolutePath string) string {
 	uriPath := filepath.ToSlash(absolutePath)
 	if runtime.GOOS == "windows" && len(uriPath) >= 2 && uriPath[1] == ':' {
 		uriPath = "/" + uriPath
@@ -168,7 +166,7 @@ func backupDataSourceName(absolutePath string) (string, error) {
 	query.Set("mode", "rwc")
 	query.Add("_pragma", "synchronous(FULL)")
 	u.RawQuery = query.Encode()
-	return u.String(), nil
+	return u.String()
 }
 
 func readOnlyDataSourceName(absolutePath string) string {
