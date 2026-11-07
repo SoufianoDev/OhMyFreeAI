@@ -504,3 +504,6 @@
 
 
 - Arch Linux rolling passed the latest two-stage bridge retest in run 42405827037: both GetSnapshot calls succeeded before/after UI-module import and database reopen passed. Output: WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2, attempt=2 calls=2, WEBVIEW_REOPEN_PASS.
+
+
+- The latest two-stage bridge matrix has revalidated Debian 13, Fedora 44 GTK4 and Arch rolling end-to-end. All three pass application build, two GetSnapshot calls around UI-module import, and SQLite reopen.
