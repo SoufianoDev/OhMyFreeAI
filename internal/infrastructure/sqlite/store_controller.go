@@ -178,8 +178,10 @@ func (c *StoreController) WithShared(ctx context.Context, operation func(*Store)
 }
 
 // WithExclusive drains all shared operations and prevents new ones while the
-// callback runs. The callback returns the Store that remains active. It must
-// return the original Store on a non-destructive operation.
+// callback runs. The callback must return the Store that is safe to expose after
+// the operation, even when it also returns an error. For a non-destructive
+// failure this is the original Store; after a failed destructive operation it
+// must be a verified rollback Store. Returning nil fails the controller closed.
 func (c *StoreController) WithExclusive(ctx context.Context, operation func(*Store) (*Store, error)) error {
 	if ctx == nil {
 		ctx = context.Background()
@@ -193,17 +195,18 @@ func (c *StoreController) WithExclusive(ctx context.Context, operation func(*Sto
 	}
 	defer release()
 
-	next, err := operation(store)
-	if err != nil {
-		return err
-	}
-	if next == nil {
-		return ErrStoreUnavailable
-	}
+	next, operationErr := operation(store)
 	c.mu.Lock()
 	c.store = next
 	c.signalLocked()
 	c.mu.Unlock()
+
+	if operationErr != nil {
+		return operationErr
+	}
+	if next == nil {
+		return ErrStoreUnavailable
+	}
 	return nil
 }
 
