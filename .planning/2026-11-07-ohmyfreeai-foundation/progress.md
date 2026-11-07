@@ -266,3 +266,14 @@
 - Validate additional Linux distributions; Ubuntu 24.04 is the only certified Linux build baseline.
 - Audit the original Colab + llama.cpp + Gateway + OpenCode proof path and its current policy constraints.
 - Review documentation, full branch diff and remaining acceptance gaps before any merge.
+
+
+## Verification follow-up: 2026-11-07
+
+- Core CI run 42397556757 completed successfully on Ubuntu 24.04 and Windows after the migration-history integrity test was added. Go vet, all Go tests, Go build, Python checks, frontend syntax and architecture checks passed.
+- SQLite evaluation run 42397556823 completed successfully on all four matrix combinations: modernc/Ubuntu, modernc/Windows, ncruces/Ubuntu and ncruces/Windows.
+- The production migration runner now rejects non-contiguous applied history (for example versions 1 and 3 with version 2 missing). The new corruption test passed in the full Ubuntu/Windows CI.
+- Wails run 42397232427 completed successfully on Ubuntu 24.04 and Windows. Both generated one service, two methods and seven models, produced the Vite bundle and verified the native executable.
+- Updated GitHub Actions pins to checkout v7.0.1, setup-go v7.0.0, setup-node v7.1.0 and setup-python v7.1.0. The Node 20 deprecation warning is gone in the subsequent runs.
+- The Windows Wails build still prints a non-fatal '-VThe system cannot find the file specified.' line before Taskfile tasks. The executable and bindings succeed; origin remains unknown and is not marked resolved.
+- Added docs/architecture/DESKTOP_BUILD.md and internal/infrastructure/sqlite/README.md; refreshed ADR 0001/0004, the ADR index, implementation blueprint and migrations README.
