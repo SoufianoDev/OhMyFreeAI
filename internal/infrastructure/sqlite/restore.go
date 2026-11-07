@@ -127,8 +127,13 @@ func RestoreDatabase(ctx context.Context, sourcePath, targetPath string, migrati
 		return "", err
 	}
 	targetExists := false
-	if _, statErr := os.Lstat(absoluteTarget); statErr == nil {
+	targetInfo, statErr := os.Lstat(absoluteTarget)
+	switch {
+	case statErr == nil:
 		targetExists = true
+		if !targetInfo.Mode().IsRegular() {
+			return "", ErrRestoreTargetInvalid
+		}
 		if err := os.Chmod(absoluteTarget, 0o600); err != nil {
 			return "", fmt.Errorf("restrict previous SQLite database permissions: %w", err)
 		}
@@ -147,6 +152,10 @@ func RestoreDatabase(ctx context.Context, sourcePath, targetPath string, migrati
 		if renameErr := os.Rename(absoluteTarget, rollbackPath); renameErr != nil {
 			return "", fmt.Errorf("preserve previous SQLite database: %w", renameErr)
 		}
+	case errors.Is(statErr, os.ErrNotExist):
+		targetExists = false
+	default:
+		return "", fmt.Errorf("recheck SQLite restore target: %w", statErr)
 	}
 
 	if err := os.Rename(temporaryPath, absoluteTarget); err != nil {
@@ -225,12 +234,7 @@ func validateRestoreTarget(path string) error {
 	if err == nil && !info.Mode().IsRegular() {
 		return ErrRestoreTargetInvalid
 	}
-	if err == nil {
-		if err := ensureNoSQLiteSidecars(path); err != nil {
-			return err
-		}
-	}
-	return nil
+	return ensureNoSQLiteSidecars(path)
 }
 
 func ensureNoSQLiteSidecars(path string) error {
