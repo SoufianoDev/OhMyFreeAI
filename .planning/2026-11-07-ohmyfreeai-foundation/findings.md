@@ -537,3 +537,10 @@
 - The run passed without the later extra PATH restoration for openSUSE, showing that removing setup-python was the material shell-resolution fix. The guard in the newest workflow revision is redundant but benign.
 - Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405729874
 - Scope: these are distribution-container userland builds and Xvfb WebView smoke tests on GitHub-hosted runners. They do not certify every bare-metal GPU, compositor, desktop session, installer/uninstaller or the production WebKit sandbox. The sandbox is explicitly not bypassed in product builds; its host-level verification remains open.
+
+
+## Latest workflow revision also passed all eight lanes — 2026-11-07T19:37Z
+
+- The follow-up run `42405827037`, which includes the openSUSE PATH guard, completed with conclusion SUCCESS across all eight distro/stack jobs.
+- All eight jobs again passed app build, two-stage WebView-to-Go invocation and SQLite reopen. This verifies the current workflow revision, not just the preceding run.
+- Run URL: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42405827037
