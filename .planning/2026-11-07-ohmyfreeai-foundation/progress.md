@@ -13,6 +13,10 @@
   - Created branch `foundation/bootstrap` from `main`.
   - Attempted local git clone; failed because the container could not resolve github.com. Switched to GitHub connector for repository operations.
   - Created task planning files using the upstream template structure as the documented fallback because the initializer cannot be executed in the shell environment.
+  - Inspected both supplied Wails prototypes: Go 1.24, Wails v2.10.2, embedded frontend; the remote-complete archive includes remote Colab polling and local monitoring. Did not adopt the rejected visual design.
+  - Parsed all three uploaded Python scripts with ast.parse successfully; did not execute any script because they modify or interact with the user's live runtime.
+  - Read the user's Material Design 3 skill and key references; confirmed web-specific limitations (Material Web maintenance mode, no M3 Expressive parity).
+  - Read KotlinComposeKit's reusable component design skill; extracted only transferable component API principles, not Kotlin/Compose implementation details.
 - Files created/modified:
   - .planning/2026-11-07-ohmyfreeai-foundation/task_plan.md
   - .planning/2026-11-07-ohmyfreeai-foundation/findings.md
