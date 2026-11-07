@@ -392,3 +392,8 @@
 - Earlier failures have separate fixes already present: Debian 12's toolcache Python required GLIBC 2.38 while Debian 12 provides 2.36 (use distro Python); GTK3 compatibility requires `-tags gtk3` for both Wails CLI and app; setup actions can alter pkg-config search paths (explicit distro paths); WebKit smoke on hosted runners fails bubblewrap network namespace creation (disable sandbox only in CI smoke subprocess, never production).
 - The repeated signal-10 WebKit/JSC warning was not the cause of the observed GTK SIGTRAP; the root cause was bubblewrap network namespace / D-Bus credential failure.
 - OpenSUSE remains the only demonstrated failure in run `42404735351`; other legacy GTK3 jobs were still running when inspected, so their result was not inferred.
+
+
+- Arch Linux rolling / GTK4-WebKitGTK 6.0 passed the full build + two-launch bridge smoke in run `42404735351`; both success markers and `WEBVIEW_REOPEN_PASS` were observed.
+- Fedora 44 / GTK4-WebKitGTK 6.0 also passed the full build + two-launch bridge smoke in the same run.
+- Confirmed green lanes so far: Ubuntu 24.04, Debian 13, Fedora 44 (GTK4), Arch Linux rolling. The three legacy lanes and openSUSE remain outstanding.
