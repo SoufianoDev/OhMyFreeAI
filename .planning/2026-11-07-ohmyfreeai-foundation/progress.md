@@ -652,3 +652,14 @@
 - Wails native workflow `42415564460` is still building the actual application on Windows and Ubuntu 24.04. Native executable CLI and WebView/SQLite smoke results are not yet confirmed for this revision.
 - Eight-distro matrix `42415564608` is queued for the same revision. It includes the updated X11 readiness probe and full native backup CLI success-path smoke. Ubuntu 22.04 remains the key retest lane.
 - Root CI is green; do not infer native Wails or distro matrix success from it.
+
+
+## Native Wails proof GREEN — commit 569c0c69
+
+- Wails workflow `42415564460` completed SUCCESS on both Windows and Ubuntu 24.04.
+- Windows native executable smoke passed the full CLI backup workflow: no-database export rejection, missing archive inspect rejection, successful export from a migrated fixture, successful inspect, archive entry/manifest checks, overwrite rejection, and preservation of the source DB.
+- Ubuntu native executable smoke passed the same CLI backup workflow and the two-launch WebView-to-Go bridge/SQLite reopen test. Exact markers: `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, `WEBVIEW_REOPEN_PASS`.
+- Observed Ubuntu WebView smoke timing: each launch took approximately 26 seconds to reach the second GetSnapshot call. The test's previous 30-second deadline had little margin and plausibly explains the Ubuntu 22.04 timeout; this is supported by timing evidence but not yet proven as the only cause.
+- Updated the smoke harness to use a 60-second deadline, print a launch/progress marker, wait for the X11 socket to be ready, and retain Xvfb output. The 60-second change is in the newer commit `c4d7bf5c`; its full CI/Wails/distro workflows are queued/pending.
+- Root CI `42415564618` is SUCCESS on Ubuntu and Windows for commit `569c0c69`.
+- Linux distro matrix `42415564608` for commit `569c0c69` is running; the next authoritative matrix is the current-branch run after the 60-second harness adjustment.
