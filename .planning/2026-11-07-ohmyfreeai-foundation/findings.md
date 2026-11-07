@@ -290,3 +290,9 @@
 - Updated the AppService marker protocol: successful snapshot load writes `GetSnapshot success`; a configuration-load failure writes `GetSnapshot failed: <error>`. The smoke test now rejects and prints an explicit service failure, and includes the captured application output on timeout or early exit.
 - The marker remains opt-in via `OMFAI_WEBVIEW_SMOKE_MARKER`; normal production runs are unaffected.
 - The next Wails run is the diagnostic gate. Do not claim the frontend bridge works until it produces the success marker twice.
+
+
+## openSUSE shell invocation follow-up — 2026-11-07T18:51Z
+
+- The POSIX bootstrap step installed Bash and confirmed `/usr/bin/Xvfb`, but a later GitHub Actions run step still failed with OCI `exec: "bash": executable file not found in $PATH`. The package manager reported Bash was already installed; the runner's subsequent container-shell resolution still did not find it.
+- Removed dependence on Bash entirely for the distro-container job by setting job-level `defaults.run.shell: sh`. All run blocks in this job use POSIX-compatible syntax. This is a CI container-shell compatibility fix, not an application defect.
