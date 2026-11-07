@@ -35,7 +35,7 @@ jobs:
     timeout-minutes: 60
     defaults:
       run:
-        shell: sh
+        shell: /bin/sh
     strategy:
       fail-fast: false
       matrix:
@@ -87,7 +87,7 @@ jobs:
 
     steps:
       - name: Install native desktop build and virtual-display dependencies
-        shell: sh
+        shell: /bin/sh
         env:
           DISTRO_FAMILY: ${{ matrix.family }}
           BUILD_STACK: ${{ matrix.stack }}
@@ -97,7 +97,7 @@ jobs:
             debian:gtk4-webkit6)
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-                build-essential pkg-config libgtk-4-dev libwebkitgtk-6.0-dev \
+                build-essential pkg-config python3 libgtk-4-dev libwebkitgtk-6.0-dev \
                 xvfb xauth dbus-x11 libegl1 libgl1-mesa-dri libgbm1 \
                 libx11-xcb1 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
                 libxrender1 libxtst6 libxi6 libxkbcommon-x11-0 libwayland-client0 \
@@ -106,26 +106,26 @@ jobs:
             debian:legacy-gtk3-webkit41)
               apt-get update
               DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-                build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev \
+                build-essential pkg-config python3 libgtk-3-dev libwebkit2gtk-4.1-dev \
                 xvfb xauth dbus-x11 libegl1-mesa libgl1-mesa-dri libgbm1 \
                 libx11-xcb1 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
                 libxrender1 libxtst6 libxi6 libxkbcommon-x11-0 libwayland-client0 \
                 libdrm2 curl git ca-certificates
               ;;
             fedora:gtk4-webkit6)
-              dnf install -y gcc gcc-c++ pkgconf-pkg-config gtk4-devel webkitgtk6.0-devel \
+              dnf install -y gcc gcc-c++ python3 pkgconf-pkg-config gtk4-devel webkitgtk6.0-devel \
                 xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers mesa-libEGL mesa-libGL \
                 libX11-xcb libXcomposite libXdamage libXfixes libXrandr libXrender \
                 libXtst libXi libxkbcommon-x11 libwayland-client libdrm curl git ca-certificates
               ;;
             fedora:legacy-gtk3-webkit41)
-              dnf install -y gcc gcc-c++ pkgconf-pkg-config gtk3-devel webkit2gtk4.1-devel \
+              dnf install -y gcc gcc-c++ python3 pkgconf-pkg-config gtk3-devel webkit2gtk4.1-devel \
                 xorg-x11-server-Xvfb xorg-x11-xauth mesa-dri-drivers mesa-libEGL mesa-libGL \
                 libX11-xcb libXcomposite libXdamage libXfixes libXrandr libXrender \
                 libXtst libXi libxkbcommon-x11 libwayland-client libdrm curl git ca-certificates
               ;;
             arch:gtk4-webkit6)
-              pacman -Syu --noconfirm --needed base-devel pkgconf gtk4 webkitgtk-6.0 \
+              pacman -Syu --noconfirm --needed base-devel python pkgconf gtk4 webkitgtk-6.0 \
                 xorg-server-xvfb xorg-xauth mesa libx11 libxcomposite libxdamage \
                 libxfixes libxrandr libxrender libxtst libxi libxkbcommon-x11 \
                 wayland libdrm curl git ca-certificates
@@ -133,7 +133,7 @@ jobs:
             suse:gtk4-webkit6)
               zypper --non-interactive refresh
               zypper --non-interactive install --no-recommends \
-                bash gcc gcc-c++ pkg-config gtk4-devel webkitgtk4-devel \
+                bash python3 gcc gcc-c++ pkg-config gtk4-devel webkitgtk4-devel \
                 xorg-x11-server-Xvfb xauth Mesa-dri libX11-xcb1 libXcomposite1 \
                 libXdamage1 libXfixes3 libXrandr2 libXrender1 libXtst6 libXi6 \
                 libxkbcommon-x11-0 libwayland-client0 libdrm2 curl git ca-certificates
@@ -159,11 +159,6 @@ jobs:
         uses: actions/setup-node@v7.1.0
         with:
           node-version: "22"
-
-      - name: Set up Python
-        uses: actions/setup-python@v7.1.0
-        with:
-          python-version: "3.13"
 
       - name: Configure native pkg-config search paths
         env:
@@ -202,7 +197,7 @@ jobs:
       - name: Build the actual OhMyFreeAI desktop application
         env:
           WAILS_BUILD_TAGS: ${{ matrix.build_tags }}
-        run: python scripts/build_desktop.py --output-dir dist
+        run: python3 scripts/build_desktop.py --output-dir dist
 
       - name: Launch twice and verify the live WebView-to-Go bridge
-        run: python scripts/smoke_desktop.py dist/OhMyFreeAI
+        run: python3 scripts/smoke_desktop.py dist/OhMyFreeAI
