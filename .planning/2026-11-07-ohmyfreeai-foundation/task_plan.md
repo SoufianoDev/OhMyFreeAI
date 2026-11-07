@@ -86,6 +86,7 @@ Resolved so far: Go core tests pass on Go 1.23.2. Wails v3 requires Go 1.26+ and
 | Policy-gate Go test failed after adding required policy revision | 1 | Add the missing revision to the test fixture and rerun the full Go suite |
 | Browser blocked file:// and localhost navigation | 1 | Use Playwright page.set_content() with inline local assets |
 | Playwright locator matched both nav and quick-access buttons | 1 | Target unique data-page selectors and rerun successfully |
+| Planning phase status markers initially included a list bullet | 1 | Corrected to the upstream `**Status:** value` format and manually revalidated all five phases |
 
 ## Notes
 
