@@ -599,3 +599,21 @@
 
 
 - Tooling-only authoring error: one Code Mode attempt to append the backup findings used an unescaped Markdown backtick inside a JavaScript template literal and raised a TypeError before any GitHub write. Retried with a line-array join; the intended findings were then saved successfully. No repository code was affected.
+
+
+## 2026-11-07 — CLI matrix verified; backup inspect/export integrated
+
+- Verified Linux distro CLI-enabled workflow `42410214638`: all eight jobs completed SUCCESS. Each lane built the actual Wails application, passed native CLI smoke (`--help`, `--version`, `doctor`, unknown command/exit 2 and read-only doctor), and passed two-launch WebView-to-Go plus SQLite reopen.
+- Added test-first archive inspection tests in `internal/infrastructure/backup/archive_inspect_test.go` (commit `7de297d`). The expected RED was observed in run `42412080552`: `go vet` failed because `Manager.Inspect` did not exist yet.
+- Implemented `Manager.Inspect` (commit `6ae3fc8`) using isolated temporary extraction and existing strict archive validation; added explicit temporary cleanup assertions (commit `2936f86`).
+- Wired native Wails `ExportBackup` and `InspectBackup` actions using the pinned v3.0.0 file-dialog API; added bilingual Settings controls and generated bridge exposure for both methods. The build script now requires all four AppService bindings.
+- A source inspection caught that Wails v3.0.0 `SaveFileDialogStruct` has no `SetTitle` method. Replaced the attempted fluent call with `SaveFileWithOptions(&SaveFileDialogOptions{Title, Filename, Filters})`. The OpenFile dialog does support `SetTitle`.
+- Root CI `42412587313`: Ubuntu SUCCESS, Windows SUCCESS. Includes Go vet/tests/build, Python tests, frontend syntax and architecture checks.
+- Wails native run `42412554344`: Windows SUCCESS and Ubuntu SUCCESS. Both actual application builds and native executable checks passed. Ubuntu also passed CLI smoke and live WebView bridge/SQLite reopen smoke. Exact output: `WEBVIEW_GO_BRIDGE_PASS attempt=1 calls=2`, `WEBVIEW_GO_BRIDGE_PASS attempt=2 calls=2`, `WEBVIEW_REOPEN_PASS`.
+- Current backup-enabled distro matrix `42412554358` is in progress. At the last check four GTK4 jobs were building and four GTK3/openSUSE jobs were queued. Keep this open until all eight jobs finish.
+- Planning docs updated after the verified results. Next: verify all eight lanes in `42412554358`; then add CLI export/inspect commands. Do not expose restore until the Store lifecycle can safely close, restore, reopen, swap repository references and roll back.
+
+### Tooling/authoring notes
+
+- One attempt to append findings used a JavaScript template literal containing unescaped Markdown backticks and failed before a GitHub write. Retried with a line array; findings were saved successfully. No repository code was affected.
+- One initial Wails save-dialog implementation used a nonexistent fluent `SetTitle` method on SaveFileDialog. Verified against the pinned upstream source and corrected to `SaveFileWithOptions` before the successful Wails run.
