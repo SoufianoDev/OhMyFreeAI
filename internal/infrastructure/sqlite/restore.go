@@ -69,9 +69,6 @@ func RestoreDatabase(ctx context.Context, sourcePath, targetPath string, migrati
 	if err := os.MkdirAll(targetDirectory, 0o700); err != nil {
 		return "", fmt.Errorf("create SQLite restore directory: %w", err)
 	}
-	if err := os.Chmod(targetDirectory, 0o700); err != nil {
-		return "", fmt.Errorf("restrict SQLite restore directory: %w", err)
-	}
 
 	temporaryFile, err := os.CreateTemp(targetDirectory, ".ohmyfreeai-restore-*.sqlite")
 	if err != nil {
