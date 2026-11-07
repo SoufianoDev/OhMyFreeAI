@@ -86,6 +86,15 @@
           <div class="page-heading"><div><p class="eyebrow" data-i18n="preferences">التفضيلات</p><h1 id="settings-heading" data-i18n="settings">الإعدادات</h1><p class="page-subtitle" data-i18n="settingsSub">تفضيلات الواجهة الأساسية.</p></div></div>
           <section class="surface-section settings-group"><div><h2 data-i18n="appearance">المظهر</h2><p data-i18n="appearanceSub">اختر المظهر الفاتح أو الداكن.</p></div><div class="segmented" role="group" aria-label="Theme"><button type="button" data-theme-choice="light" class="is-selected" data-i18n="light">فاتح</button><button type="button" data-theme-choice="dark" data-i18n="dark">داكن</button></div></section>
           <section class="surface-section settings-group"><div><h2 data-i18n="language">اللغة</h2><p data-i18n="languageSub">العربية والإنجليزية مع اتجاه تخطيط صحيح.</p></div><div class="segmented" role="group" aria-label="Language"><button type="button" data-language-choice="ar" class="is-selected">العربية</button><button type="button" data-language-choice="en">English</button></div></section>
+          <section class="surface-section backup-section" aria-labelledby="backup-heading">
+            <div class="backup-copy"><h2 id="backup-heading" data-i18n="backupTitle">النسخ الاحتياطي</h2><p data-i18n="backupDescription">صدّر إعدادات التطبيق وبياناته المحلية، أو افحص نسخة موجودة قبل الاستعادة.</p></div>
+            <div class="backup-actions">
+              <button class="action-button primary" id="backup-export" type="button" data-i18n="backupExport">تصدير نسخة احتياطية</button>
+              <button class="action-button" id="backup-inspect" type="button" data-i18n="backupInspect">فحص نسخة احتياطية</button>
+            </div>
+            <p class="backup-status" id="backup-status" role="status" aria-live="polite" hidden></p>
+            <div class="backup-details" id="backup-details" hidden></div>
+          </section>
         </section>
       </div>
     </main>
