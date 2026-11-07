@@ -33,6 +33,7 @@ go.work.sum
 # .vscode/
 
 # OhMyFreeAI generated and local state
+/.build/
 /bin/
 /build/
 /dist/
