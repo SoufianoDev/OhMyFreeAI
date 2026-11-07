@@ -371,3 +371,6 @@
 - Debian 13 / GTK4 + WebKitGTK 6.0 passed the complete job in run `42404735351`: native dependency installation, pkg-config checks, pinned Wails CLI install, actual application build, and two WebView-to-Go calls plus database reopen.
 - Smoke output: `WEBVIEW_GO_BRIDGE_PASS attempt=1`, `WEBVIEW_GO_BRIDGE_PASS attempt=2`, `WEBVIEW_REOPEN_PASS`.
 - This is the first non-Ubuntu Linux distribution with end-to-end CI evidence. Other seven matrix lanes are still running or queued; do not extrapolate Debian success to them.
+
+
+- Ubuntu 24.04 / GTK4 + WebKitGTK 6.0 also passed all steps in run `42404735351`, including two bridge markers and database reopen. It matches the native runner proof and validates the distro-container workflow on the Ubuntu base lane.
