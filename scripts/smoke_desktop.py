@@ -4,12 +4,20 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import time
 from pathlib import Path
+
+
+def parse_snapshot_marker(value: str) -> int:
+    match = re.fullmatch(r"GetSnapshot success count=([1-9][0-9]*)\\n?", value)
+    if match is None:
+        raise ValueError(f"invalid snapshot marker: {value!r}")
+    return int(match.group(1))
 
 
 def diagnostic_excerpt(path: Path) -> str:
@@ -66,9 +74,14 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                     value = marker.read_text(encoding="utf-8")
                     if value.startswith("GetSnapshot failed:"):
                         raise RuntimeError(value.strip())
-                    if value != "GetSnapshot success\n":
-                        raise RuntimeError(f"Unexpected WebView marker: {value!r}")
-                    print(f"WEBVIEW_GO_BRIDGE_PASS attempt={attempt}", flush=True)
+                    try:
+                        call_count = parse_snapshot_marker(value)
+                    except ValueError as error:
+                        raise RuntimeError(f"Unexpected WebView marker: {value!r}") from error
+                    print(
+                        f"WEBVIEW_GO_BRIDGE_PASS attempt={attempt} calls={call_count}",
+                        flush=True,
+                    )
                     return
                 if process.poll() is not None:
                     output.flush()
