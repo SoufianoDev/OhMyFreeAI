@@ -312,3 +312,38 @@ func TestBackupToHonorsCanceledContext(t *testing.T) {
 		t.Fatalf("canceled backup should not publish a destination, stat error: %v", err)
 	}
 }
+
+
+func TestOpenRestrictsExistingDatabasePermissions(t *testing.T) {
+	directory := filepath.Join(t.TempDir(), "application-data")
+	if err := os.Mkdir(directory, 0o755); err != nil {
+		t.Fatalf("create permissive database directory: %v", err)
+	}
+	databasePath := filepath.Join(directory, "state.db")
+	if err := os.WriteFile(databasePath, []byte{}, 0o644); err != nil {
+		t.Fatalf("create permissive database file: %v", err)
+	}
+
+	store, err := Open(context.Background(), databasePath)
+	if err != nil {
+		t.Fatalf("open existing SQLite database: %v", err)
+	}
+	defer store.Close()
+
+	if runtime.GOOS != "windows" {
+		directoryInfo, err := os.Stat(directory)
+		if err != nil {
+			t.Fatalf("stat application data directory: %v", err)
+		}
+		if got := directoryInfo.Mode().Perm(); got != 0o700 {
+			t.Fatalf("application data directory permissions are %04o, want 0700", got)
+		}
+		fileInfo, err := os.Stat(databasePath)
+		if err != nil {
+			t.Fatalf("stat SQLite database file: %v", err)
+		}
+		if got := fileInfo.Mode().Perm(); got != 0o600 {
+			t.Fatalf("SQLite database file permissions are %04o, want 0600", got)
+		}
+	}
+}
