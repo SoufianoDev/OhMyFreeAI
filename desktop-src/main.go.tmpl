@@ -104,19 +104,23 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("open application database: %w", err)
 	}
-	defer func() {
-		if err := store.Close(); err != nil {
-			log.Printf("close application database: %v", err)
-		}
-	}()
-
 	if err := store.Migrate(startupContext, migrations.Files, "."); err != nil {
+		_ = store.Close()
 		return fmt.Errorf("migrate application database: %w", err)
 	}
 
-	configuration := appconfig.Service{Repository: store}
+	storeController := sqlite.NewStoreController(store)
+	defer func() {
+		closeContext, closeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer closeCancel()
+		if err := storeController.Close(closeContext); err != nil {
+			log.Printf("close application database through controller: %v", err)
+		}
+	}()
+
+	configuration := appconfig.Service{Repository: storeController}
 	backupManager := backup.Manager{ApplicationVersion: version.Current, Migrations: migrations.Files, MigrationDir: "."}
-	service := NewAppService(configuration, backupManager, store)
+	service := NewAppService(configuration, backupManager, storeController)
 
 	app := application.New(application.Options{
 		Name:        "OhMyFreeAI",
@@ -145,15 +149,17 @@ func run() error {
 
 
 type localBackupOperations struct {
-	manager backup.Manager
-	store   *sqlite.Store
+	manager         backup.Manager
+	storeController *sqlite.StoreController
 }
 
 func (operations localBackupOperations) Export(ctx context.Context, destination string) error {
-	if operations.store == nil {
+	if operations.storeController == nil {
 		return fmt.Errorf("local application database is unavailable")
 	}
-	return operations.manager.Create(ctx, operations.store, destination)
+	return operations.storeController.WithShared(ctx, func(store *sqlite.Store) error {
+		return operations.manager.Create(ctx, store, destination)
+	})
 }
 
 func (operations localBackupOperations) Inspect(ctx context.Context, archivePath string) (appcli.BackupInspection, error) {
@@ -200,9 +206,11 @@ func runBackupCommand(ctx context.Context, invocation appcli.Invocation, output 
 		if err != nil {
 			return fmt.Errorf("open existing application database: %w", err)
 		}
-		operations.store = store
+		operations.storeController = sqlite.NewStoreController(store)
 		defer func() {
-			if closeErr := store.Close(); closeErr != nil && result == nil {
+			closeContext, closeCancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer closeCancel()
+			if closeErr := operations.storeController.Close(closeContext); closeErr != nil && result == nil {
 				result = fmt.Errorf("close application database after backup: %w", closeErr)
 			}
 		}()
