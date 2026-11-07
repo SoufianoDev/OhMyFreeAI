@@ -245,6 +245,9 @@ func (m Manager) Restore(ctx context.Context, archivePath, targetDatabasePath st
 
 func extractArchive(ctx context.Context, archivePath, snapshotPath string) (Manifest, error) {
 	var manifest Manifest
+	if err := ctx.Err(); err != nil {
+		return manifest, err
+	}
 	archiveInfo, err := os.Lstat(archivePath)
 	if err != nil {
 		return manifest, fmt.Errorf("%w: inspect archive: %v", ErrInvalidBackupArchive, err)
@@ -326,6 +329,9 @@ func extractArchive(ctx context.Context, archivePath, snapshotPath string) (Mani
 	hash := sha256.New()
 	written, err := io.Copy(io.MultiWriter(output, hash), io.LimitReader(contextReader{ctx: ctx, reader: entryReader}, maxDatabaseBytes+1))
 	if err != nil {
+		if contextErr := ctx.Err(); contextErr != nil {
+			return manifest, contextErr
+		}
 		return manifest, fmt.Errorf("%w: extract database entry: %v", ErrInvalidBackupArchive, err)
 	}
 	if written <= 0 || uint64(written) != fileRecord.Size || uint64(written) > maxDatabaseBytes {
