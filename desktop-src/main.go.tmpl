@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -39,6 +40,14 @@ func main() {
 	case appcli.RunDoctor:
 		if err := runDoctor(os.Stdout); err != nil {
 			fmt.Fprintf(os.Stderr, "OhMyFreeAI doctor: %v\n", err)
+			os.Exit(1)
+		}
+	case appcli.BackupExport, appcli.BackupInspect:
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+		err := runBackupCommand(ctx, invocation, os.Stdout)
+		cancel()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "OhMyFreeAI backup: %v\n", err)
 			os.Exit(1)
 		}
 	case appcli.LaunchGUI:
@@ -132,4 +141,71 @@ func run() error {
 		return fmt.Errorf("run desktop application: %w", err)
 	}
 	return nil
+}
+
+
+type localBackupOperations struct {
+	manager backup.Manager
+	store   *sqlite.Store
+}
+
+func (operations localBackupOperations) Export(ctx context.Context, destination string) error {
+	if operations.store == nil {
+		return fmt.Errorf("local application database is unavailable")
+	}
+	return operations.manager.Create(ctx, operations.store, destination)
+}
+
+func (operations localBackupOperations) Inspect(ctx context.Context, archivePath string) (appcli.BackupInspection, error) {
+	manifest, err := operations.manager.Inspect(ctx, archivePath)
+	if err != nil {
+		return appcli.BackupInspection{}, err
+	}
+	if len(manifest.Files) != 1 {
+		return appcli.BackupInspection{}, fmt.Errorf("validated backup manifest has an unexpected file count")
+	}
+	record := manifest.Files[0]
+	return appcli.BackupInspection{
+		FormatVersion:      manifest.FormatVersion,
+		ApplicationVersion: manifest.ApplicationVersion,
+		SchemaVersion:      manifest.SchemaVersion,
+		CreatedAt:          manifest.CreatedAt,
+		DatabaseSizeBytes:  record.Size,
+		DatabaseSHA256:     record.SHA256,
+	}, nil
+}
+
+// runBackupCommand is the CLI composition boundary. Export opens only an
+// existing database and never creates a first-run database or runs migrations.
+func runBackupCommand(ctx context.Context, invocation appcli.Invocation, output io.Writer) (result error) {
+	manager := backup.Manager{ApplicationVersion: version.Current, Migrations: migrations.Files, MigrationDir: "."}
+	operations := localBackupOperations{manager: manager}
+	if invocation.Command == appcli.BackupExport {
+		configDirectory, err := os.UserConfigDir()
+		if err != nil {
+			return fmt.Errorf("resolve application config directory: %w", err)
+		}
+		databasePath := filepath.Join(configDirectory, "OhMyFreeAI", "state.db")
+		info, err := os.Lstat(databasePath)
+		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return fmt.Errorf("application database does not exist; launch OhMyFreeAI once before exporting")
+			}
+			return fmt.Errorf("inspect application database: %w", err)
+		}
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return fmt.Errorf("application database path is not a regular file")
+		}
+		store, err := sqlite.OpenExisting(ctx, databasePath)
+		if err != nil {
+			return fmt.Errorf("open existing application database: %w", err)
+		}
+		operations.store = store
+		defer func() {
+			if closeErr := store.Close(); closeErr != nil && result == nil {
+				result = fmt.Errorf("close application database after backup: %w", closeErr)
+			}
+		}()
+	}
+	return appcli.RunBackup(ctx, output, invocation, operations)
 }
