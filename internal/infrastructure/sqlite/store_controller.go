@@ -207,6 +207,29 @@ func (c *StoreController) WithExclusive(ctx context.Context, operation func(*Sto
 	return nil
 }
 
+// Close acquires the exclusive lease, drains all active operations, and
+// removes the Store from the controller only after its connection pool closes.
+func (c *StoreController) Close(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	store, release, err := c.acquireExclusive(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+	if err := store.Close(); err != nil {
+		return err
+	}
+	c.mu.Lock()
+	if c.store == store {
+		c.store = nil
+		c.signalLocked()
+	}
+	c.mu.Unlock()
+	return nil
+}
+
 // Load and Save make StoreController a stable configuration repository. Each
 // operation holds its lease for the full SQLite call.
 func (c *StoreController) Load(ctx context.Context) (domainconfig.Config, error) {
