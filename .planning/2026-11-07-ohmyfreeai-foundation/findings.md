@@ -364,3 +364,10 @@
 
 - The next matrix run still failed immediately with `Invalid shell option`. Inspection found the job default had been changed to built-in `sh`, but the dependency-install step retained an explicit `shell: /bin/sh`, which GitHub Actions rejects.
 - Aligned that explicit step with the supported `shell: sh` identifier. No package/build/smoke step ran in the rejected jobs.
+
+
+## First Linux distribution matrix pass — 2026-11-07T19:11Z
+
+- Debian 13 / GTK4 + WebKitGTK 6.0 passed the complete job in run `42404735351`: native dependency installation, pkg-config checks, pinned Wails CLI install, actual application build, and two WebView-to-Go calls plus database reopen.
+- Smoke output: `WEBVIEW_GO_BRIDGE_PASS attempt=1`, `WEBVIEW_GO_BRIDGE_PASS attempt=2`, `WEBVIEW_REOPEN_PASS`.
+- This is the first non-Ubuntu Linux distribution with end-to-end CI evidence. Other seven matrix lanes are still running or queued; do not extrapolate Debian success to them.
