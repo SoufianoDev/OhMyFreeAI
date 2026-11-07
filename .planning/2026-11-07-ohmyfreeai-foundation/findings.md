@@ -85,6 +85,11 @@
 - Chromium/Playwright browser smoke test rendered the dashboard and exercised Models navigation, Arabic-to-English RTL/LTR switching (including active page title), Settings navigation and dark theme. Screenshots were created locally for review. The browser's file:// and localhost navigation were blocked by the container policy; embedding the source with page.set_content() worked. The preview used the local UI mirror; remote branch HTML/CSS were separately checked for required IDs and balanced braces.
 - Wails proof-of-concept is blocked in this container: Go is 1.23.2 (official Wails v3 docs require Go 1.26+), neither Wails CLI is installed, GTK/WebKit development packages are absent, and Windows is unavailable. No install was attempted.
 
+- Added initial SQLite migration `migrations/001_initial.sql` for settings, model revisions, artifacts, artifact locations, engine installations, compatibility assessments, runtime sessions, downloads, client integrations, operational events and schema history.
+- Schema constraints enforce valid SHA-256 hex strings, sanitized source URI columns, positive sizes/generations, allowed state values, foreign keys, model/artifact revision identity, and the rule that a Supported assessment requires verified integrity, successful load, health and inference.
+- Added Python standard-library SQLite schema tests. Six tests pass, covering table creation, foreign keys, hash validation, evidence completeness and model/artifact identity.
+- Exact Git blob hashes for the committed Go core, Go tests, developer script, SQL migration and Python schema tests match the locally tested mirror. This removes the earlier source-mirror ambiguity for those files.
+
 ## Visual/Browser Findings
 
 - The static frontend shell has been authored but not rendered in a real browser/WebView screenshot. Visual acceptance is therefore pending an actual desktop preview.
