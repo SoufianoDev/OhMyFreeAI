@@ -59,9 +59,7 @@ func TestOpenMigratesAndPersistsConfig(t *testing.T) {
 		t.Fatalf("reload configuration: %v", err)
 	}
 	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("configuration round-trip mismatch:
- got: %#v
-want: %#v", actual, expected)
+		t.Fatalf("configuration round-trip mismatch:\n got: %#v\nwant: %#v", actual, expected)
 	}
 
 	// Hold four connections at once so the test verifies connection-scoped
