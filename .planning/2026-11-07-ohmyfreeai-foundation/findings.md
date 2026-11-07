@@ -240,3 +240,12 @@
 - The Wails v2 monitor is a Linux-only read-only observability app, not the product shell. Its dark orbit/hero dashboard is intentionally not reused; the new product continues with the Material 3 interface.
 - The historical JSC_SIGNAL_FOR_GC=12 setting is specific to the archived Wails v2/WebKit2GTK 4.1 runtime. The new Wails v3/GTK4/WebKitGTK 6 runtime must be observed before setting a default signal.
 - No live Colab /props or /v1/models request, SSE completion test, or model/hardware compatibility check was run. Those remain explicit activation gates.
+
+
+## SQLite online backup/restore implementation
+- modernc.org/sqlite v1.62.0 exposes NewBackup and NewRestore on its underlying connection, plus Backup.Step, Finish, Remaining and PageCount. The adapter accesses the exported methods through narrow optional interfaces and keeps all raw driver-connection use inside database/sql.Conn.Raw.
+- Store.BackupTo creates a transactionally consistent snapshot via SQLite's online backup API; it does not copy the live database or WAL sidecar. It retries primary SQLite BUSY/LOCKED result codes, observes context cancellation between page batches, verifies integrity_check, foreign_key_check and contiguous migration history, syncs and publishes without intentionally overwriting an existing destination.
+- RestoreDatabase validates the source snapshot before touching the target, restores to a temporary database via NewRestore, applies forward migrations, verifies the restored DB, checkpoints/closes it, rejects target sidecars and non-SQLite files, and keeps the previous target as a rollback file.
+- Added a migration guard that rejects a database schema newer than the application's latest available migration. This prevents restoring a backup from a newer application and silently treating it as compatible.
+- Root CI run 42398884244 passed on Ubuntu 24.04 and Windows with the backup/restore test suite. SQLite driver matrix run 42398884345 passed on both operating systems for modernc and ncruces.
+- The current implementation is a raw SQLite snapshot/restore primitive only. The user-selected .omfaibackup container, manifest, checksum verification, archive path/size validation and application-level backup UI are still not implemented.
