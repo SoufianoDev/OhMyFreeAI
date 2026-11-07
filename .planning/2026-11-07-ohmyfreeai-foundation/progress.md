@@ -342,3 +342,6 @@
 - The first direct-Xvfb native Ubuntu attempt exited with status 2 before the marker. The prior helper discarded the useful application log on this early-exit path. Updated it to flush and include the last 5,000 log characters in the failure report; the next Wails run is required to diagnose the exact startup error.
 - openSUSE Tumbleweed failed because its minimal container did not include Bash, the default shell GitHub Actions requested. Added Bash to its dependency installation.
 - All of these are test-harness/CI bootstrap corrections. Do not mark distro or WebView coverage passed until the latest matrix and native Wails jobs finish.
+
+
+- Follow-up correction: the openSUSE dependency step itself cannot use Bash before Bash is installed. Changed that bootstrap step to POSIX `sh` and retained Bash installation for subsequent GitHub Actions steps. The next matrix run will validate this ordering.
