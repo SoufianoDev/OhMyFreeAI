@@ -5,7 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"time"
+
+	"github.com/wailsapp/wails/v3/pkg/application"
+
+	"github.com/SoufianoDev/OhMyFreeAI/internal/infrastructure/backup"
+	"github.com/SoufianoDev/OhMyFreeAI/internal/infrastructure/sqlite"
 
 	appconfig "github.com/SoufianoDev/OhMyFreeAI/internal/application/config"
 	domainconfig "github.com/SoufianoDev/OhMyFreeAI/internal/domain/config"
@@ -20,12 +26,89 @@ type DashboardSnapshot struct {
 
 // AppService is the narrow Wails boundary. Domain and application packages do
 // not import Wails types.
-type AppService struct {
-	configuration appconfig.Service
+type BackupExportResult struct {
+	Canceled bool   `json:"canceled"`
+	FileName string `json:"fileName,omitempty"`
 }
 
-func NewAppService(configuration appconfig.Service) *AppService {
-	return &AppService{configuration: configuration}
+type BackupInspectionSnapshot struct {
+	Canceled            bool      `json:"canceled"`
+	FormatVersion       int       `json:"formatVersion,omitempty"`
+	ApplicationVersion  string    `json:"applicationVersion,omitempty"`
+	SchemaVersion       int       `json:"schemaVersion,omitempty"`
+	CreatedAt           time.Time `json:"createdAt,omitempty"`
+	DatabaseSizeBytes   uint64    `json:"databaseSizeBytes,omitempty"`
+	DatabaseSHA256      string    `json:"databaseSha256,omitempty"`
+}
+
+type AppService struct {
+	configuration appconfig.Service
+	backupManager backup.Manager
+	store         *sqlite.Store
+}
+
+func NewAppService(configuration appconfig.Service, backupManager backup.Manager, store *sqlite.Store) *AppService {
+	return &AppService{configuration: configuration, backupManager: backupManager, store: store}
+}
+
+// ExportBackup uses a native save dialog and writes a verified .omfaibackup
+// archive without overwriting an existing file.
+func (s *AppService) ExportBackup() (BackupExportResult, error) {
+	if s == nil || s.store == nil || s.backupManager.Migrations == nil {
+		return BackupExportResult{}, fmt.Errorf("backup export is unavailable")
+	}
+	dialog := application.Get().Dialog.SaveFile().
+		SetTitle("Export OhMyFreeAI backup").
+		SetFilename("OhMyFreeAI-Backup-" + time.Now().Format("2006-01-02") + backup.ArchiveExtension).
+		AddFilter("OhMyFreeAI backup", "*"+backup.ArchiveExtension)
+	path, err := dialog.PromptForSingleSelection()
+	if err != nil {
+		return BackupExportResult{}, fmt.Errorf("select backup destination: %w", err)
+	}
+	if path == "" {
+		return BackupExportResult{Canceled: true}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	if err := s.backupManager.Create(ctx, s.store, path); err != nil {
+		return BackupExportResult{}, fmt.Errorf("export backup: %w", err)
+	}
+	return BackupExportResult{FileName: filepath.Base(path)}, nil
+}
+
+// InspectBackup validates a selected archive in temporary storage. It never
+// restores or modifies the live application database.
+func (s *AppService) InspectBackup() (BackupInspectionSnapshot, error) {
+	if s == nil || s.backupManager.Migrations == nil {
+		return BackupInspectionSnapshot{}, fmt.Errorf("backup inspection is unavailable")
+	}
+	dialog := application.Get().Dialog.OpenFile().
+		SetTitle("Inspect OhMyFreeAI backup").
+		AddFilter("OhMyFreeAI backup", "*"+backup.ArchiveExtension)
+	path, err := dialog.PromptForSingleSelection()
+	if err != nil {
+		return BackupInspectionSnapshot{}, fmt.Errorf("select backup archive: %w", err)
+	}
+	if path == "" {
+		return BackupInspectionSnapshot{Canceled: true}, nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	defer cancel()
+	manifest, err := s.backupManager.Inspect(ctx, path)
+	if err != nil {
+		return BackupInspectionSnapshot{}, fmt.Errorf("inspect backup: %w", err)
+	}
+	record := manifest.Files[0]
+	return BackupInspectionSnapshot{
+		FormatVersion:      manifest.FormatVersion,
+		ApplicationVersion: manifest.ApplicationVersion,
+		SchemaVersion:      manifest.SchemaVersion,
+		CreatedAt:          manifest.CreatedAt,
+		DatabaseSizeBytes:  record.Size,
+		DatabaseSHA256:     record.SHA256,
+	}, nil
 }
 
 // GetSnapshot returns only verified local application state. It does not
