@@ -69,7 +69,7 @@ Phase 4
 - [x] Diagnose GitHub runner WebKit bubblewrap namespace restriction and keep WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 confined to the smoke-test subprocess only
 - [ ] Validate WebKit's production sandbox on a real Linux host; container CI explicitly does not certify sandbox behavior
 - [x] Define explicit Linux distribution targets and add GTK4/WebKitGTK 6.0 plus legacy GTK3/WebKit2GTK 4.1 build/runtime smoke matrix (Ubuntu 24.04, Debian 13, Fedora 44, Arch, openSUSE Tumbleweed, Ubuntu 22.04, Debian 12, Fedora 44 legacy)
-- [ ] Verify all eight Linux distro jobs pass; Ubuntu 24.04, Debian 13, Fedora 44 GTK4 and Arch rolling are green, four lanes remain; distinguish container userland coverage from bare-metal certification
+- [ ] Verify all eight Linux distro jobs pass; Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Fedora 44 legacy GTK3 and Arch rolling are green, three lanes remain; distinguish container userland coverage from bare-metal certification
 - [ ] Add abrupt-process crash/reopen recovery tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
