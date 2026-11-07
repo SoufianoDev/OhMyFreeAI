@@ -1,5 +1,7 @@
 package compatibility
 
+import "encoding/hex"
+
 // Status is an evidence-backed assessment result for an exact model/runtime tuple.
 type Status string
 
@@ -32,9 +34,17 @@ type Assessment struct {
 
 // Ready requires exact tuple identity and successful end-to-end execution evidence.
 func (a Assessment) Ready() bool {
-	return a.ModelRevision != "" && a.ArtifactSHA256 != "" && a.EngineVersion != "" &&
+	return a.ModelRevision != "" && validSHA256(a.ArtifactSHA256) && a.EngineVersion != "" &&
 		a.Backend != "" && a.RuntimeFingerprint != "" &&
 		(a.Status == StatusSupported || a.Status == StatusSupportedWithLimits) &&
 		a.Evidence.ArtifactIntegrityVerified && a.Evidence.EngineLoadSucceeded &&
 		a.Evidence.HealthCheckPassed && a.Evidence.InferenceSucceeded
+}
+
+func validSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	decoded, err := hex.DecodeString(value)
+	return err == nil && len(decoded) == 32
 }
