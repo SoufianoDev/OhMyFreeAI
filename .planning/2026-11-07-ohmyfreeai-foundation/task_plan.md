@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Verify the native CLI smoke on Ubuntu/Windows and the eight Linux distro lanes. If green, mark CLI complete, then design the backup application boundary around the open SQLite database lifecycle before implementing inspect/export/restore. Keep Colab remote inference policy-gated.
+Verify the native CLI smoke across all eight Linux distro lanes. If green, close CLI verification, then implement the read-only backup inspect and export application boundary. Keep restore separate until coordinated SQLite close/reopen/rollback lifecycle is proven. Keep Colab remote inference policy-gated.
 
 ## Current Phase
 
@@ -73,7 +73,8 @@ Phase 4
 - [x] Define explicit Linux distribution targets and add GTK4/WebKitGTK 6.0 plus legacy GTK3/WebKit2GTK 4.1 build/runtime smoke matrix (Ubuntu 24.04, Debian 13, Fedora 44, Arch, openSUSE Tumbleweed, Ubuntu 22.04, Debian 12, Fedora 44 legacy)
 - [x] Verify all eight Linux distro jobs pass in run 42405827037; distinguish container userland coverage from bare-metal certification
 - [x] Implement framework-independent GUI-default CLI parser with typed unknown-command/extra-argument errors and unit tests
-- [ ] Verify the built native executable handles `--help`, `--version`, `doctor`, unknown commands and read-only doctor behavior on Linux/Windows and all eight Linux distro lanes
+- [x] Verify the built native executable handles `--help`, `--version`, `doctor`, unknown commands and read-only doctor behavior on Ubuntu 24.04 and Windows (Wails run 42409974970)
+- [ ] Verify the same native CLI smoke on all eight Linux distro lanes (run 42410214638)
 - [ ] Add abrupt-process crash/reopen recovery tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
