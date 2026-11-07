@@ -379,3 +379,12 @@
 - The earlier signal-10 warning is not causal for this failure. No JSC signal override was added.
 - Added `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` and `GTK_A11Y=none` strictly to the smoke subprocess environment. This bypasses a sandbox requirement unavailable in GitHub's restricted namespace, only for CI. It is not stored in product configuration, launch scripts or release builds.
 - Updated desktop build documentation to explicitly state that this CI smoke validates WebView startup, JS-to-Go, and database reopen but does not validate the WebKit sandbox itself. A separate host-level security check remains required.
+
+
+## Final distro bootstrap refinements — 2026-11-07T19:02Z
+
+- Removed setup-python from distro containers; its Python 3.13 toolcache requires GLIBC_2.38 and fails on Debian 12's older glibc. All matrix jobs now install/use distro-provided Python 3, which is sufficient for the standard-library-only scripts.
+- The Wails CLI itself now uses the GTK3 build tag on legacy lanes; previously only the app build was tagged.
+- The workflow now verifies exact pkg-config modules and prepends distro-native pkg-config directories after setup actions.
+- Replaced shell lookup with the explicit /bin/sh command template across the distro matrix to avoid openSUSE container PATH resolution problems.
+- Next verification run is 42404224038 (Linux distribution compatibility); no matrix lane is marked green until build + two-launch WebView bridge smoke pass.
