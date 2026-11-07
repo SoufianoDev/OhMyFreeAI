@@ -16,7 +16,13 @@ REQUIRED_DOCS = (
     "docs/architecture/SYSTEM_ARCHITECTURE.md",
     "docs/architecture/MODULE_BOUNDARIES.md",
     "docs/architecture/COMPATIBILITY_ARCHITECTURE.md",
+    "docs/architecture/DATA_ARCHITECTURE.md",
+    "docs/architecture/SECURITY_ARCHITECTURE.md",
+    "docs/architecture/UI_UX_ARCHITECTURE.md",
+    "docs/architecture/IMPLEMENTATION_BLUEPRINT.md",
+    "docs/architecture/ADR_INDEX.md",
     "docs/legal/COLAB_RISK_DISCLOSURE.md",
+    "docs/legal/THIRD_PARTY_SERVICES.md",
 )
 
 
