@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Complete the current Wails and eight-distro verification runs for the two-stage native bridge smoke. Confirm openSUSE's verified Bash PATH and Ubuntu 22.04's pre/post-frontend GetSnapshot calls; do not treat a build-only pass as runtime success. Then implement the missing GUI-default CLI dispatcher and wire the existing .omfaibackup manager into user-facing export/inspect/restore workflows, followed by abrupt-process recovery tests, real-host WebKit sandbox validation, packaging and full diff review. Keep Colab remote inference policy-gated.
+Implement the GUI-default application CLI dispatcher (`--help`, `--version`, `doctor`) using TDD; unknown commands must exit without launching the GUI. Then design and wire safe `.omfaibackup` inspect/export/restore flows, respecting the open-database lifecycle. Keep Colab remote inference policy-gated.
 
 ## Current Phase
 
@@ -67,11 +67,11 @@ Phase 4
 - [ ] Wire backup export/inspect/restore into the application layer, native file dialogs, GUI and CLI
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
 - [x] Revalidate the refactored two-stage bridge bootstrap on native Ubuntu; run 42405729902 passed with two GetSnapshot calls per launch and DB reopen
-- [ ] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs
+- [x] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs (run 42405827037)
 - [x] Diagnose GitHub runner WebKit bubblewrap namespace restriction and keep WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 confined to the smoke-test subprocess only
 - [ ] Validate WebKit's production sandbox on a real Linux host; container CI explicitly does not certify sandbox behavior
 - [x] Define explicit Linux distribution targets and add GTK4/WebKitGTK 6.0 plus legacy GTK3/WebKit2GTK 4.1 build/runtime smoke matrix (Ubuntu 24.04, Debian 13, Fedora 44, Arch, openSUSE Tumbleweed, Ubuntu 22.04, Debian 12, Fedora 44 legacy)
-- [ ] Verify all eight Linux distro jobs pass; six lanes are green (Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Arch rolling, Fedora 44 GTK3 legacy, Debian 12 GTK3 legacy); openSUSE and Ubuntu 22.04 remain under investigation; distinguish container userland coverage from bare-metal certification
+- [x] Verify all eight Linux distro jobs pass in run 42405827037; distinguish container userland coverage from bare-metal certification
 - [ ] Add GUI-default CLI dispatch (`--help`, `--version`, `doctor`; unknown commands must not open GUI)
 - [ ] Add abrupt-process crash/reopen recovery tests
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
@@ -91,7 +91,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows. The native Wails workflow is now green on Ubuntu 24.04 and Windows. Ubuntu emitted WEBVIEW_GO_BRIDGE_PASS twice and WEBVIEW_REOPEN_PASS. The first smoke failure was traced to bubblewrap namespace restrictions in GitHub Actions, not the signal-10 warning. The sandbox bypass is confined to CI. The eight-distro matrix is the remaining Linux verification gate; Debian 13, Fedora 44 GTK4, Arch and Ubuntu 24.04 have passed the new two-stage bridge smoke; legacy GTK3 and openSUSE retests remain. The app has one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView-to-Go smoke verification, real-host WebKit sandbox verification, eight-distro CI completion, .omfaibackup archive/manifest/checksum wrapper, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation and packaging/uninstall. Colab remote-inference activation remains policy-gated.
+Resolved so far: Wails v3.0.0 native builds pass on Ubuntu 24.04 and Windows. Root CI and the Wails platform workflow passed at commit f189e0b1; the latest Linux distro workflow run 42405827037 passed all eight jobs at commit 001533d8b07cb699b3515db04382a4e8fcb35e90. Every distro job built the application, verified two native GetSnapshot calls per launch around frontend module import, and verified SQLite reopen. The CI-only WebKit sandbox bypass remains confined to smoke-test subprocesses; real-host production sandbox validation remains open. The production modernc.org/sqlite v1.62.0 Store, migrations, config repository, online backup/restore primitives and strict `.omfaibackup` archive manager are implemented and tested on Linux/Windows. Still open: GUI-default app CLI, application/UI/CLI backup integration, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review. Colab remote-inference activation remains policy-gated.
 
 ## Decisions Made
 
