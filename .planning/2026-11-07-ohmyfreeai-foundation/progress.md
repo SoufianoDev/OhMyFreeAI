@@ -52,14 +52,17 @@
   - Added the shared Planning with Files pointer at .planning/.active_plan for the single named plan.
   - Manually validated the plan structure: active pointer resolves to the plan directory, all three required files exist, five phases have exactly five valid status markers. The upstream check-complete.sh --validate was not run because the repository checkout and helper scripts are not mounted in the shell environment.
   - Verified the static UI with Node syntax check and Python HTML parsing; no duplicate IDs were found.
-  - Verified the committed Go core against an exact local mirror (Git blob SHA match): go test ./... and go build ./... passed, including config, runtime, compatibility and policy gate packages.
+  - Verified the committed Go core against an exact local mirror (Git blob SHA match before the latest TDD hardening): go test ./..., go vet ./..., go test -race ./... and go build ./... passed. The latest security/compatibility hardening was also retested locally; exact SHA reconciliation is being refreshed.
   - Added initial SQLite schema with foreign keys, state/checksum constraints, redacted URI fields and cross-table model/artifact identity; six Python sqlite3/unittest cases passed against the exact committed SQL and test file.
   - Matched committed Go source blobs against the tested local mirror after applying gofmt formatting to the remaining files.
   - Verified Python syntax and developer command smoke tests. The architecture checker was exercised against a local fixture, not a full remote checkout.
   - Rendered the local UI mirror in Chromium via Playwright; tested Models navigation, Arabic/English direction and active page title, Settings navigation and dark theme. UI preview screenshots were captured locally.
   - Evaluated SQLite drivers: modernc.org/sqlite v1.62.0 is CGO-free/BSD-3-Clause but requires Go 1.26; mattn/go-sqlite3 is MIT but requires CGO/GCC; ncruces/go-sqlite3 is CGO-free but uses a WASM-derived SQLite VFS with additional memory and WAL/locking validation needs. Added a proposed ADR; no driver is pinned.
-  - Set the repository toolchain target to Go 1.27.3, the latest stable patch shown by official Go release history on 2026-11-07. `scripts/dev.py doctor` now flags older local Go toolchains without installing or changing anything.
-  - Added a Linux/Windows GitHub Actions validation workflow using the go.mod toolchain target. No Actions run/status is available yet because the workflow is only on this feature branch.
+  - Set the repository toolchain target to Go 1.27.3, the latest stable patch shown by official Go release history on 2026-11-07. scripts/dev.py doctor now flags older local Go toolchains without installing or changing anything.
+  - Added and retained the relevant ECC skills (Go patterns/testing, database migrations, security review, TDD workflow) under .agents/skills/ecc/ with the MIT license. Updated AGENTS.md to require them for matching work.
+  - Used a real TDD RED/GREEN cycle for policy-source URL hardening, OS secret-reference validation and duplicate-port rejection. Added strict SHA-256 format validation to model readiness; malformed digests no longer qualify as ready.
+  - Added the development-only down migration and test proving it removes the initial schema. Production migration policy remains forward-only.
+  - Added a Linux/Windows GitHub Actions validation workflow using the go.mod toolchain target and expanded architecture checks. No Actions run/status is available yet on this feature branch.
   - Wails v3 PoC remains blocked in this container by local Go 1.23.2, missing Wails CLI/GTK4/WebKitGTK 6 dependencies and no Windows host. Official v3 docs identify v3.0.0 as stable and provide the vanilla-js template; no Wails dependency or CLI was installed.
 
 ### Errors and corrections in this session
@@ -67,6 +70,7 @@
   - GitHub create-file returned HTTP 422 because a path already existed from the partial batch; fetched its SHA and updated it instead of retrying create.
   - A policy-gate test initially failed after adding a required policy revision; updated the test fixture and reran all Go tests successfully.
   - Browser file:// and localhost navigation were blocked by the container policy; switched to Playwright page.set_content() with inline local assets.
+  - A checksum-readiness test failed as expected in the TDD RED stage; implemented strict 64-character hexadecimal SHA-256 validation and the suite passed. An initial broad fixture replacement also changed the negative test vector; restored the malformed value and reran successfully.
   - First UI interaction test used an ambiguous accessible button name; switched to unique data-page selectors and reran successfully.
   - Manual Planning with Files validation found phase status markers had a leading list bullet; corrected them to the exact upstream `**Status:** value` format and reran structural validation successfully.
 
