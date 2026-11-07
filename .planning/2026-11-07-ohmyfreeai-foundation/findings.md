@@ -374,3 +374,10 @@
 
 
 - Ubuntu 24.04 / GTK4 + WebKitGTK 6.0 also passed all steps in run `42404735351`, including two bridge markers and database reopen. It matches the native runner proof and validates the distro-container workflow on the Ubuntu base lane.
+
+
+## openSUSE shell resolution after package bootstrap — 2026-11-07T19:12Z
+
+- openSUSE dependency installation now completes and installs both `bash` and `Xvfb`, but the later built-in `sh` step cannot be resolved (`exec: "sh": executable file not found in $PATH`). The minimal image does not expose a stable `sh` command after its package transaction.
+- The initial package bootstrap successfully starts with `sh`; subsequent steps will now use `bash`, which the bootstrap explicitly installs. setup-python has been removed, so its earlier PATH mutation is no longer present.
+- openSUSE reached package installation but not pkg-config, compilation or smoke. It remains unverified.
