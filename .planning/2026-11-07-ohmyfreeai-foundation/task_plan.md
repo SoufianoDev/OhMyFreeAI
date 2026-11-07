@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-The latest Wails smoke run failed because its stdout-based readiness assertion did not observe the AppService call; replace it with the opt-in GetSnapshot marker and inspect the new Wails + 8-distro CI runs. Then complete the .omfaibackup archive/manifest/checksum validator, abrupt-crash recovery tests, packaging and full diff review.
+Inspect the current Wails run with the CI-only WebKit sandbox workaround and the corrected eight-distro matrix (native GTK/WebKit packages, distro Python, matching GTK build tags and pkg-config paths). Confirm JS-to-Go and two-launch DB reopen. Then validate the WebKit sandbox on a real host, complete the .omfaibackup archive/manifest/checksum validator, abrupt-crash recovery tests, packaging and full diff review.
 
 ## Current Phase
 
@@ -64,7 +64,9 @@ Phase 4
 - [ ] Revalidate current Colab /props and /v1/models behavior, model-specific Q8_0/262144 compatibility and the live SSE path before enabling remote inference
 - [x] Add SQLite online backup/restore primitives with integrity, foreign-key, migration-history, cancellation, no-overwrite, target-safety and rollback tests on Ubuntu and Windows
 - [ ] Package snapshots into .omfaibackup with a strict manifest, checksums, fixed entry names and archive-size/path-traversal protections
-- [ ] Complete actual desktop WebView-to-Go invocation and JavaScriptCore signal smoke tests; the new opt-in marker and Xvfb software-rendering test must pass on native Ubuntu and the distro matrix
+- [ ] Complete actual desktop WebView-to-Go invocation and two-launch DB reopen smoke tests; the opt-in success marker must pass on native Ubuntu and the distro matrix
+- [x] Diagnose GitHub runner WebKit bubblewrap namespace restriction and keep WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1 confined to the smoke-test subprocess only
+- [ ] Validate WebKit's production sandbox on a real Linux host; container CI explicitly does not certify sandbox behavior
 - [x] Define explicit Linux distribution targets and add GTK4/WebKitGTK 6.0 plus legacy GTK3/WebKit2GTK 4.1 build/runtime smoke matrix (Ubuntu 24.04, Debian 13, Fedora 44, Arch, openSUSE Tumbleweed, Ubuntu 22.04, Debian 12, Fedora 44 legacy)
 - [ ] Verify all eight Linux distro jobs pass; distinguish container userland coverage from bare-metal certification
 - [ ] Add abrupt-process crash/reopen recovery tests
@@ -85,7 +87,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows. A previous Ubuntu WebView smoke check failed to observe its stdout marker; a new explicit frontend-to-Go marker and eight-distro Linux container matrix have been committed and are awaiting CI results. The app has one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView/signal smoke verification, .omfaibackup archive/manifest/checksum wrapper, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, broader Linux distro coverage and packaging/uninstall. Colab remote-inference activation remains policy-gated.
+Resolved so far: the complete Wails v3.0.0 application now builds on Ubuntu 24.04 and Windows. A previous Ubuntu WebView smoke check failed to observe its stdout marker; a new explicit frontend-to-Go marker and eight-distro Linux container matrix have been committed and are awaiting CI results. The app has one registered AppService, two generated methods (GetSnapshot/SaveConfig), seven generated models, a Vite production bundle and verified native executables. The production modernc.org/sqlite v1.62.0 Store, transactional migration runner and config repository are implemented and tested on both OSes. Root Go/Python/frontend/architecture CI and the separate modernc/ncruces evaluation matrix passed. Still open: live WebView-to-Go smoke verification, real-host WebKit sandbox verification, eight-distro CI completion, .omfaibackup archive/manifest/checksum wrapper, abrupt-crash recovery, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation and packaging/uninstall. Colab remote-inference activation remains policy-gated.
 
 ## Decisions Made
 
