@@ -58,7 +58,9 @@
   - Verified Python syntax and developer command smoke tests. The architecture checker was exercised against a local fixture, not a full remote checkout.
   - Rendered the local UI mirror in Chromium via Playwright; tested Models navigation, Arabic/English direction and active page title, Settings navigation and dark theme. UI preview screenshots were captured locally.
   - Evaluated SQLite drivers: modernc.org/sqlite v1.62.0 is CGO-free/BSD-3-Clause but requires Go 1.26; mattn/go-sqlite3 is MIT but requires CGO/GCC; ncruces/go-sqlite3 is CGO-free but uses a WASM-derived SQLite VFS with additional memory and WAL/locking validation needs. Added a proposed ADR; no driver is pinned.
-  - Wails v3 PoC remains blocked by Go 1.23.2 (v3 docs require Go 1.26+), missing Wails CLI/GTK/WebKit dependencies and no Windows host. No dependencies were installed.
+  - Set the repository toolchain target to Go 1.27.3, the latest stable patch shown by official Go release history on 2026-11-07. `scripts/dev.py doctor` now flags older local Go toolchains without installing or changing anything.
+  - Added a Linux/Windows GitHub Actions validation workflow using the go.mod toolchain target. No Actions run/status is available yet because the workflow is only on this feature branch.
+  - Wails v3 PoC remains blocked in this container by local Go 1.23.2, missing Wails CLI/GTK4/WebKitGTK 6 dependencies and no Windows host. Official v3 docs identify v3.0.0 as stable and provide the vanilla-js template; no Wails dependency or CLI was installed.
 
 ### Errors and corrections in this session
   - Bulk skill vendoring exceeded the Code Mode tool-call limit; some initial files were created before interruption. Reconciled by fetching existing files and creating only the missing files in smaller batches.
