@@ -444,3 +444,11 @@
 - A concurrent branch commit `3d5b9363` changed the AppService marker from the exact line `GetSnapshot success\n` to `GetSnapshot success count=N\n` so multiple native bridge calls can be counted.
 - The existing `scripts/smoke_desktop.py` still compares against the old exact marker string. Without updating the consumer, every distro smoke using the new AppService template will reject the new marker as unexpected. This is a deterministic producer/consumer contract mismatch, not a platform failure.
 - The correction should parse the versioned marker and assert at least one successful call per process launch; the smoke script resets the marker before each of its two launches, so each attempt should independently report a successful count.
+
+
+## Counted bridge marker correction — 2026-11-07T19:22Z
+
+- Updated `scripts/smoke_desktop.py` to parse the new `GetSnapshot success count=N` marker emitted by AppService, reject zero/malformed/legacy values, and report the call count per launch.
+- Added `tests/test_smoke_desktop.py` with valid single/multiple call counts and malformed marker cases.
+- A follow-up escaping issue in the regex initially made it match a literal backslash-n; corrected the pattern to match the actual newline written by Go. Current code is at commit `70546dd5462692a8e3d2e8183815983b13cec52c`.
+- CI, Wails and Linux distro workflows for that commit are queued; do not mark this correction verified until those runs complete.
