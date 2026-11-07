@@ -9,6 +9,7 @@ on:
       - 'frontend/**'
       - 'scripts/build_desktop.py'
       - 'scripts/smoke_desktop.py'
+      - 'scripts/smoke_cli.py'
       - 'go.mod'
       - 'go.sum'
       - 'internal/**'
