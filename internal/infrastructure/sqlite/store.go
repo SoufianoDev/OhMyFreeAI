@@ -112,7 +112,7 @@ func dataSourceName(absolutePath string) (string, error) {
 	query := url.Values{}
 	query.Add("_pragma", "foreign_keys(1)")
 	query.Add("_pragma", fmt.Sprintf("busy_timeout(%d)", busyTimeoutMS))
-	query.Add("_pragma", "synchronous(NORMAL)")
+	query.Add("_pragma", "synchronous(FULL)")
 	u.RawQuery = query.Encode()
 	return u.String(), nil
 }
