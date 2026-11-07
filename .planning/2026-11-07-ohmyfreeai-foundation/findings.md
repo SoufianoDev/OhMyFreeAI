@@ -227,3 +227,16 @@
 - Wails v3.0.0 application build run 42397232427 passed on Ubuntu 24.04 and Windows. The Windows output still includes the non-fatal '-VThe system cannot find the file specified.' line; source unknown.
 - Migrated workflows to Node 24-compatible GitHub Actions releases (checkout v7.0.1, setup-go v7.0.0, setup-node v7.1.0, setup-python v7.1.0). Subsequent runs no longer report the Node 20 deprecation warning.
 - Added native build and SQLite adapter developer documentation. The current native build remains a compile/binding proof, not a live WebView interaction test.
+
+
+## Read-only audit of the supplied historical prototype
+
+- Both ZIP archives and all three Python scripts were inspected without execution. SHA-256 hashes and detailed observations are recorded in docs/architecture/PROTOTYPE_AUDIT.md.
+- Recovered topology: OpenCode -> local Gateway 127.0.0.1:18081 -> Colab CLI session qwen-opencode -> llama-server at 127.0.0.1:8081. The monitor reads /props, /proc, nvidia-smi and /proc/meminfo.
+- The monitor's most important safety invariant is deferring remote colab exec telemetry while another matching colab exec is active. The SSE repair's important invariant is preserving blank lines between SSE events.
+- The 262144 context and Q8_0 KV cache are requested configuration targets, not proof of compatibility. Actual checkpoint, llama.cpp build, GPU/VRAM and RAM must be verified independently.
+- Identified patch hazards: fix-soufianodev-free-ai.py replaces the entire runtime.env with two settings; fix-soufianodev-sse-framing.py patches two files non-transactionally, kills by /proc command-line matching and does not roll back on failed restart/SSE test.
+- Identified monitor hazards: PID-only liveness checks, Linux-only /proc/syscall/xdg-open assumptions, unbounded JSONL history and whole-file log reads, default permissions for the Python history file, and unredacted/truncated Colab CLI error output.
+- The Wails v2 monitor is a Linux-only read-only observability app, not the product shell. Its dark orbit/hero dashboard is intentionally not reused; the new product continues with the Material 3 interface.
+- The historical JSC_SIGNAL_FOR_GC=12 setting is specific to the archived Wails v2/WebKit2GTK 4.1 runtime. The new Wails v3/GTK4/WebKitGTK 6 runtime must be observed before setting a default signal.
+- No live Colab /props or /v1/models request, SSE completion test, or model/hardware compatibility check was run. Those remain explicit activation gates.
