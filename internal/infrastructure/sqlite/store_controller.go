@@ -5,8 +5,11 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/SoufianoDev/OhMyFreeAI/internal/application/ports"
 	domainconfig "github.com/SoufianoDev/OhMyFreeAI/internal/domain/config"
 )
+
+var _ ports.ConfigRepository = (*StoreController)(nil)
 
 var (
 	ErrStoreControllerRequired = errors.New("SQLite store controller requires a store")
@@ -53,6 +56,9 @@ func (c *StoreController) acquireShared(ctx context.Context) (*Store, func(), er
 		ctx = context.Background()
 	}
 	for {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 		c.mu.Lock()
 		if c.store == nil {
 			c.mu.Unlock()
@@ -91,6 +97,9 @@ func (c *StoreController) acquireExclusive(ctx context.Context) (*Store, func(),
 		ctx = context.Background()
 	}
 
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	c.mu.Lock()
 	c.waitingWriters++
 	c.signalLocked()
@@ -109,6 +118,10 @@ func (c *StoreController) acquireExclusive(ctx context.Context) (*Store, func(),
 	}
 
 	for {
+		if err := ctx.Err(); err != nil {
+			removeWaiting()
+			return nil, nil, err
+		}
 		c.mu.Lock()
 		if c.store == nil {
 			c.waitingWriters--
@@ -149,6 +162,9 @@ func (c *StoreController) acquireExclusive(ctx context.Context) (*Store, func(),
 // WithShared runs an operation while holding a shared lease. The Store must
 // not escape the callback.
 func (c *StoreController) WithShared(ctx context.Context, operation func(*Store) error) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if operation == nil {
 		return errors.New("SQLite shared operation is required")
 	}
@@ -164,6 +180,9 @@ func (c *StoreController) WithShared(ctx context.Context, operation func(*Store)
 // callback runs. The callback returns the Store that remains active. It must
 // return the original Store on a non-destructive operation.
 func (c *StoreController) WithExclusive(ctx context.Context, operation func(*Store) (*Store, error)) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if operation == nil {
 		return errors.New("SQLite exclusive operation is required")
 	}
