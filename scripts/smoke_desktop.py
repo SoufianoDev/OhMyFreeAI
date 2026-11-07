@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -52,12 +53,25 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
     with log_path.open("wb") as output:
         display_process = subprocess.Popen(
             [xvfb, display, "-screen", "0", "1280x820x24", "-nolisten", "tcp", "-ac"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=output,
+            stderr=subprocess.STDOUT,
         )
         process = None
         try:
-            time.sleep(0.5)
+            socket_path = f"/tmp/.X11-unix/X{display.lstrip(':')}"
+            display_ready_deadline = time.monotonic() + 10
+            while time.monotonic() < display_ready_deadline:
+                if display_process.poll() is not None:
+                    raise RuntimeError("Xvfb exited before the desktop application could start.")
+                probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                try:
+                    if probe.connect_ex(socket_path) == 0:
+                        break
+                finally:
+                    probe.close()
+                time.sleep(0.1)
+            else:
+                raise RuntimeError(f"Xvfb did not become ready on {display}; socket={socket_path}")
             if display_process.poll() is not None:
                 raise RuntimeError("Xvfb exited before the desktop application could start.")
             env["DISPLAY"] = display
