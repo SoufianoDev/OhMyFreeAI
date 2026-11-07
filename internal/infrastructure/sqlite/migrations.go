@@ -14,9 +14,10 @@ import (
 )
 
 var (
-	ErrMigrationGap     = errors.New("SQLite migration version gap")
-	ErrUntrackedSchema  = errors.New("SQLite schema exists without an applied migration record")
-	ErrInvalidMigration = errors.New("invalid SQLite migration")
+	ErrMigrationGap           = errors.New("SQLite migration version gap")
+	ErrUntrackedSchema        = errors.New("SQLite schema exists without an applied migration record")
+	ErrMigrationHistoryCorrupt = errors.New("SQLite migration history is not contiguous")
+	ErrInvalidMigration       = errors.New("invalid SQLite migration")
 )
 
 type migrationFile struct {
@@ -99,14 +100,19 @@ func currentMigrationVersion(ctx context.Context, db *sql.DB) (bool, int, error)
 	if tableCount == 0 {
 		return false, 0, nil
 	}
-	var version sql.NullInt64
-	if err := db.QueryRowContext(ctx, "SELECT MAX(version) FROM schema_migrations").Scan(&version); err != nil {
+	var count, minimum, maximum int
+	if err := db.QueryRowContext(ctx,
+		"SELECT COUNT(*), COALESCE(MIN(version), 0), COALESCE(MAX(version), 0) FROM schema_migrations",
+	).Scan(&count, &minimum, &maximum); err != nil {
 		return true, 0, fmt.Errorf("read SQLite migration history: %w", err)
 	}
-	if !version.Valid {
+	if count == 0 {
 		return true, 0, nil
 	}
-	return true, int(version.Int64), nil
+	if minimum != 1 || maximum != count {
+		return true, 0, fmt.Errorf("%w: rows=%d min=%d max=%d", ErrMigrationHistoryCorrupt, count, minimum, maximum)
+	}
+	return true, maximum, nil
 }
 
 func (s *Store) applyMigration(ctx context.Context, source fs.FS, migration migrationFile) error {
