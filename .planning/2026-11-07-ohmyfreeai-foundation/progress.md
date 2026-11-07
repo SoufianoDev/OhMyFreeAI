@@ -624,3 +624,23 @@
 - Follow-up check of run `42412554358`: Arch Linux rolling / GTK4, Debian 13 / GTK4, Fedora 44 / GTK4 and Ubuntu 24.04 / GTK4 all completed SUCCESS.
 - All four passed actual Wails desktop build, native CLI smoke, two-launch WebView-to-Go smoke and SQLite reopen.
 - Still queued at this check: openSUSE Tumbleweed / GTK4, Fedora 44 legacy GTK3, Debian 12 legacy GTK3 and Ubuntu 22.04 legacy GTK3. Do not mark the current eight-distro matrix complete yet.
+
+
+## 2026-11-07T21:xxZ — CLI backup commands and stronger native smoke
+
+- Re-read the active task plan/findings/progress before continuing. Confirmed the prior backup-enabled distro matrix `42412554358`: 7/8 passed; Ubuntu 22.04 GTK3 failed twice at the WebView bridge wait. Its native build and CLI smoke passed; app stdout/stderr was empty. The same lane passed in `42405827037`, so root cause remains unknown.
+- Compared `scripts/smoke_desktop.py` at the earlier all-green commit `001533d8` with current: the test was unchanged and used a fixed 500 ms Xvfb delay, fixed display `:97`, and discarded Xvfb output. Improved the harness to wait up to 10 seconds for the X11 Unix socket to accept connections and capture Xvfb output. Do not claim this is a proven fix until the new Ubuntu 22.04 lane passes.
+- TDD: added parser tests for `backup export` and `backup inspect`; root CI `42414904161` failed as expected on both platform jobs because `BackupExport` was undefined. Implemented the parser and typed malformed/unknown action behavior.
+- Added `internal/application/cli/backup.go` with an infrastructure-independent `BackupOperations` port and `RunBackup` output/dispatch logic; added unit tests for success output, validated manifest metadata, failure propagation and invalid dependencies.
+- Added `sqlite.OpenExisting` so backup export can open an existing DB without creating a missing file/directory or changing existing file permissions. Added tests for both guarantees.
+- Wired CLI commands in `desktop-src/main.go.tmpl`: export checks the normal application DB path and refuses missing/symlink/special paths, does not run migrations, and uses the shared archive manager; inspect uses the strict read-only `Manager.Inspect` path. Both use a bounded two-minute context and exit 1 on operational failure.
+- Expanded `scripts/smoke_cli.py` to test malformed/missing cases and the real success path with a temporary DB seeded from committed migrations: archive structure exactly two entries, manifest, successful inspect, overwrite rejection and preservation of the DB. It uses only Python standard library SQLite/ZIP support.
+- Updated `docs/architecture/CLI_ARCHITECTURE.md` to document the implemented commands and current exit codes. Updated plan/findings with current blockers and verification requirements.
+- Root CI `42415270003` passed Ubuntu on commit `640fc3f7`; Windows was still queued at the time. This was before the final positive end-to-end CLI fixture and Xvfb harness changes. Final revision CI/Wails/distro runs are pending.
+- Current validation run IDs before the latest documentation-only commits: root `42415564618`, Wails `42415564460`, distro matrix `42415564608`. Recheck latest branch runs after documentation updates; GitHub concurrency cancels superseded runs, so use the newest commit's runs as authoritative.
+
+### Decisions and constraints preserved
+
+- CLI export never silently creates a first-run database and never runs migrations.
+- CLI inspect is read-only and validates full archive content; restore remains blocked until the GUI Store lifecycle can close, restore, reopen, swap repository references and roll back safely.
+- No Colab runtime activation, paid provider, branch merge or main-branch change.
