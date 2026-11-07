@@ -580,3 +580,6 @@
 - This is GREEN evidence for the framework-independent CLI parser and unit tests. It does not yet verify the generated Wails executable's command dispatch.
 - Added `scripts/smoke_cli.py` to exercise the actual native executable's help/version/doctor/unknown-command behavior, enforce exit codes, and prove doctor does not create application state.
 - Wired native CLI smoke into Wails Linux/Windows workflow and all eight Linux distro lanes. Latest relevant runs: Wails `42409974970`, Linux distro `42410021330`, root CI `42410030822`; results pending.
+
+
+- Workflow review caught that the first automated insertion updated the Linux distro path filter but did not add the execution step because the actual step name was `Launch twice and verify the live WebView-to-Go bridge`, not the expected label. Corrected the insertion against the exact current workflow content. Commit `5ccfb6f` now runs `smoke_cli.py` before the two-launch WebView test in every distro lane. No false test-pass claim was made.
