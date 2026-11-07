@@ -580,3 +580,12 @@
 
 
 - Wails run 42409974970: Linux native app build passed and the native CLI smoke step passed all four commands plus the doctor read-only assertion. Linux WebView/SQLite smoke is still running; Windows app build is still running.
+
+
+## 2026-11-07T20:17Z — native CLI GREEN on Linux and Windows
+
+- Wails run 42409974970 completed SUCCESS on Ubuntu 24.04 and Windows.
+- The native executable smoke passed --help, --version, doctor, unknown-command exit 2, and read-only doctor behavior on both platforms.
+- Ubuntu also passed the live two-stage WebView-to-Go bridge and SQLite reopen smoke.
+- Root CI run 42410030822 passed Ubuntu and Windows.
+- All eight Linux distro lanes now have the CLI smoke wired in the workflow, but run 42410214638 is queued; do not mark that matrix complete yet.
