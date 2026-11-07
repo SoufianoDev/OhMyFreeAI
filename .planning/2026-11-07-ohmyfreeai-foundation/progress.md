@@ -478,3 +478,11 @@
 - Reviewed the latest bridge bootstrap changes: native snapshot call before UI import, a second call after import, and explicit bridge-ready event carrying the snapshot.
 - Smoke helper now requires two successful native calls per process launch, matching the producer's count marker.
 - Awaiting CI/Wails/distro runs `42405729818`, `42405729902`, `42405729874`; no result inferred yet.
+
+
+## GTK3 bridge bootstrap and openSUSE PATH refinement — 2026-11-07T19:18Z
+
+- Ubuntu 22.04 GTK3 built but its smoke timed out without marker; Debian 12 GTK3 built but its process exited before marker with no captured output. These remain runtime failures.
+- Changed the generated bridge to call GetSnapshot before dynamically importing app.js, then call it again after the module import resolves. The frontend now consumes the returned snapshot from the bridge-ready event. Smoke requires marker count=2, so it verifies both the initial native call and successful UI-module import.
+- This is an experiment to isolate a GTK3 module/bootstrap issue; no claim of success until CI.
+- openSUSE's post-install shell still could not be resolved. Added /usr/bin and /bin to GITHUB_PATH after package installation and restored the built-in sh shell for later steps.
