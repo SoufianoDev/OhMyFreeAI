@@ -218,3 +218,12 @@
 - Workflow action pins were upgraded to actions/checkout v7.0.1, setup-go v7.0.0, setup-node v7.1.0 and setup-python v7.1.0 to move off deprecated Node 20 action runtimes. Runs 42397224021 (core), 42397229073 (SQLite matrix) and 42397232427 (Wails) were still running at the time of this note.
 - Windows Wails build printed "-VThe system cannot find the file specified." immediately after the build banner. The taskfile continued; bindings, Vite build and executable verification all passed. Its origin is not established and remains an observed non-fatal warning.
 - The first app-specific Wails attempt failed because the build script passed the final project path to -d; Wails appends the project name itself. The script was corrected to pass the workspace parent, and the subsequent Linux/Windows build passed.
+
+
+### Follow-up verification and migration-history integrity
+- Added a history consistency check to currentMigrationVersion: applied versions must begin at 1 and remain contiguous through MAX(version). Empty/untracked schema history remains a separate error.
+- Added TestMigrationHistoryGapIsRejected with a deliberately corrupted history containing versions 1 and 3. The test passes on Ubuntu and Windows in core CI run 42397556757.
+- Core CI run 42397556757 completed successfully on both OSes. SQLite driver matrix run 42397556823 completed successfully across modernc/ncruces × Ubuntu/Windows.
+- Wails v3.0.0 application build run 42397232427 passed on Ubuntu 24.04 and Windows. The Windows output still includes the non-fatal '-VThe system cannot find the file specified.' line; source unknown.
+- Migrated workflows to Node 24-compatible GitHub Actions releases (checkout v7.0.1, setup-go v7.0.0, setup-node v7.1.0, setup-python v7.1.0). Subsequent runs no longer report the Node 20 deprecation warning.
+- Added native build and SQLite adapter developer documentation. The current native build remains a compile/binding proof, not a live WebView interaction test.
