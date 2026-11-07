@@ -74,7 +74,7 @@ jobs:
         run: go build ./...
 
       - name: Compile Python developer tooling
-        run: python -m py_compile scripts/dev.py scripts/build_desktop.py
+        run: python -m py_compile scripts/dev.py scripts/build_desktop.py scripts/smoke_cli.py
 
       - name: Run Python tests
         run: python -m unittest discover -s tests -v
