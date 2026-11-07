@@ -65,28 +65,18 @@ func TestSQLiteDriverEvaluation(t *testing.T) {
 		conn.Close()
 		t.Fatalf("set busy timeout: %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, `
-		CREATE TABLE parent (
-			id INTEGER PRIMARY KEY
-		);
-		CREATE TABLE child (
-			id INTEGER PRIMARY KEY,
-			parent_id INTEGER NOT NULL REFERENCES parent(id)
-		);
-		CREATE TABLE writes (
-			id INTEGER PRIMARY KEY,
-			worker INTEGER NOT NULL,
-			sequence INTEGER NOT NULL,
-			UNIQUE(worker, sequence)
-		);
-		CREATE TABLE schema_migrations (
-			version INTEGER PRIMARY KEY,
-			applied_at TEXT NOT NULL
-		);
-		INSERT INTO parent(id) VALUES (1);
-	`); err != nil {
-		conn.Close()
-		t.Fatalf("create migration fixture schema: %v", err)
+	statements := []string{
+		"CREATE TABLE parent (id INTEGER PRIMARY KEY)",
+		"CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER NOT NULL REFERENCES parent(id))",
+		"CREATE TABLE writes (id INTEGER PRIMARY KEY, worker INTEGER NOT NULL, sequence INTEGER NOT NULL, UNIQUE(worker, sequence))",
+		"CREATE TABLE schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)",
+		"INSERT INTO parent(id) VALUES (1)",
+	}
+	for _, statement := range statements {
+		if _, err := conn.ExecContext(ctx, statement); err != nil {
+			conn.Close()
+			t.Fatalf("execute schema statement %q: %v", statement, err)
+		}
 	}
 	if _, err := conn.ExecContext(ctx, "INSERT INTO child(id, parent_id) VALUES (1, 999)"); err == nil {
 		conn.Close()
