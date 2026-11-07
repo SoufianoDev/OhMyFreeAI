@@ -576,8 +576,6 @@ func TestRestoreDatabaseRejectsCorruptSourceAndPreservesTarget(t *testing.T) {
 		t.Fatalf("load unchanged target configuration: %v", err)
 	}
 	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("target changed after rejected restore:
- got: %#v
-want: %#v", actual, expected)
+		t.Fatalf("target changed after rejected restore:\n got: %#v\nwant: %#v", actual, expected)
 	}
 }
