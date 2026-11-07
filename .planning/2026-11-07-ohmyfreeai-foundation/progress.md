@@ -486,3 +486,10 @@
 - Changed the generated bridge to call GetSnapshot before dynamically importing app.js, then call it again after the module import resolves. The frontend now consumes the returned snapshot from the bridge-ready event. Smoke requires marker count=2, so it verifies both the initial native call and successful UI-module import.
 - This is an experiment to isolate a GTK3 module/bootstrap issue; no claim of success until CI.
 - openSUSE's post-install shell still could not be resolved. Added /usr/bin and /bin to GITHUB_PATH after package installation and restored the built-in sh shell for later steps.
+
+
+## Bridge refactor CI checks — 2026-11-07T19:24Z
+
+- Root CI run 42405729818 passed on Ubuntu and Windows after the two-stage bridge bootstrap refactor.
+- Wails Windows native build/executable verification passed in run 42405729902. Wails Ubuntu build and live smoke are still in progress.
+- The updated eight-distro matrix run 42405827037 includes the openSUSE PATH fix and two-stage bridge code; its jobs are queued pending hosted runner capacity.
