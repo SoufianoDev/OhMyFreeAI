@@ -454,3 +454,12 @@
 - Debian 12 legacy GTK3/WebKit2GTK 4.1 passed the actual build, two WebView-to-Go calls and SQLite reopen. Both success markers and WEBVIEW_REOPEN_PASS were observed.
 - Six lanes are green in run 42404735351: Ubuntu 24.04, Debian 13, Fedora 44 GTK4, Arch rolling, Fedora 44 legacy GTK3, Debian 12 legacy GTK3.
 - Ubuntu 22.04 legacy GTK3 built but the WebView smoke timed out without app output; the generated Go bridge was not observed. openSUSE installed dependencies but failed at the post-install shell lookup. Both are being retested with the current workflow.
+
+
+## 2026-11-07T19:19Z — Linux matrix follow-up
+
+- Recorded the six confirmed distro passes from run `42404735351`.
+- Ubuntu 22.04 legacy GTK3 is still failing only at the WebView-to-Go smoke: build succeeds, but the frontend never calls GetSnapshot within the timeout and the app log is empty. Root cause is not yet known; no unsupported diagnosis is recorded.
+- openSUSE's current correction probes the Bash executable and adds its containing directory to `GITHUB_PATH`. Verification run `42405525978` is queued.
+- One malformed workflow edit generated run `42405470161` with no jobs. Restored the file from the known-good `64bad8b` version and re-applied the change; current workflow content was checked for intact structure.
+- Next: wait for the corrected distro run and inspect the Ubuntu 22.04 WebKit startup path; then continue with CLI dispatch and backup/recovery user-facing integration without enabling policy-blocked Colab remote inference.
