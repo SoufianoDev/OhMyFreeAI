@@ -69,7 +69,7 @@ def attach_generated_binding(project: Path) -> None:
 
     bridge = (
         f'import {{ GetSnapshot, SaveConfig, ExportBackup, InspectBackup }} from "{relative}";\n'
-        'window.OhMyFreeAI = Object.freeze({ GetSnapshot, SaveConfig });\n'
+        'window.OhMyFreeAI = Object.freeze({ GetSnapshot, SaveConfig, ExportBackup, InspectBackup });\\n'
         'const firstSnapshot = Promise.resolve().then(() => GetSnapshot());\n'
         'import("../app.js").then(async () => {\n'
         '  try {\n'
