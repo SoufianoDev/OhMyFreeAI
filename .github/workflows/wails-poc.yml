@@ -49,25 +49,32 @@ jobs:
           go install github.com/wailsapp/wails/v3/cmd/wails3@v3.0.0
           echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
 
-      - name: Generate official vanilla JavaScript starter
+      - name: Generate and build official starter (Linux)
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           mkdir -p "$RUNNER_TEMP/omfai-wails-proof"
           cd "$RUNNER_TEMP/omfai-wails-proof"
           wails3 init -n omfai-wails-poc -t vanilla-js
-
-      - name: Build official starter on native runner
-        shell: bash
-        run: |
-          cd "$RUNNER_TEMP/omfai-wails-proof/omfai-wails-poc"
+          cd omfai-wails-poc
           wails3 build
+          test -f bin/omfai-wails-poc
 
-      - name: Verify executable was produced
-        shell: bash
+      - name: Generate and build official starter (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: |
-          cd "$RUNNER_TEMP/omfai-wails-proof/omfai-wails-poc"
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            test -f "bin/omfai-wails-poc.exe"
-          else
-            test -f "bin/omfai-wails-poc"
-          fi
+          $proof = Join-Path $env:RUNNER_TEMP "omfai-wails-proof"
+          New-Item -ItemType Directory -Force -Path $proof | Out-Null
+          Push-Location $proof
+          try {
+            wails3 init -n omfai-wails-poc -t vanilla-js
+            Set-Location (Join-Path $proof "omfai-wails-poc")
+            wails3 build
+            if (-not (Test-Path "bin/omfai-wails-poc.exe")) {
+              throw "Wails build completed without the expected executable."
+            }
+          }
+          finally {
+            Pop-Location
+          }
