@@ -50,6 +50,7 @@
   - Added a fail-closed runtime policy assessment port and connection use case; tests prove the connector is never called before a scoped, revisioned HTTPS approval.
   - Added versioned config defaults/validation, a ConfigRepository port and an application config service that rejects invalid settings before persistence. Gateway defaults to disabled and loopback-only.
   - Added the shared Planning with Files pointer at .planning/.active_plan for the single named plan.
+  - Manually validated the plan structure: active pointer resolves to the plan directory, all three required files exist, five phases have exactly five valid status markers. The upstream check-complete.sh --validate was not run because the repository checkout and helper scripts are not mounted in the shell environment.
   - Verified the static UI with Node syntax check and Python HTML parsing; no duplicate IDs were found.
   - Verified the committed Go core against an exact local mirror (Git blob SHA match): go test ./... and go build ./... passed, including config, runtime, compatibility and policy gate packages.
   - Added initial SQLite schema with foreign keys, state/checksum constraints, redacted URI fields and cross-table model/artifact identity; six Python sqlite3/unittest cases passed against the exact committed SQL and test file.
@@ -65,6 +66,7 @@
   - A policy-gate test initially failed after adding a required policy revision; updated the test fixture and reran all Go tests successfully.
   - Browser file:// and localhost navigation were blocked by the container policy; switched to Playwright page.set_content() with inline local assets.
   - First UI interaction test used an ambiguous accessible button name; switched to unique data-page selectors and reran successfully.
+  - Manual Planning with Files validation found phase status markers had a leading list bullet; corrected them to the exact upstream `**Status:** value` format and reran structural validation successfully.
 
 ## Test Results
 
