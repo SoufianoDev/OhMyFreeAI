@@ -596,3 +596,6 @@
 
 
 - CLI-enabled distro run 42410214638 has passed both native CLI smoke and two-launch WebView/SQLite smoke on Ubuntu 24.04, Debian 13 and Fedora 44 GTK4. Four other lanes are still running and Debian 12 is queued.
+
+
+- Tooling-only authoring error: one Code Mode attempt to append the backup findings used an unescaped Markdown backtick inside a JavaScript template literal and raised a TypeError before any GitHub write. Retried with a line-array join; the intended findings were then saved successfully. No repository code was affected.
