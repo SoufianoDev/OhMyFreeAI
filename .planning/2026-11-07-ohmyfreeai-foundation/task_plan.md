@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-GUI and CLI backup export/inspect are implemented. Verify the current full CI, native Wails, and eight-distro matrix after the CLI integration and X-server readiness hardening. Then design coordinated SQLite close/reopen/rollback before exposing restore. Keep Colab remote inference policy-gated.
+GUI and CLI backup export/inspect are implemented and the eight-distro matrix is green. Implement and verify the Store Lifecycle Controller first; then route configuration and backup operations through it. Only after that add the durable restore journal and rollback. Keep Colab remote inference policy-gated.
 
 ## Current Phase
 
@@ -68,7 +68,7 @@ Phase 4
 - [x] Wire backup export/inspect into the Wails service using native file dialogs and bilingual settings UI
 - [x] Add CLI backup export/inspect commands using the shared archive manager and existing-only SQLite open
 - [x] Specify crash-safe restore lifecycle, durable journal, startup recovery and failure-injection requirements in RESTORE_LIFECYCLE.md
-- [ ] Implement coordinated Store lifecycle, journal and rollback before enabling restore
+- [ ] Implement coordinated Store lifecycle, journal and rollback before enabling restore\n  - [ ] Complete StoreController TDD and green Ubuntu/Windows root CI\n  - [ ] Route Wails configuration and backup export through controller leases; remove long-lived raw Store references\n  - [ ] Route CLI backup export through controller leases\n  - [ ] Add concurrent config/backup drain and closed-Store safety tests
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
 - [x] Revalidate the refactored two-stage bridge bootstrap on native Ubuntu; run 42405729902 passed with two GetSnapshot calls per launch and DB reopen
 - [x] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs (run 42405827037)
