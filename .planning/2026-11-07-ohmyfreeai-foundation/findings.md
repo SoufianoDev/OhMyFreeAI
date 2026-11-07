@@ -64,3 +64,22 @@
 ## Visual/Browser Findings
 
 - No visual design references have been accepted or applied yet. Inspect the user's Material Design 3 skill before making UI decisions.
+
+## External Technical Research (Exa, 2026-11-07)
+
+- Current official Wails documentation presents v3.0.0 as stable for desktop (Windows/macOS/Linux), and says new projects should use v3 while v2 continues receiving critical updates. Wails v3 requires Go 1.26+, Node/npm for most frontend templates, Windows WebView2, and Linux GTK4 + WebKitGTK 6.0 by default. Ubuntu 24.04+ is the documented Linux baseline; legacy GTK3/WebKit2GTK 4.1 is temporary through v3.1.
+- Official Wails v2 documentation reports v2.17.0 docs, Go 1.21+ and Linux GTK3/WebKit dependencies; the supplied prototype's v2.10.2 dependency is older than the current v2 docs and must not be treated as current baseline.
+- This creates a concrete tradeoff for the architecture's Linux-first/distro-agnostic requirement: Wails v3 is the current new-project recommendation but its GTK4/WebKitGTK 6 baseline narrows older distro compatibility; Wails v2 has broader legacy stack coverage but is no longer the recommended start for new projects. A small Linux/Windows PoC is required before choosing.
+- Google Colab official FAQ describes free compute including GPUs/TPUs but does not guarantee a particular GPU or stable resource allotment. Usage limits, availability and runtime duration can vary; product architecture must treat hardware/session continuity as dynamic and not promise a GPU.
+- Upstream llama.cpp documentation advertises official prebuilt release binaries, source builds, multiple backends (CUDA, HIP, MUSA, Vulkan, SYCL), quantization formats, CPU/GPU hybrid inference, and OpenAI-compatible llama-server endpoints. These broad capabilities do not prove every model/checkpoint/backend combination; compatibility still requires exact artifact and real runtime verification.
+- Google's Material Design developer site states Material Web and Android Views are in maintenance mode, while Jetpack Compose is the primary Material Android path. Material 3 design guidance can still inform web tokens/layout/accessible interaction, but @material/web must not be treated as an actively evolving Expressive component system.
+
+### External source URLs
+
+- Wails v3 install: https://wails.io/getting-started/installation/
+- Wails v3 FAQ: https://v3.wails.io/faq/
+- Wails v2 install: https://v2.wails.io/docs/gettingstarted/installation/
+- Google Colab FAQ: https://research.google.com/colaboratory/faq.html
+- llama.cpp upstream: https://github.com/ggml-org/llama.cpp
+- Material Design developer platform overview: https://m3.material.io/develop
+- Material Web roadmap: https://github.com/material-components/material-web/blob/main/docs/roadmap.md
