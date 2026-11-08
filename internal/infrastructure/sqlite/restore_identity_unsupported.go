@@ -8,9 +8,8 @@ import (
 )
 
 
-// restoreArtifactMetadataUnchanged relies on the shared size and modification
-// time checks on Windows. Windows handle sharing prevents concurrent writers
-// from opening a conflicting write handle during inspection.
+// Unsupported platforms fail closed in openRestoreArtifactFile, so this
+// metadata comparison is not reachable during a successful inspection.
 func restoreArtifactMetadataUnchanged(before, after os.FileInfo) (bool, error) {
 	return true, nil
 }
