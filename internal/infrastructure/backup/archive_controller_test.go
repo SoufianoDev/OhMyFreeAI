@@ -27,85 +27,72 @@ func TestManagerCreateWithStoreControllerDrainsBeforeClose(t *testing.T) {
 		t.Fatalf("migrate SQLite store: %v", err)
 	}
 
-	lockStore, err := sqlite.Open(ctx, databasePath)
-	if err != nil {
-		_ = store.Close()
-		t.Fatalf("open SQLite lock store: %v", err)
-	}
-	lockConn, err := lockStore.DB().Conn(ctx)
-	if err != nil {
-		_ = lockStore.Close()
-		_ = store.Close()
-		t.Fatalf("acquire SQLite lock connection: %v", err)
-	}
-	if _, err := lockConn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
-		_ = lockConn.Close()
-		_ = lockStore.Close()
-		_ = store.Close()
-		t.Fatalf("begin exclusive SQLite transaction: %v", err)
-	}
-
 	controller := sqlite.NewStoreController(store)
+	manager := Manager{ApplicationVersion: "0.1.0", Migrations: migrations.Files, MigrationDir: "."}
+	archivePath := filepath.Join(directory, "backup.omfaibackup")
+	archiveReady := make(chan struct{})
+	releasePublication := make(chan struct{})
 	var releaseOnce sync.Once
-	var releaseErr error
-	releaseLock := func() error {
+	release := func() {
 		releaseOnce.Do(func() {
-			_, releaseErr = lockConn.ExecContext(context.Background(), "ROLLBACK")
+			close(releasePublication)
 		})
-		return releaseErr
 	}
 	t.Cleanup(func() {
-		_ = releaseLock()
-		_ = lockConn.Close()
-		_ = lockStore.Close()
+		release()
 		if err := controller.Close(context.Background()); err != nil && !errors.Is(err, sqlite.ErrStoreUnavailable) {
 			t.Errorf("close StoreController during cleanup: %v", err)
 		}
 	})
 
-	manager := Manager{ApplicationVersion: "0.1.0", Migrations: migrations.Files, MigrationDir: "."}
-	archivePath := filepath.Join(directory, "backup.omfaibackup")
 	exportDone := make(chan error, 1)
 	go func() {
-		exportDone <- manager.CreateWithStoreController(ctx, controller, archivePath)
+		exportDone <- manager.createWithStoreController(ctx, controller, archivePath, func() {
+			close(archiveReady)
+			<-releasePublication
+		})
 	}()
 
-	deadline := time.Now().Add(3 * time.Second)
-	for store.DB().Stats().InUse == 0 {
-		if time.Now().After(deadline) {
-			t.Fatal("backup did not reserve a SQLite source connection")
-		}
-		time.Sleep(time.Millisecond)
-	}
-
-	closeDone := make(chan error, 1)
-	go func() {
-		closeDone <- controller.Close(context.Background())
-	}()
 	select {
-	case err := <-closeDone:
-		t.Fatalf("controller close completed while backup export was active: %v", err)
-	case <-time.After(100 * time.Millisecond):
+	case <-archiveReady:
+	case err := <-exportDone:
+		t.Fatalf("backup export returned before reaching the publication barrier: %v", err)
+	case <-time.After(10 * time.Second):
+		t.Fatal("backup export did not reach the publication barrier")
 	}
 
-	if err := releaseLock(); err != nil {
-		t.Fatalf("release SQLite lock: %v", err)
+	if _, err := os.Lstat(archivePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("archive should not be published while the publication barrier is held; Lstat error = %v", err)
 	}
+
+	closeContext, closeCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	closeErr := controller.Close(closeContext)
+	closeCancel()
+	if !errors.Is(closeErr, context.DeadlineExceeded) {
+		t.Fatalf("controller close while backup export was active = %v, want context deadline exceeded", closeErr)
+	}
+
+	release()
 	select {
 	case err := <-exportDone:
 		if err != nil {
 			t.Fatalf("create backup with StoreController: %v", err)
 		}
-	case <-time.After(10 * time.Second):
-		t.Fatal("backup export did not finish after SQLite lock release")
-	}
-	select {
-	case err := <-closeDone:
-		if err != nil {
-			t.Fatalf("controller close after backup export: %v", err)
-		}
 	case <-time.After(5 * time.Second):
-		t.Fatal("controller close did not drain the completed backup export")
+		t.Fatal("backup export did not finish after releasing the publication barrier")
+	}
+
+	if err := controller.WithShared(context.Background(), func(current *sqlite.Store) error {
+		if current != store {
+			t.Fatal("controller did not retain the active Store after a canceled close")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("shared operation after canceled close: %v", err)
+	}
+
+	if err := controller.Close(context.Background()); err != nil {
+		t.Fatalf("controller close after backup export: %v", err)
 	}
 
 	info, err := os.Stat(archivePath)

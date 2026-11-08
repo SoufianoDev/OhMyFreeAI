@@ -65,6 +65,10 @@ type Manager struct {
 }
 
 func (m Manager) Create(ctx context.Context, store *sqlite.Store, destinationPath string) error {
+	return m.create(ctx, store, destinationPath, nil)
+}
+
+func (m Manager) create(ctx context.Context, store *sqlite.Store, destinationPath string, beforePublish func()) error {
 	if store == nil || strings.TrimSpace(m.ApplicationVersion) == "" || m.Migrations == nil {
 		return ErrBackupManagerConfig
 	}
@@ -185,6 +189,9 @@ func (m Manager) Create(ctx context.Context, store *sqlite.Store, destinationPat
 		return fmt.Errorf("verify completed backup archive: %w", err)
 	}
 	_ = os.Remove(verifiedSnapshot)
+	if beforePublish != nil {
+		beforePublish()
+	}
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -203,11 +210,15 @@ func (m Manager) Create(ctx context.Context, store *sqlite.Store, destinationPat
 
 // CreateWithStoreController holds a shared lease until the complete archive is published.
 func (m Manager) CreateWithStoreController(ctx context.Context, controller *sqlite.StoreController, destinationPath string) error {
+	return m.createWithStoreController(ctx, controller, destinationPath, nil)
+}
+
+func (m Manager) createWithStoreController(ctx context.Context, controller *sqlite.StoreController, destinationPath string, beforePublish func()) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	return controller.WithShared(ctx, func(store *sqlite.Store) error {
-		return m.Create(ctx, store, destinationPath)
+		return m.create(ctx, store, destinationPath, beforePublish)
 	})
 }
 
