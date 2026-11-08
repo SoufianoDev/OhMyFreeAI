@@ -15,30 +15,43 @@ const (
 	RestoreRecoveryRestorePrevious RestoreRecoveryAction = "restore-previous"
 	RestoreRecoveryPreserveForManualReview RestoreRecoveryAction = "preserve-for-manual-review"
 	RestoreRecoveryVerifyCommitted RestoreRecoveryAction = "verify-committed"
+	RestoreRecoveryVerifyRolledBack RestoreRecoveryAction = "verify-rolled-back"
 )
 
-// RestoreRecoveryFiles is a read-only snapshot of transaction-owned file
-// presence. The planner never performs filesystem operations.
+type RestoreFileIdentity string
+
+const (
+	RestoreFileUnverified RestoreFileIdentity = "unverified"
+	RestoreFileMissing RestoreFileIdentity = "missing"
+	RestoreFileCandidate RestoreFileIdentity = "candidate"
+	RestoreFilePrevious RestoreFileIdentity = "previous"
+	RestoreFileMismatch RestoreFileIdentity = "mismatch"
+	RestoreFileUnreadable RestoreFileIdentity = "unreadable"
+)
+
+// RestoreRecoveryFiles contains identities verified against the journal, not
+// mere path existence. The executor must hash each regular file before planning.
 type RestoreRecoveryFiles struct {
-	TargetExists   bool
-	StagingExists  bool
-	RollbackExists bool
+	Target RestoreFileIdentity
+	Staging RestoreFileIdentity
+	Rollback RestoreFileIdentity
+	Quarantine RestoreFileIdentity
 }
 
 // RestoreRecoveryPlan is a conservative instruction set for a later executor.
 // A manual-review plan deliberately leaves every artifact untouched.
 type RestoreRecoveryPlan struct {
-	Action          RestoreRecoveryAction
-	RemoveStaging   bool
-	PreserveTarget  bool
+	Action RestoreRecoveryAction
+	RemoveStaging bool
+	PreserveStaging bool
+	PreserveTarget bool
 	RestoreRollback bool
-	VerifyTarget    bool
-	Reason          string
+	VerifyTarget bool
+	Reason string
 }
 
 // PlanRestoreRecovery decides what may safely happen after an interrupted
-// restore. It does not inspect or mutate the filesystem and fails closed when
-// the observed files cannot be explained by the durable journal phase.
+// restore. It never infers ownership from file presence alone.
 func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (RestoreRecoveryPlan, error) {
 	ambiguous := func(reason string) (RestoreRecoveryPlan, error) {
 		return RestoreRecoveryPlan{}, fmt.Errorf("%w: %s", ErrRestoreRecoveryAmbiguous, reason)
@@ -46,82 +59,166 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 	if journal.Version != restoreJournalVersion || !validRestorePhase(journal.Phase) ||
 		strings.TrimSpace(journal.TransactionID) == "" ||
 		strings.TrimSpace(journal.TargetPath) == "" ||
-		strings.TrimSpace(journal.StagingPath) == "" {
+		strings.TrimSpace(journal.StagingPath) == "" ||
+		strings.TrimSpace(journal.CandidateQuarantinePath) == "" {
 		return ambiguous("journal version, phase, transaction ID, or required path is invalid")
 	}
 	if journal.PreviousDatabaseExisted == nil {
 		return ambiguous("journal does not record whether a previous database existed")
 	}
-	if samePath(journal.TargetPath, journal.StagingPath) {
-		return ambiguous("target and staging paths are identical")
+	if samePath(journal.TargetPath, journal.StagingPath) ||
+		samePath(journal.TargetPath, journal.CandidateQuarantinePath) ||
+		samePath(journal.StagingPath, journal.CandidateQuarantinePath) {
+		return ambiguous("transaction paths collide")
 	}
 	hadPrevious := *journal.PreviousDatabaseExisted
 	if hadPrevious {
-		if strings.TrimSpace(journal.RollbackPath) == "" {
-			return ambiguous("previous database existed but no rollback path is recorded")
+		if strings.TrimSpace(journal.RollbackPath) == "" ||
+			samePath(journal.RollbackPath, journal.TargetPath) ||
+			samePath(journal.RollbackPath, journal.StagingPath) ||
+			samePath(journal.RollbackPath, journal.CandidateQuarantinePath) {
+			return ambiguous("previous database has a missing or colliding rollback path")
 		}
-		if samePath(journal.RollbackPath, journal.TargetPath) || samePath(journal.RollbackPath, journal.StagingPath) {
-			return ambiguous("rollback path collides with another transaction path")
+		if err := validateRestoreContentIdentity(journal.PreviousSHA256, journal.PreviousSize, "previous database", true); err != nil {
+			return ambiguous("previous database identity is invalid")
+		}
+	} else if journal.RollbackPath != "" || journal.PreviousSHA256 != "" || journal.PreviousSize != 0 ||
+		files.Rollback != RestoreFileMissing {
+		return ambiguous("unexpected previous database identity or rollback artifact")
+	}
+	candidateRequired := journal.Phase == RestorePhasePublishing ||
+		journal.Phase == RestorePhasePublished ||
+		journal.Phase == RestorePhaseReopening ||
+		journal.Phase == RestorePhaseRestoringPrevious ||
+		journal.Phase == RestorePhaseCommitted ||
+		journal.Phase == RestorePhaseRolledBack
+	if candidateRequired || journal.CandidateSHA256 != "" || journal.CandidateSize != 0 {
+		if err := validateRestoreContentIdentity(journal.CandidateSHA256, journal.CandidateSize, "candidate", true); err != nil {
+			return ambiguous("candidate identity is invalid")
 		}
 	}
-	if !hadPrevious && (files.RollbackExists || journal.RollbackPath != "") {
-		return ambiguous("journal or filesystem contains an unexpected rollback path")
+	for name, state := range map[string]RestoreFileIdentity{
+		"target": files.Target, "staging": files.Staging,
+		"rollback": files.Rollback, "quarantine": files.Quarantine,
+	} {
+		switch state {
+		case RestoreFileMissing, RestoreFileCandidate, RestoreFilePrevious,
+			RestoreFileMismatch, RestoreFileUnreadable, RestoreFileUnverified:
+		default:
+			return ambiguous(name + " file identity state is invalid")
+		}
+		if state == RestoreFileMismatch || state == RestoreFileUnreadable || state == RestoreFileUnverified {
+			return ambiguous(name + " file is present but its identity is not verified")
+		}
+	}
+	if files.Target == RestoreFileCandidate && journal.CandidateSHA256 == "" {
+		return ambiguous("target candidate identity is not recorded")
+	}
+	if files.Staging == RestoreFileCandidate && journal.CandidateSHA256 == "" {
+		return ambiguous("staging candidate identity is not recorded")
+	}
+	if files.Quarantine == RestoreFileCandidate && journal.CandidateSHA256 == "" {
+		return ambiguous("quarantined candidate identity is not recorded")
+	}
+	if files.Target == RestoreFilePrevious && !hadPrevious {
+		return ambiguous("unexpected previous database at target")
+	}
+	if files.Rollback == RestoreFilePrevious && !hadPrevious {
+		return ambiguous("unexpected previous database at rollback")
 	}
 
 	switch journal.Phase {
 	case RestorePhasePrepared, RestorePhaseStaging:
-		if hadPrevious != files.TargetExists || files.RollbackExists {
-			return ambiguous("target/rollback presence conflicts with a pre-publication phase")
+		wantTarget := RestoreFileMissing
+		if hadPrevious {
+			wantTarget = RestoreFilePrevious
+		}
+		if files.Target != wantTarget || files.Rollback != RestoreFileMissing ||
+			files.Quarantine != RestoreFileMissing ||
+			(files.Staging != RestoreFileMissing && files.Staging != RestoreFileCandidate) {
+			return ambiguous("verified file identities conflict with a pre-publication phase")
 		}
 		return RestoreRecoveryPlan{
 			Action: RestoreRecoveryCleanupStaging,
-			RemoveStaging: files.StagingExists,
-			Reason: "publication has not begun; preserve the original target",
+			RemoveStaging: files.Staging == RestoreFileCandidate,
+			Reason: "publication has not begun; preserve the verified original target",
 		}, nil
 
 	case RestorePhasePreviousPreserved:
-		if !hadPrevious || files.TargetExists || !files.RollbackExists {
-			return ambiguous("previous-preserved phase requires a missing target and an existing rollback")
+		if !hadPrevious || files.Target != RestoreFileMissing ||
+			files.Rollback != RestoreFilePrevious || files.Staging != RestoreFileCandidate ||
+			files.Quarantine != RestoreFileMissing {
+			return ambiguous("previous-preserved phase requires verified rollback and staged candidate identities")
 		}
 		return RestoreRecoveryPlan{
 			Action: RestoreRecoveryRestorePrevious,
-			RemoveStaging: files.StagingExists,
+			PreserveStaging: true,
 			RestoreRollback: true,
-			Reason: "restore the preserved database before opening the store",
+			Reason: "preserve the verified staged candidate, then restore the verified previous database",
 		}, nil
 
 	case RestorePhasePublished, RestorePhaseReopening:
 		if hadPrevious {
-			if !files.RollbackExists {
-				return ambiguous("published transaction lost its required rollback database")
+			if files.Rollback != RestoreFilePrevious || files.Staging != RestoreFileMissing {
+				return ambiguous("uncommitted publication requires a verified rollback and no staging artifact")
 			}
-			return RestoreRecoveryPlan{
-				Action: RestoreRecoveryRestorePrevious,
-				RemoveStaging: files.StagingExists,
-				PreserveTarget: files.TargetExists,
-				RestoreRollback: true,
-				Reason: "uncommitted publication must roll back to the preserved database",
-			}, nil
+			switch {
+			case files.Target == RestoreFileCandidate && files.Quarantine == RestoreFileMissing:
+				return RestoreRecoveryPlan{
+					Action: RestoreRecoveryRestorePrevious,
+					PreserveTarget: true,
+					RestoreRollback: true,
+					Reason: "quarantine the verified published candidate, then restore the previous database",
+				}, nil
+			case files.Target == RestoreFileMissing && files.Quarantine == RestoreFileCandidate:
+				return RestoreRecoveryPlan{
+					Action: RestoreRecoveryRestorePrevious,
+					RestoreRollback: true,
+					Reason: "candidate is already quarantined; restore the verified previous database",
+				}, nil
+			default:
+				return ambiguous("candidate must be verified at exactly one of target or quarantine")
+			}
 		}
-		if !files.TargetExists {
-			return ambiguous("published transaction has neither a previous database nor a published target")
+		if files.Rollback != RestoreFileMissing || files.Staging != RestoreFileMissing ||
+			!((files.Target == RestoreFileCandidate && files.Quarantine == RestoreFileMissing) ||
+				(files.Target == RestoreFileMissing && files.Quarantine == RestoreFileCandidate)) {
+			return ambiguous("first publication has no verified candidate to preserve")
 		}
 		return RestoreRecoveryPlan{
 			Action: RestoreRecoveryPreserveForManualReview,
-			Reason: "no previous database existed; preserve the published candidate and require verification",
+			Reason: "no previous database existed; preserve the verified candidate and require manual review",
 		}, nil
 
 	case RestorePhaseCommitted:
-		if !files.TargetExists || files.StagingExists || hadPrevious != files.RollbackExists {
-			return ambiguous("committed transaction has inconsistent target, staging, or rollback files")
+		wantRollback := RestoreFileMissing
+		if hadPrevious {
+			wantRollback = RestoreFilePrevious
+		}
+		if files.Target != RestoreFileCandidate || files.Staging != RestoreFileMissing ||
+			files.Rollback != wantRollback || files.Quarantine != RestoreFileMissing {
+			return ambiguous("committed transaction has inconsistent verified file identities")
 		}
 		return RestoreRecoveryPlan{
 			Action: RestoreRecoveryVerifyCommitted,
 			VerifyTarget: true,
-			Reason: "verify the committed database before journal cleanup or rollback retention changes",
+			Reason: "verify the committed candidate before journal cleanup or rollback retention changes",
+		}, nil
+
+	case RestorePhaseRolledBack:
+		if !hadPrevious || files.Target != RestoreFilePrevious ||
+			files.Staging != RestoreFileMissing || files.Rollback != RestoreFileMissing ||
+			files.Quarantine != RestoreFileCandidate {
+			return ambiguous("rolled-back transaction requires the verified previous target and retained candidate quarantine")
+		}
+		return RestoreRecoveryPlan{
+			Action: RestoreRecoveryVerifyRolledBack,
+			VerifyTarget: true,
+			Reason: "verify the restored previous database; retain the quarantined candidate",
 		}, nil
 
 	default:
-		return ambiguous("journal phase is unknown")
+		// Intent phases need the executor's exhaustive move-by-move truth tables.
+		return ambiguous("intent phase is not executable by the current recovery planner")
 	}
 }
