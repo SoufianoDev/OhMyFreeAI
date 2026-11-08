@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import select
 import socket
 import subprocess
 import sys
@@ -49,29 +50,23 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
     xvfb = shutil.which("Xvfb")
     if not xvfb:
         raise RuntimeError("Xvfb is required for the Linux WebView smoke test.")
-    display = ":97"
     with log_path.open("wb") as output:
+        # Ask Xvfb to allocate an unused display number. A fixed :97 can collide
+        # with stale sockets or another process in shared container namespaces.
         display_process = subprocess.Popen(
-            [xvfb, display, "-screen", "0", "1280x820x24", "-nolisten", "tcp", "-ac"],
-            stdout=output,
-            stderr=subprocess.STDOUT,
+            [xvfb, "-displayfd", "1", "-screen", "0", "1280x820x24", "-nolisten", "tcp", "-ac"],
+            stdout=subprocess.PIPE,
+            stderr=output,
         )
         process = None
         try:
-            socket_path = f"/tmp/.X11-unix/X{display.lstrip(':')}"
-            display_ready_deadline = time.monotonic() + 10
-            while time.monotonic() < display_ready_deadline:
-                if display_process.poll() is not None:
-                    raise RuntimeError("Xvfb exited before the desktop application could start.")
-                probe = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-                try:
-                    if probe.connect_ex(socket_path) == 0:
-                        break
-                finally:
-                    probe.close()
-                time.sleep(0.1)
-            else:
-                raise RuntimeError(f"Xvfb did not become ready on {display}; socket={socket_path}")
+            ready, _, _ = select.select([display_process.stdout], [], [], 10)
+            if not ready:
+                raise RuntimeError("Xvfb did not allocate a display within 10 seconds.")
+            display_number = display_process.stdout.readline().decode("ascii", errors="replace").strip()
+            if not display_number.isdigit():
+                raise RuntimeError(f"Xvfb returned an invalid display number: {display_number!r}")
+            display = f":{display_number}"
             if display_process.poll() is not None:
                 raise RuntimeError("Xvfb exited before the desktop application could start.")
             env["DISPLAY"] = display
