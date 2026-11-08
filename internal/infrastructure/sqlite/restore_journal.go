@@ -275,6 +275,9 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 	if candidateRequired && journal.CandidateSHA256 == "" {
 		return RestoreJournal{}, fmt.Errorf("%w: candidate identity is required in phase %q", ErrRestoreJournalInvalid, journal.Phase)
 	}
+	if !*journal.PreviousDatabaseExisted && (journal.PreviousSHA256 != "" || journal.PreviousSize != 0) {
+		return RestoreJournal{}, fmt.Errorf("%w: previous database identity is unexpected when no previous database exists", ErrRestoreJournalInvalid)
+	}
 	if err := validateRestoreContentIdentity(journal.PreviousSHA256, journal.PreviousSize, "previous database", *journal.PreviousDatabaseExisted); err != nil {
 		return RestoreJournal{}, err
 	}
