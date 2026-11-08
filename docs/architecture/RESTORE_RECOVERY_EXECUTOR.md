@@ -248,3 +248,31 @@ The Linux no-replace primitive now opens the common containing directory with `o
 This closes parent-directory symlink traversal and pins the directory object across the rename. It does **not** bind the source leaf to a previously hashed inode: Linux `renameat2` is name-based. The executor must still enforce a private state directory against untrusted concurrent writers and verify candidate/previous identity immediately before mutation. The move primitive itself is not a complete executor and does not perform directory sync or journal transitions.
 
 The regression test for a symlinked containing directory was committed first in `b529fae0b3f92ad0e6f3a04f9150df9ca78c3895`. Its CI outcome must be checked separately; do not claim a RED result until the run has actually executed the relevant test.
+
+
+## Windows handle-bound rename API verification — 2026-11-08
+
+The pinned production dependency was checked directly at the `golang.org/x/sys` tag `v0.49.0`, not inferred from current package documentation.
+
+Verified in that exact tag:
+
+- `windows.SetFileInformationByHandle(handle, class, buffer, size)` is available.
+- `windows.FileRenameInfoEx` is defined as information class value `22`.
+- The package does not expose a Go structure for the variable-length `FILE_RENAME_INFORMATION_EX` payload. The adapter must define a narrowly scoped local ABI structure/buffer and assert its layout rather than assume a convenient exported type exists.
+- The call accepts a source file handle and an information-class buffer; this is the intended handle-bound source operation.
+- The no-replace contract is explicit: leave `FILE_RENAME_REPLACE_IF_EXISTS` (0x1) unset. Do not set POSIX replacement semantics or unrelated flags.
+- A rooted relative destination uses a retained destination directory handle in `RootDirectory` and a single validated UTF-16 leaf name. Network/redirector operations are out of scope because the protocol requires RootDirectory to be zero for network operations.
+
+The Microsoft protocol structure describes a 32-bit Flags field, a reserved 32-bit alignment field, a 64-bit RootDirectory handle, a 32-bit FileNameLength, and a variable UTF-16 name. The minimum structure size is 24 bytes. The buffer builder must calculate the name byte length with overflow checks, omit the trailing NUL from FileNameLength, and allocate enough aligned storage for the fixed header plus the name and protocol minimum size.
+
+Important limitation: Microsoft's Win32 SetFileInformationByHandle documentation currently lists FileRenameInfo but does not list FileRenameInfoEx in its published class table. The protocol specification defines FileRenameInformationEx, and x/sys exposes class value 22, but neither fact certifies support by every Windows version or filesystem provider. Therefore the implementation must capability-test the exact operation on the actual state volume, treat unsupported class/provider errors as unsupported, and keep automatic Restore disabled unless the filesystem is explicitly qualified. NTFS is the initial qualification target; ReFS, SMB, removable media, and other providers remain unsupported until separately tested.
+
+This is API-surface verification and ABI design only. No Windows handle-bound rename implementation or NTFS runtime qualification is claimed by this entry.
+
+### Sources
+
+- Pinned [x/sys v0.49.0 windows/types_windows.go](https://github.com/golang/sys/blob/v0.49.0/windows/types_windows.go) — FileRenameInfoEx class value 22.
+- Pinned [x/sys v0.49.0 windows/syscall_windows.go](https://github.com/golang/sys/blob/v0.49.0/windows/syscall_windows.go) and [generated syscall wrapper](https://github.com/golang/sys/blob/v0.49.0/windows/zsyscall_windows.go) — SetFileInformationByHandle declaration and implementation.
+- Microsoft [MS-FSCC FileRenameInformationEx](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c) — field layout, RootDirectory semantics, and no-replace behavior when the replace flag is absent.
+- Microsoft [FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info) — Win32 union semantics and relative destination handle.
+- Microsoft [SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle) — source handle access requirements and provider-dependent support caveat.
