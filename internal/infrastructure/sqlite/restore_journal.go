@@ -60,8 +60,8 @@ type RestoreJournal struct {
 	UpdatedAt      time.Time    `json:"updated_at"`
 }
 
-// WriteRestoreJournal durably publishes the journal using a same-directory
-// temporary file and the platform-specific namespace persistence barrier.
+// WriteRestoreJournal publishes the journal using a same-directory temporary
+// file and the platform-specific namespace persistence barrier.
 func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	root, err := canonicalStateDirectory(stateDirectory)
 	if err != nil {

@@ -172,3 +172,34 @@ The primitive does not sync the containing directory, persist journal phases, ve
 ### Verification boundary
 
 Test-first commit 61a19ea5932bbda9ef722e8789c5af42cabe4c45 produced expected RED in Root Go CI run 42438137306: go vet failed because moveRestoreFileNoReplace did not yet exist. The implementation and platform-specific tests were then added. On code commit d717eac7096d98c3b59b1b9ebd39aa1cff6e2d93, Root Go CI run 42438368020 passed on Ubuntu and Windows, including Linux race tests; SQLite driver matrix run 42438368022 passed 4/4. Wails run 42438368038 and Linux distribution run 42438368003 were still running at the time of this update. A separate retry of the failed Ubuntu 22.04 GTK3 WebView smoke from run 42437541325 was also in progress. Do not infer those pending results.
+
+
+## Journal namespace durability by platform — 2026-11-08
+
+The previous shared `syncRestoreDirectory` helper silently returned success on Windows. That was not a valid equivalent of POSIX directory `fsync`, and it overstated the journal's durability contract.
+
+The journal publication path is now platform-specific:
+
+- Non-Windows: write and sync the temporary journal, atomically rename it over the current journal in the same directory, then sync the containing directory. A directory-sync error is returned.
+- Windows: write and sync the temporary journal, then publish it with `MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`. This requests the documented write-through move behavior; the code no longer pretends that `os.Open(directory).Sync()` is the Windows equivalent.
+- Windows journal removal currently fails closed with `errRestoreJournalRemovalUnsupported`; it leaves the journal intact. There is no production caller today, and no destructive cleanup should depend on an unproven namespace-deletion barrier.
+
+### Windows durability boundary
+
+Microsoft documents that `FlushFileBuffers` requires a handle with `GENERIC_WRITE`, and its directory-handle guidance lists supported directory-handle APIs without listing `FlushFileBuffers`. Microsoft also documents `MOVEFILE_WRITE_THROUGH` as not returning until the move is performed on disk, while the explicit flush guarantee in its flag description is phrased for copy-and-delete moves. This implementation uses same-directory/same-volume replacement and requests write-through, but this alone is not an end-to-end power-loss certification for the Restore protocol.
+
+Restore remains disabled. Before Windows Restore can be enabled, the full executor must reconcile source/target identities after every move result, retain rollback artifacts, and pass process-death/restart tests on NTFS. Other Windows filesystem classes remain unverified and must fail closed unless separately qualified. Hardware and storage stacks that falsely acknowledge flush/write-through are outside the application's guarantee.
+
+### Research sources
+
+- Linux `fsync(2)`: https://man7.org/linux/man-pages/man2/fsync.2.html — file sync does not necessarily persist the containing directory entry; the directory itself must be synced.
+- Microsoft `FlushFileBuffers`: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers — requires `GENERIC_WRITE`.
+- Microsoft directory handles: https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-a-handle-to-a-directory — lists documented consumers of directory handles.
+- Microsoft `MoveFileExW`: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw — replacement and write-through flags.
+- Microsoft file caching: https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching — file metadata is cached and must be flushed or opened write-through.
+- SQLite corruption guidance: https://www.sqlite.org/howtocorrupt.html — a hot journal/WAL must remain paired with its database; moving or deleting it can prevent automatic recovery.
+- SQLite atomic commit: https://sqlite.org/atomiccommit.html — SQLite's crash tests inject partial writes, garbage sectors, and reordered writes, then reopen and verify transaction consistency.
+
+### Verification boundary
+
+Test-first commits `f876c42f215a80340245fb4334af6ab2ba9caa97` and `db2eddd33ff7c76a216c8dfce67565c0506841c3` added the journal publication and Windows fail-closed deletion tests before implementation. Their GitHub Actions attempts were cancelled before test execution because later commits superseded them; therefore no RED result is claimed. Implementation commits: `a51e9589c77795441a56de56670db17ec8ed1756`, `45c5329e0524c736b8c31eda1c833a0326a18ea3`, `cbccd640b8aa154b58abc293ea054613fafa36f5`, `a68bba150a627b143c9cf95ca6a1ed918de742d8`, `1cfd08056d2ecfa1afe31910c38cfde0886b415b`, `673782ca5aa49c0c32bfadb17234a20bdfdb4924`, and `48bc9401ea070bea00cb155fe7ab91c4b72b2f6e`. CI for the latest code revision is not yet verified; the Ubuntu root job is queued and the Windows root job was cancelled in the latest attempt. Do not infer success.

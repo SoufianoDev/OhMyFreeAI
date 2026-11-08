@@ -166,3 +166,15 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Wails native platform proof 42438368038 passed 2/2, including Ubuntu WebView-to-Go and SQLite reopen.
 - Previous distro matrix 42437541325 reached 8/8 after rerunning only its failed Ubuntu 22.04 GTK3 lane; that targeted retry passed without a code change.
 - Current code-revision distro matrix 42438368003 remains pending and must be checked separately.
+
+
+## Continuation — platform-specific journal namespace barriers
+
+- Removed the false Windows success path from the shared directory-sync helper.
+- Non-Windows journal publication now owns its complete sequence: rename then parent-directory sync.
+- Windows journal publication now uses same-directory MoveFileExW with REPLACE_EXISTING + WRITE_THROUGH after syncing the temporary file.
+- Windows journal deletion fails closed and preserves the journal; no production caller currently depends on removal.
+- Tests were added first in commits f876c42 and db2eddd, but their workflow attempts were cancelled before test execution. No RED evidence is claimed.
+- Implementation commits: a51e958, 45c5329, cbccd640, a68bba1, 1cfd080, 673782c, 48bc940.
+- Latest code CI is pending: Ubuntu root job queued, Windows root job cancelled; Wails and distro jobs queued. Do not claim pass.
+- Next: close current CI, then design and implement the executor only after the platform durability boundary is explicit. Windows remains unqualified for full power-loss Restore until NTFS-specific process-death/restart evidence exists.

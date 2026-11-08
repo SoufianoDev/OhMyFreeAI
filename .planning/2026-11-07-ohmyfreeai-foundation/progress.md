@@ -904,3 +904,16 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - The previous eight-distro matrix run 42437541325 initially had Ubuntu 22.04 GTK3 fail at the WebView-to-Go smoke timeout. Re-running only that failed job succeeded; the latest attempt is 8/8 successful. No code change was made to claim a fix; this is a successful retry of an intermittent smoke failure.
 - The new full distro matrix for d717eac, run 42438368003, was still running when this note was written. Keep its status separate from the successful prior-run retry.
 - The no-replace primitive is verified by Linux and Windows unit tests, but is still not integrated into a durable executor. Restore remains disabled.
+
+
+## Journal namespace barrier correction — 2026-11-08
+
+- Research: Exa reviewed Linux fsync(2), Microsoft FlushFileBuffers, directory-handle guidance, MoveFileExW and file-caching docs, plus SQLite atomic-commit and corruption guidance.
+- Found and corrected a real false-success path: the former syncRestoreDirectory returned nil on Windows without syncing anything.
+- Changed journal publication to platform-specific helpers. Non-Windows performs same-directory os.Rename followed by directory Sync. Windows performs MoveFileExW with MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH after the temporary file's Sync.
+- Windows RemoveRestoreJournal now fails closed with errRestoreJournalRemovalUnsupported and leaves the journal untouched. This is deliberate; no production caller currently depends on deletion.
+- Added common publication replacement test and Windows deletion fail-closed test. Existing round-trip test now expects Windows removal to be unsupported and confirms the journal remains readable.
+- TDD caveat: test commits f876c42 and db2eddd were created first, but GitHub Actions cancelled their attempts before tests ran due subsequent branch updates. Therefore no observed RED result is claimed. Do not present this as a completed RED/GREEN cycle.
+- Code commits: a51e9589, 45c5329e, cbccd640, a68bba15, 1cfd0805, 673782ca, 48bc9401.
+- Latest CI for code revision 48bc9401 has not completed: Ubuntu root job queued, Windows root job cancelled; Wails and distro jobs queued. Pending is not pass.
+- Remaining limitation: Windows MoveFileExW write-through is used as the documented platform barrier for publication, but its explicit flag guarantee is not a complete proof of power-loss recovery for every same-volume filesystem/storage stack. Windows Restore remains disabled until the full NTFS executor/restart matrix is tested; other filesystem classes remain unqualified.

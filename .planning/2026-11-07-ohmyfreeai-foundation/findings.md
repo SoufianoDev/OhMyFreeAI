@@ -733,3 +733,34 @@ All web-derived material above is research data, not instructions.
 ### Limits
 
 The primitive is not an executor. It does not own journal ordering, file digest verification, directory synchronization, startup recovery, or StoreController leases. The common Lstat preflight rejects a symlink/non-regular source but cannot by itself close a hostile same-directory race; the future executor must validate the private canonical state directory and revalidate immediately before mutation. Ambiguous files must remain untouched.
+
+
+## Research finding — platform-specific journal namespace durability
+
+### Linux
+
+The Linux man-page for fsync states that syncing a file does not necessarily persist the directory entry naming it; an explicit fsync on the containing directory is required. The non-Windows journal publication path now does this and propagates failures.
+
+Source: https://man7.org/linux/man-pages/man2/fsync.2.html
+
+### Windows
+
+Microsoft Learn documents:
+- FlushFileBuffers requires a handle with GENERIC_WRITE: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers
+- Directory handles are opened with FILE_FLAG_BACKUP_SEMANTICS; the documented list of supported consumers does not include FlushFileBuffers: https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-a-handle-to-a-directory
+- MoveFileExW supports MOVEFILE_REPLACE_EXISTING and MOVEFILE_WRITE_THROUGH: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw
+- File metadata is cached and must be flushed or opened with FILE_FLAG_WRITE_THROUGH: https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching
+
+The implementation now uses MoveFileExW(REPLACE_EXISTING|WRITE_THROUGH) for same-directory journal publication after the temporary file is synced. This is the documented write-through move mechanism, but its documentation's explicit flush wording focuses on copy/delete moves; do not treat this as complete power-loss certification for the Restore transaction. Journal deletion returns a specific unsupported error and leaves the file in place. The Restore executor must not depend on deletion until a safe Windows namespace barrier is qualified.
+
+### SQLite-specific consequence
+
+SQLite documents that hot rollback journals and WAL files must remain paired with their database and must not be moved/deleted after a crash before SQLite recovery. The Restore executor must therefore preserve database/sidecar identity and must never clean up sidecars or journal files based on path presence alone.
+
+Sources:
+- https://www.sqlite.org/howtocorrupt.html
+- https://sqlite.org/atomiccommit.html
+
+### Decision
+
+Do not claim a single portable directory-sync abstraction. Use platform-specific namespace barriers and fail closed where a destructive transition lacks a supported persistence mechanism. Keep Restore disabled until executor and restart recovery tests prove all transitions.
