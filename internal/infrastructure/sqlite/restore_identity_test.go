@@ -162,7 +162,10 @@ func TestInspectRestoreArtifactRejectsSymlinkedParent(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	alias := filepath.Join(root, "alias")
+	// Keep the alias lexically inside the state directory. This ensures the
+	// containment check succeeds and the platform opener must reject the
+	// symlinked parent itself rather than relying on an outside-path rejection.
+	alias := filepath.Join(stateDirectory, "alias")
 	if err := os.Symlink(realDirectory, alias); err != nil {
 		if errors.Is(err, os.ErrPermission) {
 			t.Skip("creating symlinks is not permitted")
