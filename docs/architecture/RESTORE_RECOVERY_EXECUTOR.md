@@ -277,3 +277,22 @@ This is API-surface verification and ABI design only. No Windows handle-bound re
 - Microsoft [MS-FSCC FileRenameInformationEx](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c) — field layout, RootDirectory semantics, and no-replace behavior when the replace flag is absent.
 - Microsoft [FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info) — Win32 union semantics and relative destination handle.
 - Microsoft [SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle) — source handle access requirements and provider-dependent support caveat.
+
+
+## Windows handle-bound no-replace move implementation — 2026-11-08
+
+The Windows move primitive no longer calls MoveFileExW. It now uses SetFileInformationByHandle with the pinned x/sys v0.49.0 FileRenameInfoEx class (22).
+
+- Opens the source with DELETE and FILE_READ_ATTRIBUTES, using FILE_FLAG_OPEN_REPARSE_POINT so the final source reparse point can be inspected rather than followed.
+- Opens and retains the destination directory with FILE_FLAG_BACKUP_SEMANTICS and FILE_FLAG_OPEN_REPARSE_POINT.
+- Inspects both opened handles. The source must not be a directory, reparse point, or device; the destination must be a non-reparse directory.
+- Builds the variable-length protocol buffer explicitly: zero flags (therefore no replacement), zero reserved field, 64-bit RootDirectory destination handle, UTF-16 leaf name, byte count excluding NUL, and at least 24 bytes total.
+- Calls SetFileInformationByHandle against the opened source handle. There is no MoveFileExW, os.Rename, copy/delete, or replacement-capable fallback.
+
+The new Windows tests cover a source-path substitution after the source handle is opened and a destination collision. The test-only commit b398c546a3737f689d0ce7be9204f20b97e4b627 produced observed RED in Root CI run 42496137044, Windows job 128778788124, where go vet reported the missing helper. Implementation commit is 18aa3a3455857d5a68cd80afeb92a674ca6d1eca; current CI runs are pending and must be checked before declaring GREEN.
+
+### Explicit limitations
+
+The source path is still opened by pathname; intermediate parent components are not pinned using an NT-relative open. The future executor must enforce a private canonical state directory and revalidate file identity from the opened handle immediately before mutation. No actual-volume capability probe is implemented. Provider support is not generalized beyond the environment in which tests run. The primitive does not hash the opened file, sync namespace metadata, persist journal intent, reconcile ambiguous errors, or recover after process death.
+
+Restore remains disabled.

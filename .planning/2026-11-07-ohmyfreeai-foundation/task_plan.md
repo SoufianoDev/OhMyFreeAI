@@ -8,7 +8,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 StoreController integration is complete and verified. The Wails composition root and AppService retain the controller; configuration Load/Save and GUI/CLI backup export hold shared leases for their full operations; shutdown drains through the controller. The controller tests cover writer preference, cancellation, panic/failure fail-closed behavior, replacement, close draining, configuration Load/Save and backup export. On commit 3a814ff960e57da2e60bb7fc7dd697461af8bda1, Root CI 42475338115 passed Ubuntu and Windows (Linux race detector passed), SQLite driver evaluation 42475338112 passed 4/4, Wails proof 42475338129 passed 2/2, and the Linux distribution matrix 42475338092 passed 8/8.
 
-The next task is a focused TDD correction in the pure Restore planner: the previous-preserved plan requires preserving a candidate still in staging before restoring rollback, but the restoring-previous intent phase currently rejects that staging state. Add the missing truth-table test and planner decision before implementing filesystem mutations. Keep Restore disabled and do not add startup recovery or Restore UI until the executor and crash/failure test matrix pass. Journal v3, the identity-aware planner and no-replace move primitives already exist as low-level code; they are not yet a recovery executor.
+The planner's staged-candidate rollback gap is now closed by the truth-table and planner updates in commits 5a183916, dd771f6e and 47bbe3e. The current task is the Windows no-replace rename boundary: replace the path-based MoveFileExW primitive with a source-handle-bound FileRenameInfoEx operation, test the source-handle identity under path replacement, and keep Restore disabled. The handle-bound implementation is now on the branch; current root/Wails/driver CI must be closed before treating it as green. The durable filesystem executor, process-death recovery matrix, and startup integration remain future work.
 
 ## Current Phase
 
@@ -85,7 +85,7 @@ Phase 4
   - [x] Record explicit previous-database state and paired candidate/previous content identities in journal v3
   - [x] Add an identity-aware pure recovery planner, intent-phase truth tables and fail-closed ambiguity tests
   - [x] Add Linux/Windows no-replace move primitives; common behavioral tests now run on both platforms
-  - [ ] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
+  - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
@@ -200,3 +200,16 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Windows passed go vet, go test, build, Python compile/tests, frontend syntax and architecture checks; Linux-only race step was skipped as expected.
 - Eight-distro matrix run 42439943571 remained queued when recorded; no distro-matrix success is claimed for this revision.
 - Test-first commits for journal namespace changes were cancelled before test execution. No RED evidence is claimed for that subtask.
+
+
+## Continuation — Windows handle-bound no-replace rename — 2026-11-08
+
+- Reviewed Microsoft's MS-FSCC FileRenameInformationEx specification and the Win32 SetFileInformationByHandle contract, plus the exact pinned x/sys v0.49.0 API surface.
+- Added a Windows-only test for the critical identity property: after opening the candidate handle, rename its old path away and create a replacement at that path; the operation must publish the already-opened original, not the replacement.
+- Added a Windows-only destination-collision test that verifies both source and destination bytes remain unchanged.
+- Observed RED on test-only commit b398c546a3737f689d0ce7be9204f20b97e4b627: Root CI run 42496137044, Windows job 128778788124, failed at go vet with the expected undefined renameRestoreHandleNoReplace symbol.
+- Implemented Windows FileRenameInfoEx class 22 through SetFileInformationByHandle. The source is opened with DELETE and FILE_FLAG_OPEN_REPARSE_POINT; source and destination directory handles are retained; reparse points and non-regular sources are rejected; RootDirectory is the destination directory handle; replacement flag is zero; the variable UTF-16 buffer uses the documented 20-byte fixed header and 24-byte minimum structure size.
+- Implementation commit: 18aa3a3455857d5a68cd80afeb92a674ca6d1eca. Root CI 42496232166, Wails 42496232229, SQLite driver evaluation 42496232217 and distro matrix 42496232194 are pending at the time of this note; no GREEN result is claimed yet.
+- The handle-bound rename helper is a low-level primitive only. The path-based source open still depends on the future executor's private-state-directory and path-confinement guarantees; Windows parent-component reparse traversal is not yet independently pinned through a relative NT open.
+- No volume capability probe or filesystem qualification gate is wired yet. GitHub Windows runner success, if achieved, is a test result on that runner's volume, not general NTFS/ReFS/SMB certification.
+- Restore remains disabled. No executor, journal orchestration, directory durability, process-death recovery, startup recovery, or app-level Restore service has been added.

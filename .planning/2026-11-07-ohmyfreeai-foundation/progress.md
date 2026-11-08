@@ -955,3 +955,13 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - `PlanRestoreRecovery` returns `PreserveStaging=true` from the `previous-preserved` phase, because the staged candidate must be retained before restoring the old database.
 - The `restoring-previous` intent phase currently rejects every non-missing staging file and only accepts the candidate at target or quarantine. That leaves no recoverable state for a crash after the journal records the rollback intent but before it has moved the staged candidate to quarantine.
 - The next change is to add a focused truth-table test for candidate-at-staging under `restoring-previous`, then extend the planner without weakening its ambiguity checks. The filesystem executor remains unimplemented; no Restore UI/startup recovery was added.
+
+
+## Windows handle-bound no-replace rename — 2026-11-08
+
+- Added Windows source-handle identity and destination-collision tests first.
+- Observed the expected RED on Windows Root CI: run 42496137044, job 128778788124, go vet failed because renameRestoreHandleNoReplace was not yet implemented.
+- Replaced the Windows MoveFileExW path-based primitive with SetFileInformationByHandle(FileRenameInfoEx), using a retained source file handle and destination directory handle; no replacement flag or fallback is used.
+- Implementation commit: 18aa3a3455857d5a68cd80afeb92a674ca6d1eca.
+- Current verification runs: Root CI 42496232166; Wails 42496232229; SQLite driver matrix 42496232217; Linux distribution matrix 42496232194. All were pending at this update. Do not claim green until checked.
+- Known boundaries: parent-component reparse protection and source identity hashing/revalidation belong to the future executor; no actual-volume capability probe is implemented. Restore remains disabled.

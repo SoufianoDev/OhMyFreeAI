@@ -773,3 +773,31 @@ StoreController integration and the full current CI gate are green on commit `3a
 A planner-state gap must be closed before filesystem execution. The `previous-preserved` decision requests `PreserveStaging=true` and `RestoreRollback=true`, but `RestorePhaseRestoringPrevious` rejects any candidate still at staging. A crash after the journal records the rollback intent but before the staging-to-quarantine move therefore has no accepted recovery state. Add the explicit state (target missing, candidate at staging, previous DB at rollback, quarantine missing) to the intent truth table and test it. Keep all mismatched, unreadable, unverified and colliding states ambiguous.
 
 The cross-platform no-replace move tests were previously build-tagged Linux-only. Commit `3a814ff` makes the common move/collision/concurrency/symlink-source checks run on Linux and Windows, while retaining the symlinked-containing-directory test as Linux-only. Root CI passed on both platforms. Restore remains disabled; no executor, startup coordinator or UI was introduced.
+
+
+## Windows handle-bound no-replace rename — research and implementation — 2026-11-08
+
+### Primary sources reviewed with Exa
+
+- Microsoft MS-FSCC FileRenameInformationEx: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c — Flags is 4 bytes; Reserved is 4 bytes; RootDirectory is a 64-bit directory handle; FileNameLength is a byte count; FileName is UTF-16 without a required trailing NUL; minimum structure size is 24 bytes. Leaving FILE_RENAME_REPLACE_IF_EXISTS (0x1) unset requires destination collision to fail.
+- Microsoft SetFileInformationByHandle: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle — mutation is performed against the opened source handle; requested access must be present; behavior varies by OS release and underlying driver.
+- Microsoft CreateFileW: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew — FILE_FLAG_OPEN_REPARSE_POINT opens the reparse point itself; FILE_FLAG_BACKUP_SEMANTICS is required to obtain a directory handle; FILE_SHARE_DELETE permits compatible concurrent rename/delete opens.
+- Pinned x/sys v0.49.0 windows/types_windows.go: https://github.com/golang/sys/blob/v0.49.0/windows/types_windows.go — FileRenameInfoEx is information class 22.
+- Pinned x/sys v0.49.0 windows/syscall_windows.go and zsyscall_windows.go: https://github.com/golang/sys/blob/v0.49.0/windows/syscall_windows.go and https://github.com/golang/sys/blob/v0.49.0/windows/zsyscall_windows.go — SetFileInformationByHandle accepts the source handle, class, byte buffer pointer and uint32 size.
+
+### Implementation
+
+- Replaced path-based MoveFileExW in the Windows restore-move primitive.
+- The source file is opened with DELETE | FILE_READ_ATTRIBUTES and FILE_FLAG_OPEN_REPARSE_POINT, with sharing that permits rename.
+- The destination directory is opened and retained with FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT.
+- Both handles are inspected with GetFileInformationByHandle; source directory/reparse/device attributes and destination non-directory/reparse states are rejected.
+- The FileRenameInfoEx payload is built explicitly in little-endian form with zero flags, zero reserved field, the 64-bit destination RootDirectory handle, a UTF-16 leaf name, byte length excluding NUL, overflow checks and the protocol's 24-byte minimum size.
+- No replacement or POSIX replacement flags are set. Unsupported API/provider errors are returned; there is no MoveFileEx or os.Rename fallback.
+
+### Verification boundary and remaining limitations
+
+- Test-only commit b398c546 produced an observed RED in Windows Root CI run 42496137044 / job 128778788124: go vet reported the expected undefined renameRestoreHandleNoReplace helper.
+- Implementation commit 18aa3a3455857d5a68cd80afeb92a674ca6d1eca is pushed; Root CI run 42496232166, Wails run 42496232229, SQLite driver evaluation 42496232217 and Linux distro matrix 42496232194 were still pending at the time this note was written.
+- The path-based source open still relies on the executor enforcing a private canonical state directory. Intermediate parent-component reparse traversal is not pinned using an NT-relative open.
+- No actual-volume capability probe or filesystem qualification policy exists yet. A passing hosted Windows test would only qualify the runner's tested environment, not all NTFS versions/providers and certainly not ReFS, SMB or removable media.
+- This primitive is not a recovery executor and does not persist journal intents, hash identity from the open handle, sync namespace metadata, reconcile ambiguous move errors, or recover after process death. Restore stays disabled.
