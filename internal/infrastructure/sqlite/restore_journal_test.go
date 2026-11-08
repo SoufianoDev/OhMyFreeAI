@@ -197,6 +197,8 @@ func TestRestoreJournalPreservesExplicitNoPreviousDatabase(t *testing.T) {
 	journal := validTestRestoreJournal(root)
 	journal.PreviousDatabaseExisted = boolPointer(false)
 	journal.RollbackPath = ""
+	journal.PreviousSHA256 = ""
+	journal.PreviousSize = 0
 	if err := WriteRestoreJournal(root, journal); err != nil {
 		t.Fatalf("write journal with no previous database: %v", err)
 	}
