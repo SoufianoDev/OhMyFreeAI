@@ -301,3 +301,28 @@ The Windows move uses NtSetInformationFile with native FileRenameInformationEx c
 The destination directory is still initially opened by full path through CreateFile. FILE_FLAG_OPEN_REPARSE_POINT protects only the final component, not all ancestors. Next, open the canonical state-directory path component-by-component from a trusted volume root, reject every reparse component, and verify private directory permissions/ACL. The future executor must hash and revalidate source identity from the opened handle immediately before mutation, persist intent before every move, sync the required namespace state, reconcile ambiguous results and recover process death.
 
 The native rename class is not assumed to work on every filesystem/provider. Unsupported providers fail closed. No full executor, startup recovery or app-level Restore service exists. Restore remains disabled.
+
+
+## Verified-handle and no-replace move integration gate — 2026-11-08
+
+The repository now has two separate low-level capabilities, but they are not yet composed into one verified move operation:
+
+- `openVerifiedRestoreArtifact` opens the artifact, hashes bytes through that opened object, retains the read handle, and rewinds it. On Windows, the underlying inspector open requests `FILE_READ_DATA | FILE_READ_ATTRIBUTES` and shares only `FILE_SHARE_READ`.
+- `moveRestoreFileNoReplace` is an isolated namespace primitive. Linux pins the containing directory and calls `renameat2(RENAME_NOREPLACE)`. Windows opens the source leaf relative to a retained directory handle with `DELETE | FILE_READ_ATTRIBUTES`, then calls `NtSetInformationFile(FileRenameInformationEx)` with replacement flags unset.
+- The Windows move helper currently opens a **different source handle** from the verified inspector handle. It requests `FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE`, and it does not read or hash the source bytes itself.
+
+Consequences:
+
+1. Do not treat `openVerifiedRestoreArtifact` followed by `moveRestoreFileNoReplace(path, path)` as an identity-preserving transaction. The second operation reopens the source name; the retained inspector handle does not bind that later source open.
+2. The current Windows move handle permits concurrent write/delete sharing and therefore cannot, by itself, establish that the bytes moved are the bytes previously hashed.
+3. The Windows implementation gate is a single source handle that has the least rights required for both validation and rename: read the bytes and attributes, request `DELETE`, deny concurrent write/delete sharing, hash and revalidate through that same handle, then perform the no-replace rename through that handle and the retained destination-directory handle. Any inability to obtain those rights must fail closed; do not silently fall back to a path-based move.
+4. Linux `renameat2` remains name-based and cannot rename directly from an open file descriptor. Its executor must use pinned directory handles, verify the source entry against the retained file identity immediately before the move, and rely on a state directory protected against untrusted concurrent namespace mutation. If that private-directory condition cannot be established, automatic execution is unsupported.
+5. Neither platform primitive is a filesystem executor. The journal intent/completion protocol, directory durability, restart reconciliation, StoreController coordination, and process-death tests remain separate requirements.
+
+This is a design clarification only. No move code, ACL evaluator, permission repair, filesystem executor, startup recovery, Restore service, or Restore UI is enabled by this entry. Restore remains disabled.
+
+### Source references
+
+- Microsoft [SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle) — the source handle must carry appropriate access for the requested operation.
+- Microsoft [FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info) — relative destination resolution through a directory handle and no-replace behavior.
+- Microsoft [File Security and Access Rights](https://learn.microsoft.com/en-us/windows/win32/fileio/file-security-and-access-rights) — access is granted against the object's security descriptor and caller token.
