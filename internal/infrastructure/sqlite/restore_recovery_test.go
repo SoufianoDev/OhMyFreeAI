@@ -190,3 +190,47 @@ func TestPlanRestoreRecoveryFailsClosedOnAmbiguousStates(t *testing.T) {
 		})
 	}
 }
+
+
+func TestPlanRestoreRecoveryRejectsCollidingPaths(t *testing.T) {
+	tests := []struct {
+		name string
+		journal RestoreJournal
+	}{
+		{
+			name: "target equals staging",
+			journal: func() RestoreJournal {
+				j := recoveryTestJournal(RestorePhasePrepared, false)
+				j.StagingPath = j.TargetPath
+				return j
+			}(),
+		},
+		{
+			name: "rollback equals target",
+			journal: func() RestoreJournal {
+				j := recoveryTestJournal(RestorePhasePublished, true)
+				j.RollbackPath = j.TargetPath
+				return j
+			}(),
+		},
+		{
+			name: "rollback equals staging",
+			journal: func() RestoreJournal {
+				j := recoveryTestJournal(RestorePhasePublished, true)
+				j.RollbackPath = j.StagingPath
+				return j
+			}(),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plan, err := PlanRestoreRecovery(test.journal, RestoreRecoveryFiles{TargetExists: true, RollbackExists: true})
+			if !errors.Is(err, ErrRestoreRecoveryAmbiguous) {
+				t.Fatalf("PlanRestoreRecovery() = %#v, %v; want ErrRestoreRecoveryAmbiguous", plan, err)
+			}
+			if plan != (RestoreRecoveryPlan{}) {
+				t.Fatalf("colliding paths returned actionable plan: %#v", plan)
+			}
+		})
+	}
+}
