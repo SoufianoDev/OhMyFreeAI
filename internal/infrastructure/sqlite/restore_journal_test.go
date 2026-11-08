@@ -21,8 +21,13 @@ func validTestRestoreJournal(root string) RestoreJournal {
 		Phase:         RestorePhasePrepared,
 		TargetPath:    filepath.Join(root, "state.db"),
 		StagingPath:   filepath.Join(root, ".restore-stage.db"),
-		RollbackPath:  filepath.Join(root, ".restore-rollback.db"),
+		RollbackPath: filepath.Join(root, ".restore-rollback.db"),
+		CandidateQuarantinePath: filepath.Join(root, ".restore-candidate-quarantine.db"),
 		PreviousDatabaseExisted: boolPointer(true),
+		CandidateSHA256: strings.Repeat("b", 64),
+		CandidateSize: 8192,
+		PreviousSHA256: strings.Repeat("c", 64),
+		PreviousSize: 4096,
 		ArchiveSHA256: strings.Repeat("a", 64),
 		ArchiveSize:   4096,
 		UpdatedAt:     time.Now().UTC(),
@@ -235,6 +240,138 @@ func TestReadRestoreJournalRejectsLegacyVersionOne(t *testing.T) {
 		t.Fatalf("read version-one journal error = %v, want ErrRestoreJournalInvalid", err)
 	}
 }
+
+func TestReadRestoreJournalRejectsLegacyVersionTwo(t *testing.T) {
+	root := t.TempDir()
+	journal := validTestRestoreJournal(root)
+	journal.Version = 2
+	data, err := json.Marshal(journal)
+	if err != nil {
+		t.Fatalf("marshal legacy journal: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, restoreJournalFileName), data, 0o600); err != nil {
+		t.Fatalf("write legacy journal: %v", err)
+	}
+	if _, err := ReadRestoreJournal(root); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("read version-two journal error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
+func TestRestoreJournalV3AcceptsIntentAndTerminalPhases(t *testing.T) {
+	root := t.TempDir()
+	for _, phase := range []RestorePhase{
+		RestorePhasePreservingPrevious,
+		RestorePhasePublishing,
+		RestorePhaseRestoringPrevious,
+		RestorePhaseRolledBack,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			journal := validTestRestoreJournal(root)
+			journal.Phase = phase
+			if err := WriteRestoreJournal(root, journal); err != nil {
+				t.Fatalf("write v3 phase %q: %v", phase, err)
+			}
+			got, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read v3 phase %q: %v", phase, err)
+			}
+			if got.Phase != phase {
+				t.Fatalf("phase = %q, want %q", got.Phase, phase)
+			}
+		})
+	}
+}
+
+func TestWriteRestoreJournalRequiresCandidateIdentityBeforePublication(t *testing.T) {
+	root := t.TempDir()
+	for _, phase := range []RestorePhase{
+		RestorePhasePublishing,
+		RestorePhasePublished,
+		RestorePhaseReopening,
+		RestorePhaseRestoringPrevious,
+		RestorePhaseCommitted,
+		RestorePhaseRolledBack,
+	} {
+		t.Run(string(phase), func(t *testing.T) {
+			journal := validTestRestoreJournal(root)
+			journal.Phase = phase
+			journal.CandidateSHA256 = ""
+			journal.CandidateSize = 0
+			if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+				t.Fatalf("write without candidate identity error = %v, want ErrRestoreJournalInvalid", err)
+			}
+		})
+	}
+}
+
+func TestWriteRestoreJournalRejectsIncompleteOrInvalidContentIdentities(t *testing.T) {
+	root := t.TempDir()
+	tests := []struct {
+		name string
+		mutate func(*RestoreJournal)
+	}{
+		{name: "candidate digest without size", mutate: func(j *RestoreJournal) { j.CandidateSize = 0 }},
+		{name: "candidate size without digest", mutate: func(j *RestoreJournal) { j.CandidateSHA256 = "" }},
+		{name: "candidate malformed digest", mutate: func(j *RestoreJournal) { j.CandidateSHA256 = "ABC" }},
+		{name: "candidate zero size", mutate: func(j *RestoreJournal) { j.CandidateSize = 0 }},
+		{name: "previous digest without size", mutate: func(j *RestoreJournal) { j.PreviousSize = 0 }},
+		{name: "previous size without digest", mutate: func(j *RestoreJournal) { j.PreviousSHA256 = "" }},
+		{name: "previous malformed digest", mutate: func(j *RestoreJournal) { j.PreviousSHA256 = "not-hex" }},
+		{name: "previous zero size", mutate: func(j *RestoreJournal) { j.PreviousSize = 0 }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			journal := validTestRestoreJournal(root)
+			test.mutate(&journal)
+			if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+				t.Fatalf("write invalid content identity error = %v, want ErrRestoreJournalInvalid", err)
+			}
+		})
+	}
+}
+
+func TestWriteRestoreJournalRequiresPreviousIdentityIffPreviousDatabaseExists(t *testing.T) {
+	root := t.TempDir()
+	journal := validTestRestoreJournal(root)
+	journal.PreviousSHA256 = ""
+	journal.PreviousSize = 0
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("write without previous identity error = %v, want ErrRestoreJournalInvalid", err)
+	}
+
+	journal = validTestRestoreJournal(root)
+	journal.PreviousDatabaseExisted = boolPointer(false)
+	journal.RollbackPath = ""
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("write unexpected previous identity error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
+func TestWriteRestoreJournalRejectsCandidateQuarantinePathCollisions(t *testing.T) {
+	root := t.TempDir()
+	for _, path := range []string{
+		filepath.Join(root, "state.db"),
+		filepath.Join(root, ".restore-stage.db"),
+		filepath.Join(root, ".restore-rollback.db"),
+	} {
+		journal := validTestRestoreJournal(root)
+		journal.CandidateQuarantinePath = path
+		if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+			t.Fatalf("write with quarantine collision %q error = %v, want ErrRestoreJournalInvalid", path, err)
+		}
+	}
+}
+
+func TestWriteRestoreJournalRejectsCandidateQuarantineOutsideStateDirectory(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	journal := validTestRestoreJournal(root)
+	journal.CandidateQuarantinePath = filepath.Join(outside, "candidate.db")
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("write with external quarantine path error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
 
 
 func TestWriteRestoreJournalRejectsInconsistentRollbackMetadata(t *testing.T) {
