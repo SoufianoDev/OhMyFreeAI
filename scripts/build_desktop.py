@@ -70,17 +70,23 @@ def attach_generated_binding(project: Path) -> None:
     bridge = (
         f'import {{ GetSnapshot, SaveConfig, ExportBackup, InspectBackup }} from "{relative}";\n'
         'window.OhMyFreeAI = Object.freeze({ GetSnapshot, SaveConfig, ExportBackup, InspectBackup });\n'
-        'const firstSnapshot = Promise.resolve().then(() => GetSnapshot());\n'
-        'import("../app.js").then(async () => {\n'
+        'const appLoaded = import("../app.js");\n'
+        'const pageLoaded = document.readyState === "complete"\n'
+        '  ? Promise.resolve()\n'
+        '  : new Promise(resolve => window.addEventListener("load", resolve, { once: true }));\n'
+        'Promise.all([appLoaded, pageLoaded]).then(async () => {\n'
         '  try {\n'
-        '    const snapshot = await firstSnapshot;\n'
+        '    const snapshot = await GetSnapshot();\n'
         '    await GetSnapshot();\n'
         '    window.dispatchEvent(new CustomEvent("ohmyfreeai:bridge-ready", { detail: snapshot }));\n'
         '  } catch (error) {\n'
         '    window.dispatchEvent(new CustomEvent("ohmyfreeai:bridge-error", { detail: error }));\n'
         '    console.error("Could not initialize the native core:", error);\n'
         '  }\n'
-        '}).catch(error => console.error("Could not load the OhMyFreeAI frontend module:", error));\n'
+        '}).catch(error => {\n'
+        '  window.dispatchEvent(new CustomEvent("ohmyfreeai:bridge-error", { detail: error }));\n'
+        '  console.error("Could not load the OhMyFreeAI frontend module:", error);\n'
+        '});\n'
     )
     (source_dir / "main.js").write_text(bridge, encoding="utf-8")
 
