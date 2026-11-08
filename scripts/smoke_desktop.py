@@ -28,6 +28,52 @@ def diagnostic_excerpt(path: Path) -> str:
     return text[:5000] + "\\n... middle of native log omitted ...\\n" + text[-5000:]
 
 
+def process_diagnostics(pid: int, display_process: subprocess.Popen[bytes], display: str) -> str:
+    """Capture a bounded Linux process/X11 snapshot without exposing environment variables."""
+    pending = [pid, display_process.pid]
+    seen: set[int] = set()
+    rows: list[str] = []
+
+    while pending and len(seen) < 24:
+        current_pid = pending.pop(0)
+        if current_pid in seen:
+            continue
+        seen.add(current_pid)
+        proc = Path("/proc") / str(current_pid)
+        try:
+            status = (proc / "status").read_text(encoding="utf-8", errors="replace")
+            fields = {}
+            for line in status.splitlines():
+                if line.startswith(("Name:", "State:", "PPid:")):
+                    key, value = line.split(":", 1)
+                    fields[key] = value.strip()
+            wchan = (proc / "wchan").read_text(encoding="ascii", errors="replace").strip()
+            rows.append(
+                f"pid={current_pid} name={fields.get('Name', '?')} "
+                f"state={fields.get('State', '?')} ppid={fields.get('PPid', '?')} "
+                f"wchan={wchan or '?'}"
+            )
+            children = (proc / "task" / str(current_pid) / "children").read_text(
+                encoding="ascii", errors="replace"
+            ).split()
+            pending.extend(int(child) for child in children if child.isdigit())
+        except (OSError, ValueError):
+            rows.append(f"pid={current_pid} unavailable")
+
+    socket_path = Path("/tmp/.X11-unix") / f"X{display.removeprefix(':')}"
+    try:
+        socket_state = "present" if socket_path.exists() else "missing"
+    except OSError as error:
+        socket_state = f"unavailable ({error})"
+
+    return (
+        f"Process snapshot (application_pid={pid}, app_exit={None}, "
+        f"xvfb_pid={display_process.pid}, xvfb_exit={display_process.poll()}, "
+        f"display={display}, x_socket={socket_state}):\\n"
+        + "\\n".join(rows)
+    )
+
+
 def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None:
     marker.unlink(missing_ok=True)
     env = os.environ.copy()
@@ -111,7 +157,13 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                 time.sleep(0.2)
             output.flush()
             details = log_path.read_text(encoding="utf-8", errors="replace")[-5000:]
-            raise RuntimeError("Timed out waiting for the frontend-to-Go GetSnapshot call. Application output:\\n" + details)
+            diagnostics = process_diagnostics(process.pid, display_process, display)
+            raise RuntimeError(
+                "Timed out waiting for the frontend-to-Go GetSnapshot call.\\n"
+                + diagnostics
+                + "\\nApplication output:\\n"
+                + details
+            )
         finally:
             if process is not None and process.poll() is None:
                 process.terminate()
