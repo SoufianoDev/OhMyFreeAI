@@ -31,6 +31,18 @@ def main() -> int:
     if version.returncode != 0:
         raise RuntimeError(f"llama-server --version failed:\n{version.stdout}")
 
+    # This exercises ggml's runtime backend discovery from the executable
+    # directory and proves that at least one compatible CPU backend loads.
+    devices = subprocess.run(
+        [str(server), "--list-devices"], cwd=root, text=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30,
+    )
+    if devices.returncode != 0 or "CPU" not in devices.stdout.upper():
+        raise RuntimeError(
+            "llama-server could not enumerate a CPU backend from the staged bundle:\\n"
+            + devices.stdout
+        )
+
     ldd = shutil.which("ldd")
     if args.require_ldd_clean and not ldd:
         raise RuntimeError("ldd is required for dependency validation but was not found in PATH")
@@ -62,7 +74,7 @@ def main() -> int:
     report = {
         "status": "passed",
         "server": str(server.relative_to(root)),
-        "version_output": version.stdout.strip(),
+        "version_output": version.stdout.strip(),\n        "device_enumeration_output": devices.stdout.strip(),
         "dependency_targets_checked": len(dependency_checks),
         "dependency_checks": dependency_checks,
         "gpu_readiness": "NOT_TESTED — requires a compatible real Colab GPU",
