@@ -121,6 +121,7 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 | Do not claim the skill is installed in the agent runtime | The available environment has no writable agent-home mount; repository vendoring is the durable project-level route |
 | Keep Wails confined to the desktop adapter | Core domain/application packages remain Wails-independent; the desktop build is generated from the pinned official vanilla-js template in a temporary workspace |
 | Keep the historical Colab monitor read-only | Preserve the busy-session guard and SSE framing invariant, but do not port Linux-only Wails v2 UI/process code into the cross-platform product |
+| Mandatory Ponytail Ultra engineering mode | Challenge unjustified scope before implementation; prefer the smallest complete change while preserving security, validation, data-loss protections, user constraints and required tests |
 
 ## Errors Encountered
 
