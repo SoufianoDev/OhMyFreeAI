@@ -74,9 +74,9 @@ Every intent phase must have an exhaustive truth table for target, staging, roll
 
 ## Current implementation status
 
-Implemented: durable journal v2, canonical path confinement, non-regular path rejection, pure conservative recovery planner, StoreController leases, and lower-level SQLite staging primitive.
+Implemented: strict durable journal v3 with intent-phase names, canonical path confinement, candidate quarantine metadata, paired candidate/previous database identities, non-regular path rejection, and an identity-aware pure recovery planner for the completed phases. StoreController leases and the lower-level SQLite staging primitive are also implemented.
 
-Not implemented: intent phases, candidate quarantine metadata, database content identities, platform-specific no-replace move adapter, filesystem executor, startup coordinator, process-death executor tests, or application-level restore orchestration.
+Not implemented: automatic planning for the three interrupted intent phases (they fail closed), platform-specific no-replace move adapter, filesystem executor, startup coordinator, process-death executor tests, and application-level restore orchestration.
 
 This design deliberately blocks a quick implementation based on os.Rename or check-then-rename. Safety takes priority over automatic cleanup: ambiguous artifacts are preserved and Restore remains disabled.
 
@@ -125,3 +125,12 @@ Intent phases are durable *before* their corresponding filesystem mutation. Comp
 - `rolled-back` requires the verified previous database at target, no candidate at target, and retained rollback/quarantine artifacts consistent with the last durable intent. It does not authorize deleting rollback.
 - The pure planner must model candidate/quarantine presence and identity verification results explicitly; it must never emit a destructive action from booleans that omit content identity.
 - Tests must reject v2, missing paired identity fields, malformed digests, zero sizes, inconsistent previous-database identity, and every path collision before any executor operation can run.
+
+
+## Identity-aware planner implementation status
+
+The pure planner now receives explicit per-path identity outcomes for target, staging, rollback and quarantine: missing, candidate match, previous-database match, mismatch, unreadable, or unverified. Mismatch, unreadable and unverified states return ambiguity with an empty plan. A partial staging artifact is never selected for cleanup unless its candidate identity matches the journal.
+
+Completed-phase decisions require the expected content identity at each relevant path. Candidate publication rollback requires a verified previous database at rollback and a verified candidate either at target or already in quarantine. Committed verification requires the candidate at target and retains the previous rollback. Rolled-back verification requires the previous database at target and the candidate retained in quarantine.
+
+The planner intentionally rejects `preserving-previous`, `publishing`, and `restoring-previous` intent phases until the executor's move-by-move truth tables and no-replace operations are implemented. This is a deliberate fail-closed boundary, not a claim of automatic crash recovery.
