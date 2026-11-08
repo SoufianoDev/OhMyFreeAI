@@ -147,6 +147,7 @@ jobs:
           echo "SOURCE_COMMIT=$SOURCE_COMMIT" >> "$GITHUB_ENV"
           cmake -S /tmp/llama-src -B /tmp/llama-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DLLAMA_BUILD_IS_DEV=OFF \
             -DCMAKE_INSTALL_PREFIX=/tmp/llama-install \
             -DCMAKE_INSTALL_BINDIR=bin \
             -DCMAKE_INSTALL_LIBDIR=bin \
@@ -166,8 +167,10 @@ jobs:
           cmake --build /tmp/llama-build --config Release --parallel 2 --target install
           test -x /tmp/llama-install/bin/llama-server
           /tmp/llama-install/bin/llama-server --version | tee /tmp/llama-server-version.txt
-          # The executable's display version is informational only. The exact
-          # upstream commit above is the authoritative source identity.
+          if grep -q -- '-dev' /tmp/llama-server-version.txt; then
+            echo "::error::Development build flag was not disabled; refusing to publish."
+            exit 1
+          fi
           cp -a /tmp/llama-install/bin/. stage/llama-engine/bin/
           cp /tmp/llama-src/LICENSE stage/llama-engine/LICENSE
 
@@ -186,7 +189,7 @@ jobs:
             --source-commit "$SOURCE_COMMIT" \
             --source-mode "$SOURCE_MODE" \
             --artifact-url "$ARTIFACT_URL" \
-            --build-flags "Release;GGML_NATIVE=OFF;BUILD_SHARED_LIBS=ON;GGML_BACKEND_DL=ON;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=OFF" \
+            --build-flags "Release;LLAMA_BUILD_IS_DEV=OFF;GGML_NATIVE=OFF;BUILD_SHARED_LIBS=ON;GGML_BACKEND_DL=ON;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=OFF" \
             --backend "$BACKEND"
           python3 scripts/engine/validate_engine.py --root stage/llama-engine --require-ldd-clean
 
