@@ -4,7 +4,8 @@ These skills are vendored so compatible coding agents can discover them after cl
 
 | Skill | Source | Version/scope | Application |
 |---|---|---|---|
-| planning-with-files | https://github.com/OthmanAdi/planning-with-files | v3.28.1 | Persistent plans, findings, progress, validation |
+| planning-with-files | https://github.com/OthmanAdi/planning-with-files | v3.28.1 | Persistent plans, findings, progress, validation; applies project-specific Ponytail Ultra rules below |
+| ponytail | https://github.com/DietrichGebert/ponytail | Upstream main snapshot | Mandatory Ultra engineering mode: challenge scope, minimize complete diffs, preserve safety and tests |
 | material-3 | https://github.com/SoufianoDev/material-3-skill | v1.1.1 | Material Design 3 tokens, component semantics, layout, accessibility |
 | compose-component-design | https://github.com/SoufianoDev/KotlinComposeKit | Current source skill | Reusable component ownership and caller-controlled content/placement principles only |
 | ECC Go patterns | https://github.com/affaan-m/ECC/tree/main/skills/golang-patterns | Current source skill | Idiomatic Go, small interfaces, error handling and package boundaries |
