@@ -809,3 +809,26 @@
 - Commits: 62068a8d7c17a8988d571aab37ee379e392f2401 (journal validation), 1548e9d62cd1a6e10a51337ed304f8c61940691f (tests), followed by this documentation correction.
 - CI status for the latest commits is not available from the current GitHub status lookup; no test success is claimed.
 - Restore remains disabled. Next: obtain full CI evidence, then implement the recovery executor only with collision-safe no-overwrite semantics and process-death tests.
+
+
+## Continuation: 2026-11-08T01:04Z — Restore journal hardening CI closure
+
+### CI verification
+
+The latest code commit under test was `31b9a963c1403bee223f0d9da632f8e570d9ffa6` (non-regular restore transaction path rejection). All four workflows completed successfully:
+
+- Root Go CI `42431721560`: Ubuntu and Windows passed.
+- SQLite driver evaluation `42431721488`: modernc and ncruces on Ubuntu and Windows passed (4/4).
+- Wails v3.0.0 platform proof `42431721597`: Ubuntu and Windows passed (2/2).
+- Linux distribution compatibility `42431721639`, attempt 2: all eight jobs passed (8/8), including Ubuntu 22.04 GTK3/WebKit2GTK 4.1, Debian 12, Fedora GTK3, Ubuntu 24.04, openSUSE Tumbleweed, Debian 13, Fedora GTK4 and Arch Linux.
+
+The first Ubuntu 22.04 attempt timed out waiting for the frontend-to-Go WebView call. The targeted rerun passed; its bridge smoke test succeeded twice and the WebView reopen check passed. No code change was made for this transient failure. This is a successful rerun, not evidence of a code fix.
+
+### Documentation
+
+- Updated `docs/architecture/RESTORE_LIFECYCLE.md` with exact workflow/run evidence and a clear boundary on what CI does and does not prove.
+- Restore remains disabled. CI success for the foundation does not certify a recovery executor or the complete restore transaction.
+
+### Next engineering step
+
+Proceed with the collision-safe filesystem recovery executor only after designing its ownership and no-overwrite semantics. It must revalidate paths immediately before each mutation, preserve unexpected candidates at collision-free transaction-owned locations, sync directory metadata where supported, and fail closed on any race or contradictory state. Add process-death tests at every journal phase before startup recovery is wired into Store opening.
