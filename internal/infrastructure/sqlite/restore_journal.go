@@ -191,7 +191,11 @@ func canonicalStateDirectory(path string) (string, error) {
 	if err != nil || !info.IsDir() {
 		return "", fmt.Errorf("%w: state directory is not a directory", ErrRestoreJournalInvalid)
 	}
-	return filepath.Clean(resolved), nil
+	// Keep the caller's absolute spelling for stable round-trips. On Windows,
+	// EvalSymlinks may rewrite a long temporary path to its 8.3 alias; using
+	// that resolved spelling in journal fields makes equivalent paths compare
+	// unequal to the paths supplied by the transaction owner.
+	return filepath.Clean(absolute), nil
 }
 
 func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJournal, error) {
@@ -239,21 +243,25 @@ func canonicalStatePath(root, path string) (string, error) {
 		return "", fmt.Errorf("%w: resolve transaction path: %v", ErrRestoreJournalInvalid, err)
 	}
 	absolute = filepath.Clean(absolute)
+	resolvedRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", fmt.Errorf("%w: resolve state directory: %v", ErrRestoreJournalInvalid, err)
+	}
 	parent, err := filepath.EvalSymlinks(filepath.Dir(absolute))
 	if err != nil {
 		return "", fmt.Errorf("%w: resolve transaction path parent: %v", ErrRestoreJournalInvalid, err)
 	}
-	canonical := filepath.Join(parent, filepath.Base(absolute))
+	resolvedCandidate := filepath.Join(parent, filepath.Base(absolute))
 	if info, statErr := os.Lstat(absolute); statErr == nil && info.Mode()&os.ModeSymlink != 0 {
 		return "", fmt.Errorf("%w: transaction path must not be a symbolic link", ErrRestoreJournalInvalid)
 	} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
 		return "", fmt.Errorf("%w: inspect transaction path: %v", ErrRestoreJournalInvalid, statErr)
 	}
-	relative, err := filepath.Rel(root, canonical)
+	relative, err := filepath.Rel(resolvedRoot, resolvedCandidate)
 	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
 		return "", fmt.Errorf("%w: transaction path escapes the application state directory", ErrRestoreJournalInvalid)
 	}
-	return canonical, nil
+	return absolute, nil
 }
 
 func validRestorePhase(phase RestorePhase) bool {
