@@ -1,0 +1,698 @@
+{
+  "schema_version": 2,
+  "engine": "llama.cpp",
+  "created_utc": "2026-11-08T17:17:58.045876+00:00",
+  "source_repository": "https://github.com/ggml-org/llama.cpp",
+  "source_ref": "v0.9.0",
+  "source_commit": "7d7f0287530bc8981690f361d8c1627dbae1c99a",
+  "source_mode": "source-build",
+  "official_artifact_url": null,
+  "platform": "Linux-6.8.0-1070-azure-x86_64-with-glibc2.35",
+  "system": "Linux",
+  "architecture": "x86_64",
+  "python": "3.10.12",
+  "compiler": "c++ (Ubuntu 11.4.0-1ubuntu1~22.04.3) 11.4.0\nCopyright (C) 2021 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.",
+  "cmake": "cmake version 3.31.6\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).",
+  "ninja": "1.13.2",
+  "zstd": "*** Zstandard CLI (64-bit) v1.5.7, by Yann Collet ***",
+  "glibc": "ldd (Ubuntu GLIBC 2.35-0ubuntu3.15) 2.35\nCopyright (C) 2022 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\nWritten by Roland McGrath and Ulrich Drepper.",
+  "backend_requested": "cpu",
+  "build_flags": "Release;GGML_NATIVE=OFF;BUILD_SHARED_LIBS=ON;GGML_BACKEND_DL=ON;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=OFF",
+  "cuda": {
+    "nvidia_smi": null,
+    "nvcc": null
+  },
+  "package_filename": "llama-engine.tar.zst",
+  "bundled_files": [
+    {
+      "path": "LICENSE",
+      "size_bytes": 1078,
+      "sha256": "94f29bbed6a22c35b992c5c6ebf0e7c92f13b836b90f36f461c9cf2f0f1d010d"
+    },
+    {
+      "path": "bin/cmake/ggml/ggml-config-version.cmake",
+      "size_bytes": 2765,
+      "sha256": "b08ff64ee92e0bc29c979b444fa106f7af080758ed5b00abdc9c7ad3b68196e6"
+    },
+    {
+      "path": "bin/cmake/ggml/ggml-config.cmake",
+      "size_bytes": 13527,
+      "sha256": "4de350e1fdbb622a6aa945315fc1901206cf9ee2c909f1de066164cedc7f5551"
+    },
+    {
+      "path": "bin/cmake/llama/llama-config-version.cmake",
+      "size_bytes": 2774,
+      "sha256": "cf740929749184dda2ae162850415cc3609977492f6d770734e9b8542b243c76"
+    },
+    {
+      "path": "bin/cmake/llama/llama-config.cmake",
+      "size_bytes": 1815,
+      "sha256": "f5d49bdbd591ec93322389f6cd77c8af12eef3800dbcb4a66daa4d0ba88f6999"
+    },
+    {
+      "path": "bin/libggml-base.so",
+      "size_bytes": 942080,
+      "sha256": "099f245bb7b022840a05043163fc7f7775d0a62263f91cb7a3db14a1932bdec0"
+    },
+    {
+      "path": "bin/libggml-base.so.0",
+      "size_bytes": 942080,
+      "sha256": "099f245bb7b022840a05043163fc7f7775d0a62263f91cb7a3db14a1932bdec0"
+    },
+    {
+      "path": "bin/libggml-base.so.0.29.0",
+      "size_bytes": 942080,
+      "sha256": "099f245bb7b022840a05043163fc7f7775d0a62263f91cb7a3db14a1932bdec0"
+    },
+    {
+      "path": "bin/libggml-cpu-alderlake.so",
+      "size_bytes": 1455768,
+      "sha256": "7b2f1f221140535d14babeeda046abb55773ef3737214e135edf6f72a4c91525"
+    },
+    {
+      "path": "bin/libggml-cpu-cannonlake.so",
+      "size_bytes": 1618784,
+      "sha256": "51b701ea0dfa341a33dd2fda6a58658bdefdcc94bc75b93898fca7cab52e1b5c"
+    },
+    {
+      "path": "bin/libggml-cpu-cascadelake.so",
+      "size_bytes": 1630776,
+      "sha256": "f9e097290bd57840d4d94a0b62446467d6cf1e46f81babb551cbc38f227b5b16"
+    },
+    {
+      "path": "bin/libggml-cpu-cooperlake.so",
+      "size_bytes": 1630848,
+      "sha256": "747ce450a1ed52b5a6234153112245e1de6ad05aabb74817f3ec90ca359cb4a1"
+    },
+    {
+      "path": "bin/libggml-cpu-haswell.so",
+      "size_bytes": 1459864,
+      "sha256": "5fe121b7e853fc6db0f07e14296436bfcbdf9f48e4420e8fe579c704176b1c90"
+    },
+    {
+      "path": "bin/libggml-cpu-icelake.so",
+      "size_bytes": 1630776,
+      "sha256": "5941c9cd741d73d6a647a8caef4cd752a84974940c44924a7d6e02717e49868d"
+    },
+    {
+      "path": "bin/libggml-cpu-ivybridge.so",
+      "size_bytes": 1399584,
+      "sha256": "be06029d69900e1fb953a289d708d2813a6670a7f77eebc2fec47cbba3285645"
+    },
+    {
+      "path": "bin/libggml-cpu-piledriver.so",
+      "size_bytes": 1391392,
+      "sha256": "7535d4257f111cc36370cf3659be1742e068d5c9ed8fa3ed41b99c8e8cd14d29"
+    },
+    {
+      "path": "bin/libggml-cpu-sandybridge.so",
+      "size_bytes": 1372936,
+      "sha256": "49eadd21cbd66165c095f173d86f1c1e92177183bdca1a632fab5e5a99fe7836"
+    },
+    {
+      "path": "bin/libggml-cpu-sapphirerapids.so",
+      "size_bytes": 1897184,
+      "sha256": "bbbc8de341945be8122e00c0d27506a06903c7911a0adadcb3ada036e1568c52"
+    },
+    {
+      "path": "bin/libggml-cpu-skylakex.so",
+      "size_bytes": 1618784,
+      "sha256": "6274ccfb2b75843e4d74de686558eb6a6aa44d724ba9416e3eaab98831a9f9e4"
+    },
+    {
+      "path": "bin/libggml-cpu-sse42.so",
+      "size_bytes": 980576,
+      "sha256": "57038b416ad5498b7f4939f043ea4955e272c7964c93268e1abe565bd293866e"
+    },
+    {
+      "path": "bin/libggml-cpu-x64.so",
+      "size_bytes": 976600,
+      "sha256": "bd3e87d7e5fef0a1c77280ba6264bc3a3292ce11967b398e30f899ede8c27ae4"
+    },
+    {
+      "path": "bin/libggml-cpu-zen4.so",
+      "size_bytes": 1630848,
+      "sha256": "d6bcea0850909481bc438ef9b3f4141b2980e15d1f71907f990600aa7041edf1"
+    },
+    {
+      "path": "bin/libggml.so",
+      "size_bytes": 51040,
+      "sha256": "649feab72b3e26baa55381c9a9231ad0f79882bce9213e48c8e1eed51f1aba7e"
+    },
+    {
+      "path": "bin/libggml.so.0",
+      "size_bytes": 51040,
+      "sha256": "649feab72b3e26baa55381c9a9231ad0f79882bce9213e48c8e1eed51f1aba7e"
+    },
+    {
+      "path": "bin/libggml.so.0.29.0",
+      "size_bytes": 51040,
+      "sha256": "649feab72b3e26baa55381c9a9231ad0f79882bce9213e48c8e1eed51f1aba7e"
+    },
+    {
+      "path": "bin/libllama-batched-bench-impl.so",
+      "size_bytes": 48904,
+      "sha256": "d97ce0d9ba48c4018080a21a24b5429044fe8b0fa2ea47a8a9f8bd2ba2608765"
+    },
+    {
+      "path": "bin/libllama-bench-impl.so",
+      "size_bytes": 490560,
+      "sha256": "07630b205115753cd5caad102314a3f38693da8d91586fa5958b4cd0b0ab7b35"
+    },
+    {
+      "path": "bin/libllama-cli-impl.so",
+      "size_bytes": 277032,
+      "sha256": "bf0ba08ae38c92cf82fe0e353d79c2c20d754a5b82f566473799d386140c7338"
+    },
+    {
+      "path": "bin/libllama-common.so",
+      "size_bytes": 6783104,
+      "sha256": "b6b9e7d035b4b5b0bac13557f069261c01a48e05ff1c3ad2fdeb33bb990345ce"
+    },
+    {
+      "path": "bin/libllama-common.so.0",
+      "size_bytes": 6783104,
+      "sha256": "b6b9e7d035b4b5b0bac13557f069261c01a48e05ff1c3ad2fdeb33bb990345ce"
+    },
+    {
+      "path": "bin/libllama-common.so.0.9.0",
+      "size_bytes": 6783104,
+      "sha256": "b6b9e7d035b4b5b0bac13557f069261c01a48e05ff1c3ad2fdeb33bb990345ce"
+    },
+    {
+      "path": "bin/libllama-completion-impl.so",
+      "size_bytes": 144864,
+      "sha256": "24919e39d421868ac8080277a5c604518e614544dce272428e93b74bb7b273fe"
+    },
+    {
+      "path": "bin/libllama-fit-params-impl.so",
+      "size_bytes": 39760,
+      "sha256": "e21853f79111c4ed082de1570e3966045feb83d62a1d5361e91a5a8dc102a2b8"
+    },
+    {
+      "path": "bin/libllama-perplexity-impl.so",
+      "size_bytes": 171912,
+      "sha256": "0128e4a7093870264fe6fa0a41ed05497cdb2abf8cdbf801e3038701deae35d1"
+    },
+    {
+      "path": "bin/libllama-quantize-impl.so",
+      "size_bytes": 81840,
+      "sha256": "79d821e4e88ebc408f52a1b3d7d13f44aeb6f71bba13574e7d395608b671775a"
+    },
+    {
+      "path": "bin/libllama-server-impl.so",
+      "size_bytes": 8296336,
+      "sha256": "33609ad98b9444b411625418dc47a6f46af096e0ee3f0e48e08a025d875a717d"
+    },
+    {
+      "path": "bin/libllama.so",
+      "size_bytes": 5491600,
+      "sha256": "dd793c10fc7e03ca2d4f6dd2abfefd6180422db7ff95c76477525ff03de04300"
+    },
+    {
+      "path": "bin/libllama.so.0",
+      "size_bytes": 5491600,
+      "sha256": "dd793c10fc7e03ca2d4f6dd2abfefd6180422db7ff95c76477525ff03de04300"
+    },
+    {
+      "path": "bin/libllama.so.0.9.0",
+      "size_bytes": 5491600,
+      "sha256": "dd793c10fc7e03ca2d4f6dd2abfefd6180422db7ff95c76477525ff03de04300"
+    },
+    {
+      "path": "bin/libmtmd.so",
+      "size_bytes": 2314600,
+      "sha256": "0eda247768c0da59bd0a8c1d961a3cb6a0a965cf7b58cc670ef068f4001cdaa4"
+    },
+    {
+      "path": "bin/libmtmd.so.0",
+      "size_bytes": 2314600,
+      "sha256": "0eda247768c0da59bd0a8c1d961a3cb6a0a965cf7b58cc670ef068f4001cdaa4"
+    },
+    {
+      "path": "bin/libmtmd.so.0.9.0",
+      "size_bytes": 2314600,
+      "sha256": "0eda247768c0da59bd0a8c1d961a3cb6a0a965cf7b58cc670ef068f4001cdaa4"
+    },
+    {
+      "path": "bin/llama",
+      "size_bytes": 62376,
+      "sha256": "5e541f9a66089fe7bd09b272880bf390b38e68dda84e10fecf47ab488703594c"
+    },
+    {
+      "path": "bin/llama-batched-bench",
+      "size_bytes": 15976,
+      "sha256": "3b70e62c5c5cf43c8c436622a845ad4b80c01837d6ba3a10c90e39b219bbd2ab"
+    },
+    {
+      "path": "bin/llama-bench",
+      "size_bytes": 17864,
+      "sha256": "1f896606bd2fa118e835cd602b04b85bf7701415745b26ab10cc0eb78f3e278c"
+    },
+    {
+      "path": "bin/llama-cli",
+      "size_bytes": 1511440,
+      "sha256": "78754ae2b70e3f32a69bb7250d4833b4bfc3a195648d12c4d944ff5f77eb6924"
+    },
+    {
+      "path": "bin/llama-completion",
+      "size_bytes": 15968,
+      "sha256": "7119bef261611b26f326f7c4da4dc3fdeb7bb28e2faf1ec392bda7b21215ef52"
+    },
+    {
+      "path": "bin/llama-fit-params",
+      "size_bytes": 15968,
+      "sha256": "b2ad073a0c093706e5dfdfe2c9864d199ed921e49ea0383a7d0013e2ad8a81c8"
+    },
+    {
+      "path": "bin/llama-gguf-split",
+      "size_bytes": 48264,
+      "sha256": "ae1dd48eed01bad097539d79c618f70296a94c6c070e61e7844f249ce6adb703"
+    },
+    {
+      "path": "bin/llama-imatrix",
+      "size_bytes": 221240,
+      "sha256": "b93606c7a9c44f7a2cd050ab6f465da304224dbddfc07fd29b746d61886c540f"
+    },
+    {
+      "path": "bin/llama-mtmd-cli",
+      "size_bytes": 101376,
+      "sha256": "fef86caac3f7c0aa704e52eb47a1317ad6ae4d7848ce12283ae4d9ca93c509e7"
+    },
+    {
+      "path": "bin/llama-perplexity",
+      "size_bytes": 15968,
+      "sha256": "1c06240ed8594fd377d655aef2dab0865431e3e779c06638474c96b38e6d74a0"
+    },
+    {
+      "path": "bin/llama-quantize",
+      "size_bytes": 17864,
+      "sha256": "676af1426b5d254a8f8a97a2cacb62651a98e38d20c984cb9aaa028ee7263803"
+    },
+    {
+      "path": "bin/llama-results",
+      "size_bytes": 50264,
+      "sha256": "faa5afe312d616f2d471e83cbcd3fd13dce76839b24a5761e65955468f7dd7b9"
+    },
+    {
+      "path": "bin/llama-server",
+      "size_bytes": 17864,
+      "sha256": "8b909c53d3a678f4a2b41a03e04a43125c1133bfea3a257dc515658f23bf2ec9"
+    },
+    {
+      "path": "bin/llama-tokenize",
+      "size_bytes": 45168,
+      "sha256": "7c3f70571062369fc096448742930ac934a7693473826fc7131186368946806e"
+    },
+    {
+      "path": "bin/llama-tts",
+      "size_bytes": 49928,
+      "sha256": "b8cecb8b65c8816bcd99b40c35296a9a5d489967507de8a21258533239b42b78"
+    },
+    {
+      "path": "bin/pkgconfig/llama.pc",
+      "size_bytes": 279,
+      "sha256": "cd30449b09bf664decfaa12b43fb87564d752f20a1fc2730ae839154d83314e2"
+    }
+  ],
+  "runtime_dependencies": {
+    "bin/llama-server": [
+      "libllama-server-impl.so => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-server-impl.so (0x00007f48fbc00000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f48fb800000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f48fc42d000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f48fb400000)",
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007f48fae00000)",
+      "libmtmd.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libmtmd.so.0 (0x00007f48faa00000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f48fa400000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f48fc41f000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f48fc34c000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f48fbb5b000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f48f9e00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f48fba74000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f48fb7b6000)"
+    ],
+    "bin/libggml-base.so": [
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007ff3a6554000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007ff3a6200000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007ff3a646d000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007ff3a644d000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007ff3a5e00000)"
+    ],
+    "bin/libggml-base.so.0": [
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f660b66e000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f660b400000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f660b319000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f660b64e000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f660b000000)"
+    ],
+    "bin/libggml-base.so.0.29.0": [
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fde413dd000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fde41000000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fde412f6000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fde412d6000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fde40c00000)"
+    ],
+    "bin/libggml-cpu-alderlake.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fcc169ff000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fcc169a9000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fcc16600000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fcc168c2000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fcc168a2000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fcc16200000)"
+    ],
+    "bin/libggml-cpu-cannonlake.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f39fb5d8000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f39fb582000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f39fb200000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f39fb49b000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f39fb47b000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f39fae00000)"
+    ],
+    "bin/libggml-cpu-cascadelake.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f0411b63000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f0411b0d000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f0411800000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f0411719000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f0411aed000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f0411400000)"
+    ],
+    "bin/libggml-cpu-cooperlake.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f1370b8a000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f1370b34000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f1370800000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f1370a4d000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f1370a2d000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f1370400000)"
+    ],
+    "bin/libggml-cpu-haswell.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fc264796000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fc264740000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fc264400000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fc264659000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fc264639000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fc264000000)"
+    ],
+    "bin/libggml-cpu-icelake.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fa30616a000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fa306114000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fa305e00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fa30602d000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fa305de0000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fa305a00000)"
+    ],
+    "bin/libggml-cpu-ivybridge.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fcd0b11a000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fcd0b0c4000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fcd0ae00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fcd0ad19000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fcd0b0a4000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fcd0aa00000)"
+    ],
+    "bin/libggml-cpu-piledriver.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f5339bc4000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f5339b6e000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f5339800000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f5339a87000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f5339a67000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f5339400000)"
+    ],
+    "bin/libggml-cpu-sandybridge.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f1800017000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f17fffc1000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f17ffc00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f17ffeda000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f17ffeba000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f17ff800000)"
+    ],
+    "bin/libggml-cpu-sapphirerapids.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fa4fab2b000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fa4faad5000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fa4fa400000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fa4fa719000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fa4faab5000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fa4fa000000)"
+    ],
+    "bin/libggml-cpu-skylakex.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f93be875000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f93be81f000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f93be400000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f93be738000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f93be718000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f93be000000)"
+    ],
+    "bin/libggml-cpu-sse42.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fc3761f8000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fc3761a2000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fc375e00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fc3760bb000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fc37609b000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fc375a00000)"
+    ],
+    "bin/libggml-cpu-x64.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f2ef2fb9000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f2ef2f63000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f2ef2c00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f2ef2e7c000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f2ef2e5c000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f2ef2800000)"
+    ],
+    "bin/libggml-cpu-zen4.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fd2b6b9b000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fd2b6b45000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fd2b6800000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fd2b6a5e000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fd2b6a3e000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fd2b6400000)"
+    ],
+    "bin/libggml.so": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f8ce4309000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f8ce4000000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f8ce42dd000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f8ce3c00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f8ce4293000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f8ce3f19000)"
+    ],
+    "bin/libggml.so.0": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f301c633000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f301c200000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f301c607000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f301be00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f301c5bd000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f301c4d4000)"
+    ],
+    "bin/libggml.so.0.29.0": [
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f5b83332000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f5b83000000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f5b83306000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f5b82c00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f5b832bc000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f5b82f19000)"
+    ],
+    "bin/libllama-batched-bench-impl.so": [
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007f5209200000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f5208c00000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f520979f000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f5208800000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f5209771000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f5208400000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f520915b000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f5207e00000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f5209765000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f5208b19000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f5209111000)"
+    ],
+    "bin/libllama-bench-impl.so": [
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007f942d600000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f942d000000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f942dbd3000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f942d52d000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f942cc00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f942cf19000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f942dba5000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f942c800000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f942d488000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f942c200000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f942db59000)"
+    ],
+    "bin/libllama-cli-impl.so": [
+      "libllama-server-impl.so => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-server-impl.so (0x00007fd372400000)",
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007fd371e00000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007fd371800000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fd371400000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fd372ccd000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fd371000000)",
+      "libmtmd.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libmtmd.so.0 (0x00007fd370c00000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007fd372cc1000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fd372bee000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007fd372b49000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007fd370600000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fd371d19000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fd3723b6000)"
+    ],
+    "bin/libllama-common.so": [
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f0fa5c00000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f0fa6795000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f0fa5600000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f0fa6789000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f0fa612d000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f0fa5200000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f0fa5b19000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f0fa6767000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f0fa4e00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f0fa60e3000)"
+    ],
+    "bin/libllama-common.so.0": [
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f7f30a00000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f7f30f5b000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f7f30400000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f7f31554000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f7f30e88000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f7f30000000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f7f30919000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f7f308f9000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f7f2fc00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f7f308af000)"
+    ],
+    "bin/libllama-common.so.0.9.0": [
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007fd5a8600000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007fd5a8b5b000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007fd5a8000000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007fd5a9163000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fd5a8a88000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fd5a7c00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fd5a8519000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fd5a84f9000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fd5a7800000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fd5a84af000)"
+    ],
+    "bin/libllama-completion-impl.so": [
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007f4101a00000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f4101400000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f4101fd1000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f4101000000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f4101fa3000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f4100c00000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f410195b000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f4100600000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f4101f97000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f4101319000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f4101f4b000)"
+    ],
+    "bin/libllama-fit-params-impl.so": [
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007f67d4400000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f67d3e00000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f67d4a3f000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f67d3a00000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f67d4a11000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f67d3600000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f67d496c000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f67d3000000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f67d4960000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f67d4319000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f67d42cf000)"
+    ],
+    "bin/libllama-perplexity-impl.so": [
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007f4e2b600000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f4e2b000000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f4e2b52d000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f4e2ac00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f4e2af19000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f4e2bba6000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f4e2a800000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f4e2b488000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f4e2a200000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f4e2bb9a000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f4e2bb4e000)"
+    ],
+    "bin/libllama-quantize-impl.so": [
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007f432ce00000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f432c800000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f432d3f7000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f432c400000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f432d3c9000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f432c000000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f432cd5b000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f432ba00000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f432d3bd000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f432c719000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f432d371000)"
+    ],
+    "bin/libllama-server-impl.so": [
+      "libllama-common.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama-common.so.0 (0x00007f02cf200000)",
+      "libmtmd.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libmtmd.so.0 (0x00007f02cee00000)",
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f02ce800000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f02d00f6000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f02d0021000)",
+      "libssl.so.3 => /lib/x86_64-linux-gnu/libssl.so.3 (0x00007f02cff70000)",
+      "libcrypto.so.3 => /lib/x86_64-linux-gnu/libcrypto.so.3 (0x00007f02ce200000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f02cde00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f02cf119000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f02cff50000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f02cda00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f02cf7b6000)"
+    ],
+    "bin/libllama.so": [
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f078741e000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f078734b000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f0786a00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f0786d19000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f078731f000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f0786600000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f07872d3000)"
+    ],
+    "bin/libllama.so.0": [
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f25f3a01000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f25f392e000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f25f3000000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f25f3319000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f25f3902000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f25f2c00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f25f38b6000)"
+    ],
+    "bin/libllama.so.0.9.0": [
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007fb1f97b1000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fb1f96de000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fb1f8e00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fb1f9119000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fb1f96b2000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fb1f8a00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fb1f90cf000)"
+    ],
+    "bin/libmtmd.so": [
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007fe01ba00000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007fe01c38a000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fe01c2b7000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fe01b600000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fe01bf19000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fe01c289000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fe01b200000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fe01c23f000)"
+    ],
+    "bin/libmtmd.so.0": [
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007fa4d6200000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007fa4d6b84000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007fa4d6ab1000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007fa4d5e00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007fa4d6719000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007fa4d6a83000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007fa4d5a00000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007fa4d6a39000)"
+    ],
+    "bin/libmtmd.so.0.9.0": [
+      "libllama.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libllama.so.0 (0x00007f9a3ce00000)",
+      "libggml.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml.so.0 (0x00007f9a3d687000)",
+      "libggml-base.so.0 => /home/runner/work/OhMyFreeAI/OhMyFreeAI/stage/llama-engine/bin/libggml-base.so.0 (0x00007f9a3d32d000)",
+      "libstdc++.so.6 => /lib/x86_64-linux-gnu/libstdc++.so.6 (0x00007f9a3ca00000)",
+      "libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6 (0x00007f9a3cd19000)",
+      "libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1 (0x00007f9a3d659000)",
+      "libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6 (0x00007f9a3c600000)",
+      "libgomp.so.1 => /lib/x86_64-linux-gnu/libgomp.so.1 (0x00007f9a3d60f000)"
+    ]
+  },
+  "validation_policy": {
+    "binary_version": "required",
+    "all_bundled_shared_objects": "ldd checked before publication",
+    "real_inference": "required before runtime adoption",
+    "cuda_inference": "must be tested on an actual compatible Colab GPU"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "format": "tar+zstd",
+  "source_directory": "llama-engine",
+  "source_tree_sha256": "38b37b59bcebf196f7a018b223e55ae0e49bc8aeb99b7a0a15548317e379e026",
+  "selection_rule": "smallest archive within 15% of fastest measured extraction",
+  "max_size_mib": 90.0,
+  "selected_level": 15,
+  "selected_archive": "llama-engine.tar.zst",
+  "selected_archive_bytes": 13351100,
+  "selected_archive_sha256": "601ad9198ebb57a6556954f89f52280f5e4dc471adfc02a0fda5a8e7a815f924",
+  "benchmarks": [
+    {
+      "level": 3,
+      "archive_bytes": 16236886,
+      "compression_seconds": 0.1322,
+      "extraction_seconds": 0.0706,
+      "sha256": "8cf29066510b482ccb0c049f70f8b16b204e2bf1dad3f8cf059ac76a8d23f8d1"
+    },
+    {
+      "level": 6,
+      "archive_bytes": 15300357,
+      "compression_seconds": 0.3081,
+      "extraction_seconds": 0.0634,
+      "sha256": "c4458718109f9f00e17bcc0b9e2d1a945ed8c9014f98bb3763c1170b1a1840e5"
+    },
+    {
+      "level": 9,
+      "archive_bytes": 13596082,
+      "compression_seconds": 0.4648,
+      "extraction_seconds": 0.0634,
+      "sha256": "14bb1794e63bf68b17e8cec362e3af0d87f088981f0dfe0d409b0f9a5bf92eb4"
+    },
+    {
+      "level": 15,
+      "archive_bytes": 13351100,
+      "compression_seconds": 2.776,
+      "extraction_seconds": 0.0677,
+      "sha256": "601ad9198ebb57a6556954f89f52280f5e4dc471adfc02a0fda5a8e7a815f924"
+    },
+    {
+      "level": 19,
+      "archive_bytes": 11311074,
+      "compression_seconds": 9.8505,
+      "extraction_seconds": 0.0761,
+      "sha256": "69926a6db1659fe4d09e0d914fbdd09de2ae12bdf2d6e271f3d5edc4157e5bf4"
+    }
+  ]
+}
