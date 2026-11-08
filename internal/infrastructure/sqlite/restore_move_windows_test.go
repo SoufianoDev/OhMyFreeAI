@@ -164,3 +164,82 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 		}
 	}
 }
+
+
+func TestOpenRestoreSourceRelativeUsesPinnedDirectoryHandle(t *testing.T) {
+	root := t.TempDir()
+	directory := filepath.Join(root, "state")
+	movedDirectory := filepath.Join(root, "state-moved")
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(directory, "candidate.db")
+	if err := os.WriteFile(source, []byte("original candidate"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	directoryHandle, err := windows.CreateFile(
+		windows.StringToUTF16Ptr(directory),
+		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		if directoryHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(directoryHandle)
+		}
+	}()
+
+	if err := os.Rename(directory, movedDirectory); err != nil {
+		t.Fatalf("move opened directory path aside: %v", err)
+	}
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(directory, "candidate.db"), []byte("replacement at old directory path"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	sourceHandle, err := openRestoreSourceRelative(directoryHandle, "candidate.db")
+	if err != nil {
+		t.Fatalf("open source relative to pinned directory handle: %v", err)
+	}
+	defer func() {
+		if sourceHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(sourceHandle)
+		}
+	}()
+
+	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, "published.db"); err != nil {
+		t.Fatalf("rename opened source handle: %v", err)
+	}
+	if err := windows.CloseHandle(sourceHandle); err != nil {
+		t.Fatal(err)
+	}
+	sourceHandle = windows.InvalidHandle
+	if err := windows.CloseHandle(directoryHandle); err != nil {
+		t.Fatal(err)
+	}
+	directoryHandle = windows.InvalidHandle
+
+	got, err := os.ReadFile(filepath.Join(movedDirectory, "published.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "original candidate" {
+		t.Fatalf("published content = %q, want original candidate", got)
+	}
+	got, err = os.ReadFile(filepath.Join(directory, "candidate.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "replacement at old directory path" {
+		t.Fatalf("replacement content = %q, want replacement at old directory path", got)
+	}
+}
