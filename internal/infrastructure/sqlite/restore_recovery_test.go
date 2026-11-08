@@ -141,6 +141,24 @@ func TestPlanRestoreRecoveryFailsClosedOnAmbiguousStates(t *testing.T) {
 			files: RestoreRecoveryFiles{},
 		},
 		{
+			name: "unsupported journal version",
+			journal: func() RestoreJournal {
+				j := recoveryTestJournal(RestorePhasePrepared, false)
+				j.Version++
+				return j
+			}(),
+			files: RestoreRecoveryFiles{},
+		},
+		{
+			name: "empty target path",
+			journal: func() RestoreJournal {
+				j := recoveryTestJournal(RestorePhasePrepared, false)
+				j.TargetPath = ""
+				return j
+			}(),
+			files: RestoreRecoveryFiles{},
+		},
+		{
 			name: "missing prior database metadata",
 			journal: func() RestoreJournal {
 				j := recoveryTestJournal(RestorePhasePrepared, false)
