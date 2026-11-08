@@ -1068,3 +1068,10 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - No filesystem executor, startup recovery, Restore UI/CLI route, ACL evaluator, or permission repair was enabled.
 - ACL policy remains unapproved.
 - Backup export and archive inspection remain available.
+
+
+## Follow-up: remove final legacy Restore expectation — 2026-11-08T23:50Z
+
+- Root CI run `42536767313` on `d2db9c7` found one remaining test outside the earlier removed block: `TestRestoreDatabasePreservesExistingTargetDirectoryPermissions` at the end of `store_test.go`. It still invoked the disabled API and expected a successful restore.
+- Removed that obsolete test in `f68cc09fad0426dc3f18844d26558fb142a05c12`. Its behavior was part of the old direct restore implementation and is not a valid expectation while Restore is fail-closed.
+- Latest CI for `f68cc09`: Root CI `42536872136` queued; SQLite driver matrix `42536872085` in progress/queued; Wails `42536872092` queued; Linux distribution matrix `42536872064` in progress/queued. No pass is claimed yet.
