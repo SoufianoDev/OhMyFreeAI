@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-GUI and CLI backup export/inspect are implemented. StoreController is now wired into Wails configuration, Wails backup export, and CLI backup export. Finish its failure/drain/race tests and obtain green root CI; then add the durable restore journal and rollback. Keep Colab remote inference policy-gated.
+GUI and CLI backup export/inspect are implemented. StoreController is wired into Wails configuration and GUI/CLI backup export. The durable journal primitive is implemented (schema v2 with explicit prior-database existence), and a pure, fail-closed recovery planner has tests. First obtain fresh green CI for the Windows path-normalization and Linux Xvfb-display fixes plus the planner; then build the filesystem recovery executor and crash-injection suite. Keep Restore disabled and Colab remote inference policy-gated.
 
 ## Current Phase
 
@@ -69,7 +69,11 @@ Phase 4
 - [x] Add CLI backup export/inspect commands using the shared archive manager and existing-only SQLite open
 - [x] Specify crash-safe restore lifecycle, durable journal, startup recovery and failure-injection requirements in RESTORE_LIFECYCLE.md
 - [ ] Implement coordinated Store lifecycle, journal and rollback before enabling restore\n  - [ ] Complete StoreController TDD and green Ubuntu/Windows root CI\n  - [x] Route Wails configuration and backup export through controller leases; remove long-lived raw Store references\n  - [x] Route CLI backup export through controller leases\n  - [x] Add StoreController shutdown drain and closed-controller rejection tests\n  - [x] Publish a verified rollback Store after failed exclusive replacement, or fail closed\n  - [ ] Add concurrent config/backup drain tests that hold leases through complete operations\n  - [x] Add concurrent StoreController lease stress test and canceled-shutdown regression test
-  - [ ] Run Go race detector and add failure-injection coverage\n  - [ ] Implement durable restore journal, staged publication and startup crash recovery
+  - [ ] Run Go race detector and add failure-injection coverage\n  - [x] Add durable restore journal storage primitive with bounded strict decoding, path confinement and atomic persistence (CI still pending on latest schema)
+  - [x] Record whether a previous database existed as required version-2 journal metadata
+  - [x] Add a pure phase/file-state recovery planner and fail-closed ambiguity tests (CI still pending)
+  - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
+  - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
 - [x] Revalidate the refactored two-stage bridge bootstrap on native Ubuntu; run 42405729902 passed with two GetSnapshot calls per launch and DB reopen
 - [x] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs (run 42405827037)
@@ -81,6 +85,8 @@ Phase 4
 - [x] Verify the built native executable handles `--help`, `--version`, `doctor`, unknown commands and read-only doctor behavior on Ubuntu 24.04 and Windows (Wails run 42409974970)
 - [x] Verify native CLI smoke on all eight Linux distro lanes (run 42410214638)
 - [ ] Add abrupt-process crash/reopen recovery tests
+- [x] Diagnose Windows 8.3/long-path mismatch in journal round-trip and normalize canonical paths
+- [x] Replace fixed Xvfb display :97 with dynamically allocated display numbers in the Linux WebView smoke helper
 - [ ] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
 
