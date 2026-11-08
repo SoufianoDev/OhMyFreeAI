@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-GUI and CLI backup export/inspect are implemented. StoreController is wired into Wails configuration and GUI/CLI backup export. The durable journal primitive is currently schema v2 and the pure recovery planner is conservative but not crash-complete. The next implementation gate is a strict v3 journal with durable intent phases, candidate quarantine path, paired candidate/previous database content identities, and planner identity inputs. Then add atomic Linux/Windows no-replace moves and process-death executor tests. Keep Restore disabled and Colab remote inference policy-gated.
+GUI and CLI backup export/inspect are implemented. StoreController is wired into Wails configuration and GUI/CLI backup export. The durable journal primitive is currently schema v2 and the pure recovery planner is conservative but not crash-complete. The current gate is the collision-safe Restore recovery executor: add move-by-move truth tables for the three intent phases, atomic Linux/Windows no-replace moves, and process-death tests. Keep Restore disabled and Colab remote inference policy-gated. Hush and Deslop code-hygiene policies are now installed and mandatory for code changes.
 
 ## Current Phase
 
@@ -54,6 +54,7 @@ Phase 4
 ### Phase 4: Testing & Verification
 
 - [x] Run repository Go vet/tests/build, Python tests, frontend syntax and architecture checks on Ubuntu and Windows via GitHub Actions
+- [x] Vendor Hush and Deslop Code hygiene skills and make their scoped cleanup rules mandatory in AGENTS.md and Planning with Files
 - [x] Evaluate modernc and ncruces on Ubuntu and Windows, including the production initial migration SQL
 - [x] Test the production SQLite adapter, migration rollback/idempotence, version-gap and corrupt-history rejection, config round-trip, file permissions and per-connection PRAGMAs on Ubuntu and Windows
 - [x] Build the complete Wails application on Ubuntu and Windows; generate 1 service, 2 methods and 7 models, produce the Vite production bundle and verify the native executable
