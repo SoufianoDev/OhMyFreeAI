@@ -16,6 +16,7 @@ const (
 	RestoreRecoveryPreserveForManualReview RestoreRecoveryAction = "preserve-for-manual-review"
 	RestoreRecoveryVerifyCommitted RestoreRecoveryAction = "verify-committed"
 	RestoreRecoveryVerifyRolledBack RestoreRecoveryAction = "verify-rolled-back"
+	RestoreRecoveryResumeIntent RestoreRecoveryAction = "resume-intent"
 )
 
 type RestoreFileIdentity string
@@ -44,6 +45,8 @@ type RestoreRecoveryPlan struct {
 	Action RestoreRecoveryAction
 	RemoveStaging bool
 	PreserveStaging bool
+	PreservePrevious bool
+	PublishCandidate bool
 	PreserveTarget bool
 	RestoreRollback bool
 	VerifyTarget bool
@@ -189,6 +192,70 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 			Action: RestoreRecoveryPreserveForManualReview,
 			Reason: "no previous database existed; preserve the verified candidate and require manual review",
 		}, nil
+
+	case RestorePhasePreservingPrevious:
+		if !hadPrevious || files.Quarantine != RestoreFileMissing ||
+			files.Staging != RestoreFileMissing && files.Staging != RestoreFileCandidate {
+			return ambiguous("preserving-previous requires a prior database, an untouched quarantine path, and no unverified staging artifact")
+		}
+		switch {
+		case files.Target == RestoreFilePrevious && files.Rollback == RestoreFileMissing:
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryResumeIntent,
+				PreservePrevious: true,
+				Reason: "the previous database is still at target; preserve it at the recorded rollback path",
+			}, nil
+		case files.Target == RestoreFileMissing && files.Rollback == RestoreFilePrevious:
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryResumeIntent,
+				Reason: "the previous database is already preserved at rollback; complete the intent transition",
+			}, nil
+		default:
+			return ambiguous("preserving-previous requires the previous database at exactly one of target or rollback")
+		}
+
+	case RestorePhasePublishing:
+		wantRollback := RestoreFileMissing
+		if hadPrevious {
+			wantRollback = RestoreFilePrevious
+		}
+		if files.Rollback != wantRollback || files.Quarantine != RestoreFileMissing ||
+			!((files.Target == RestoreFileMissing && files.Staging == RestoreFileCandidate) ||
+				(files.Target == RestoreFileCandidate && files.Staging == RestoreFileMissing)) {
+			return ambiguous("publishing requires the candidate at exactly one of staging or target and the expected rollback state")
+		}
+		return RestoreRecoveryPlan{
+			Action: RestoreRecoveryResumeIntent,
+			PublishCandidate: files.Staging == RestoreFileCandidate,
+			Reason: "publish the verified staged candidate if the no-replace move has not completed",
+		}, nil
+
+	case RestorePhaseRestoringPrevious:
+		if !hadPrevious || files.Staging != RestoreFileMissing {
+			return ambiguous("restoring-previous requires an existing previous database and no staging artifact")
+		}
+		switch {
+		case files.Target == RestoreFileCandidate && files.Rollback == RestoreFilePrevious && files.Quarantine == RestoreFileMissing:
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryResumeIntent,
+				PreserveTarget: true,
+				RestoreRollback: true,
+				Reason: "quarantine the verified candidate, then restore the verified previous database",
+			}, nil
+		case files.Target == RestoreFileMissing && files.Rollback == RestoreFilePrevious && files.Quarantine == RestoreFileCandidate:
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryResumeIntent,
+				RestoreRollback: true,
+				Reason: "candidate is already quarantined; restore the verified previous database",
+			}, nil
+		case files.Target == RestoreFilePrevious && files.Rollback == RestoreFileMissing && files.Quarantine == RestoreFileCandidate:
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryResumeIntent,
+				Reason: "previous database is already restored; complete the rollback intent transition",
+			}, nil
+		default:
+			return ambiguous("restoring-previous requires one verified candidate at target or quarantine and one verified previous database at rollback or target")
+		}
 
 	case RestorePhaseCommitted:
 		wantRollback := RestoreFileMissing
