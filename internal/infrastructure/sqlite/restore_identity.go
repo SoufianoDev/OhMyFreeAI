@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"runtime"
+	"strings"
 )
 
 var ErrRestoreArtifactInvalid = errors.New("SQLite restore artifact is not a safely inspectable regular file")
@@ -65,20 +67,55 @@ func restoreArtifactRelativePath(stateDirectory, path string) (string, string, e
 	}
 	absolute = filepath.Clean(absolute)
 
-	// Resolve only the parent directory. This normalizes Windows path casing
-	// (and equivalent directory aliases) to the same spelling used by
-	// canonicalStateDirectory, while deliberately leaving the final leaf
-	// unresolved so a symlink/reparse-point leaf is still rejected by the
-	// platform-specific, handle-based open.
-	parent, err := filepath.EvalSymlinks(filepath.Dir(absolute))
-	if err != nil {
-		return "", "", fmt.Errorf("%w: resolve restore artifact parent: %v", ErrRestoreArtifactInvalid, err)
+	var relative string
+	if runtime.GOOS == "windows" {
+		var ok bool
+		relative, ok = windowsRestoreArtifactRelativePath(root, absolute)
+		if !ok {
+			return "", "", fmt.Errorf("%w: artifact path is outside the application state directory", ErrRestoreArtifactInvalid)
+		}
+	} else {
+		relative, err = filepath.Rel(root, absolute)
+		if err != nil || relative == "." || !filepath.IsLocal(relative) {
+			return "", "", fmt.Errorf("%w: artifact path is outside the application state directory", ErrRestoreArtifactInvalid)
+		}
 	}
-	candidate := filepath.Join(parent, filepath.Base(absolute))
-
-	relative, err := filepath.Rel(root, candidate)
-	if err != nil || relative == "." || !filepath.IsLocal(relative) {
+	if relative == "." || !filepath.IsLocal(relative) {
 		return "", "", fmt.Errorf("%w: artifact path is outside the application state directory", ErrRestoreArtifactInvalid)
 	}
 	return root, relative, nil
+}
+
+// Windows paths are case-insensitive. filepath.Rel performs a lexical
+// comparison, so compare path components with EqualFold while preserving the
+// caller's spelling in the relative path. Do not EvalSymlinks on the artifact
+// parent: the platform opener must reject every reparse/symlink component
+// relative to the pinned state-directory handle.
+func windowsRestoreArtifactRelativePath(root, candidate string) (string, bool) {
+	root = filepath.Clean(root)
+	candidate = filepath.Clean(candidate)
+
+	rootVolume := filepath.VolumeName(root)
+	candidateVolume := filepath.VolumeName(candidate)
+	if !strings.EqualFold(rootVolume, candidateVolume) {
+		return "", false
+	}
+
+	rootComponents := windowsRestorePathComponents(strings.TrimPrefix(root, rootVolume))
+	candidateComponents := windowsRestorePathComponents(strings.TrimPrefix(candidate, candidateVolume))
+	if len(candidateComponents) <= len(rootComponents) {
+		return "", false
+	}
+	for i, component := range rootComponents {
+		if !strings.EqualFold(component, candidateComponents[i]) {
+			return "", false
+		}
+	}
+	return filepath.Join(candidateComponents[len(rootComponents):]...), true
+}
+
+func windowsRestorePathComponents(path string) []string {
+	return strings.FieldsFunc(path, func(r rune) bool {
+		return r == '\\' || r == '/'
+	})
 }
