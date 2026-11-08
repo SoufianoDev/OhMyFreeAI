@@ -63,7 +63,20 @@ func restoreArtifactRelativePath(stateDirectory, path string) (string, string, e
 	if err != nil {
 		return "", "", fmt.Errorf("resolve SQLite restore artifact path: %w", err)
 	}
-	relative, err := filepath.Rel(root, filepath.Clean(absolute))
+	absolute = filepath.Clean(absolute)
+
+	// Resolve only the parent directory. This normalizes Windows path casing
+	// (and equivalent directory aliases) to the same spelling used by
+	// canonicalStateDirectory, while deliberately leaving the final leaf
+	// unresolved so a symlink/reparse-point leaf is still rejected by the
+	// platform-specific, handle-based open.
+	parent, err := filepath.EvalSymlinks(filepath.Dir(absolute))
+	if err != nil {
+		return "", "", fmt.Errorf("%w: resolve restore artifact parent: %v", ErrRestoreArtifactInvalid, err)
+	}
+	candidate := filepath.Join(parent, filepath.Base(absolute))
+
+	relative, err := filepath.Rel(root, candidate)
 	if err != nil || relative == "." || !filepath.IsLocal(relative) {
 		return "", "", fmt.Errorf("%w: artifact path is outside the application state directory", ErrRestoreArtifactInvalid)
 	}
