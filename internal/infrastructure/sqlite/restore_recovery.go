@@ -3,6 +3,7 @@ package sqlite
 import (
 	"errors"
 	"fmt"
+	"strings"
 )
 
 var ErrRestoreRecoveryAmbiguous = errors.New("SQLite restore recovery state is ambiguous")
@@ -41,6 +42,12 @@ type RestoreRecoveryPlan struct {
 func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (RestoreRecoveryPlan, error) {
 	ambiguous := func(reason string) (RestoreRecoveryPlan, error) {
 		return RestoreRecoveryPlan{}, fmt.Errorf("%w: %s", ErrRestoreRecoveryAmbiguous, reason)
+	}
+	if journal.Version != restoreJournalVersion || !validRestorePhase(journal.Phase) ||
+		strings.TrimSpace(journal.TransactionID) == "" ||
+		strings.TrimSpace(journal.TargetPath) == "" ||
+		strings.TrimSpace(journal.StagingPath) == "" {
+		return ambiguous("journal version, phase, transaction ID, or required path is invalid")
 	}
 	if journal.PreviousDatabaseExisted == nil {
 		return ambiguous("journal does not record whether a previous database existed")
