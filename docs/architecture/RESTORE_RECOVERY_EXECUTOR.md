@@ -281,18 +281,24 @@ This is API-surface verification and ABI design only. No Windows handle-bound re
 
 ## Windows handle-bound no-replace move implementation — 2026-11-08
 
-The Windows move primitive no longer calls MoveFileExW. It now uses SetFileInformationByHandle with the pinned x/sys v0.49.0 FileRenameInfoEx class (22).
+The first implementation attempt called Win32 SetFileInformationByHandle with FileRenameInfoEx class 22 and a non-null RootDirectory handle. The Windows Root CI run 42496232166 exposed a real incompatibility: all regular-move and collision tests returned ERROR_INVALID_PARAMETER. Ubuntu tests passed, but the Windows test suite did not.
 
-- Opens the source with DELETE and FILE_READ_ATTRIBUTES, using FILE_FLAG_OPEN_REPARSE_POINT so the final source reparse point can be inspected rather than followed.
+The correction uses the native NtSetInformationFile API with FileRenameInformationEx class 65. Microsoft's FILE_INFORMATION_CLASS documentation identifies class 65 as available starting with Windows 10 version 1709. The native API accepts the rooted relative destination semantics described by MS-FSCC; the Win32 SetFileInformationByHandle documentation lists FileRenameInfo (3), not the Ex class, in its supported-class table.
+
+The adapter now:
+- Opens the source with DELETE and FILE_READ_ATTRIBUTES plus FILE_FLAG_OPEN_REPARSE_POINT.
 - Opens and retains the destination directory with FILE_FLAG_BACKUP_SEMANTICS and FILE_FLAG_OPEN_REPARSE_POINT.
-- Inspects both opened handles. The source must not be a directory, reparse point, or device; the destination must be a non-reparse directory.
-- Builds the variable-length protocol buffer explicitly: zero flags (therefore no replacement), zero reserved field, 64-bit RootDirectory destination handle, UTF-16 leaf name, byte count excluding NUL, and at least 24 bytes total.
-- Calls SetFileInformationByHandle against the opened source handle. There is no MoveFileExW, os.Rename, copy/delete, or replacement-capable fallback.
+- Rejects a source directory, reparse point, or device, and rejects a destination handle that is not a non-reparse directory.
+- Builds the native FILE_RENAME_INFORMATION_EX payload with zero flags, zero reserved field, a 64-bit RootDirectory handle, UTF-16 leaf name, byte length excluding NUL, and the protocol minimum 24-byte size.
+- Calls NtSetInformationFile with class 65. Destination collision status STATUS_OBJECT_NAME_COLLISION maps to os.ErrExist.
+- Has no MoveFileExW, SetFileInformationByHandle, os.Rename, copy/delete, replacement, or legacy-class fallback.
 
-The new Windows tests cover a source-path substitution after the source handle is opened and a destination collision. The test-only commit b398c546a3737f689d0ce7be9204f20b97e4b627 produced observed RED in Root CI run 42496137044, Windows job 128778788124, where go vet reported the missing helper. Implementation commit is 18aa3a3455857d5a68cd80afeb92a674ca6d1eca; current CI runs are pending and must be checked before declaring GREEN.
+The source-handle substitution and destination-collision tests were added first in test-only commit b398c546a3737f689d0ce7be9204f20b97e4b627 and produced observed RED in Windows Root CI run 42496137044 / job 128778788124. The first implementation commit 18aa3a3455857d5a68cd80afeb92a674ca6d1eca failed Windows tests as described above. Corrected implementation commit is d6f6bb54c9f72cfcd118087e4468e7d425e83251.
+
+Current CI runs for the corrected implementation are Root CI 42496496153, Wails 42496496135, SQLite driver evaluation 42496496199, and Linux distribution matrix 42496496136. They were pending at the time this note was written.
 
 ### Explicit limitations
 
-The source path is still opened by pathname; intermediate parent components are not pinned using an NT-relative open. The future executor must enforce a private canonical state directory and revalidate file identity from the opened handle immediately before mutation. No actual-volume capability probe is implemented. Provider support is not generalized beyond the environment in which tests run. The primitive does not hash the opened file, sync namespace metadata, persist journal intent, reconcile ambiguous errors, or recover after process death.
+The source path is still opened by pathname; intermediate parent components are not pinned using an NT-relative open. The future executor must enforce a private canonical state directory and revalidate file identity from the opened handle immediately before mutation. Native class 65 is not treated as portable to every filesystem; no legacy fallback is allowed, so providers that reject it remain unsupported. The primitive does not hash the opened file, sync namespace metadata, persist journal intent, reconcile ambiguous errors, or recover after process death.
 
 Restore remains disabled.

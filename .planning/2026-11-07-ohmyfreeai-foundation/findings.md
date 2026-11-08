@@ -801,3 +801,14 @@ The cross-platform no-replace move tests were previously build-tagged Linux-only
 - The path-based source open still relies on the executor enforcing a private canonical state directory. Intermediate parent-component reparse traversal is not pinned using an NT-relative open.
 - No actual-volume capability probe or filesystem qualification policy exists yet. A passing hosted Windows test would only qualify the runner's tested environment, not all NTFS versions/providers and certainly not ReFS, SMB or removable media.
 - This primitive is not a recovery executor and does not persist journal intents, hash identity from the open handle, sync namespace metadata, reconcile ambiguous move errors, or recover after process death. Restore stays disabled.
+
+
+## Correction — Windows rooted rename requires the native NT API — 2026-11-08
+
+- The first handle-bound implementation used SetFileInformationByHandle(FileRenameInfoEx=22) with a non-null RootDirectory. Windows Root CI run 42496232166 passed Ubuntu but failed Windows: the regular move, collision and concurrent-collision tests all returned ERROR_INVALID_PARAMETER ("The parameter is incorrect").
+- This was not a buffer-size or compilation failure. Microsoft's Win32 SetFileInformationByHandle documentation's supported-class table lists FileRenameInfo (3), not FileRenameInfoEx. A source-handle rename using a rooted relative destination is supported at the native NtSetInformationFile layer.
+- Exa research verified Microsoft's FILE_INFORMATION_CLASS table: FileRenameInformationEx is native class 65, available starting with Windows 10 version 1709. Microsoft's NtSetInformationFile documentation describes the native operation and its information-class buffer. A practitioner source-code case also documents that passing non-null RootDirectory through SetFileInformationByHandle is rejected with ERROR_INVALID_PARAMETER.
+- Corrected the adapter to call x/sys/windows.NtSetInformationFile with native class 65, the existing source handle, retained destination directory handle, and the MS-FSCC 24-byte-minimum FILE_RENAME_INFORMATION_EX payload. No replacement flag is set. STATUS_OBJECT_NAME_COLLISION maps to os.ErrExist.
+- Corrected implementation commit: d6f6bb54c9f72cfcd118087e4468e7d425e83251.
+- Current validation runs for this corrected commit: Root CI 42496496153, Wails 42496496135, SQLite driver evaluation 42496496199, and Linux distro matrix 42496496136. They were pending at the time of this note; no GREEN claim.
+- No legacy FileRenameInformation fallback is added. NTFS is the initial target; filesystems that reject class 65 remain unsupported. The source path is still opened by pathname and parent-component reparse traversal is not pinned; the future executor must enforce a private canonical state directory. Restore remains disabled.
