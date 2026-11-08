@@ -28,12 +28,12 @@ on:
         type: string
         required: false
       backend:
-        description: "Initial CI target. CUDA is deliberately not built or certified here."
+        description: "CUDA engine target for the verified Colab Tesla T4 (compute capability 7.5)."
         type: choice
         required: true
-        default: cpu
+        default: cuda-t4-sm75
         options:
-          - cpu
+          - cuda-t4-sm75
 
 permissions:
   contents: write
@@ -79,6 +79,14 @@ jobs:
           fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends cmake ninja-build ccache zstd curl tar
+          curl --fail --location --retry 3 https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-keyring_1.1-1_all.deb -o /tmp/cuda-keyring.deb
+          sudo dpkg -i /tmp/cuda-keyring.deb
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cuda-toolkit-13-0
+          echo "/usr/local/cuda-13.0/bin" >> "$GITHUB_PATH"
+          echo "LD_LIBRARY_PATH=/usr/local/cuda-13.0/targets/x86_64-linux/lib:$LD_LIBRARY_PATH" >> "$GITHUB_ENV"
+          export PATH="/usr/local/cuda-13.0/bin:$PATH"
+          nvcc --version
           python3 -m py_compile scripts/engine/*.py
           mkdir -p stage/llama-engine/bin dist
 
@@ -159,7 +167,9 @@ jobs:
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             '-DCMAKE_INSTALL_RPATH=$ORIGIN' \
             -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
-            -DGGML_CUDA=OFF \
+            -DGGML_CUDA=ON \
+            -DCMAKE_CUDA_COMPILER=/usr/local/cuda-13.0/bin/nvcc \
+            -DCMAKE_CUDA_ARCHITECTURES=75 \
             -DLLAMA_BUILD_SERVER=ON \
             -DLLAMA_BUILD_TESTS=OFF \
             -DLLAMA_BUILD_EXAMPLES=OFF
@@ -173,6 +183,9 @@ jobs:
           fi
           cp -a /tmp/llama-install/bin/. stage/llama-engine/bin/
           cp /tmp/llama-src/LICENSE stage/llama-engine/LICENSE
+          python3 scripts/engine/bundle_cuda_runtime.py \
+            --root stage/llama-engine \
+            --cuda-lib-dir /usr/local/cuda-13.0/targets/x86_64-linux/lib
 
       - name: Generate provenance and validate engine
         shell: bash
@@ -180,7 +193,7 @@ jobs:
           SOURCE_MODE: ${{ inputs.source_mode || 'source-build' }}
           SOURCE_REF: ${{ inputs.source_ref || 'v0.9.0' }}
           ARTIFACT_URL: ${{ inputs.artifact_url }}
-          BACKEND: ${{ inputs.backend || 'cpu' }}
+          BACKEND: ${{ inputs.backend || 'cuda-t4-sm75' }}
         run: |
           set -euo pipefail
           python3 scripts/engine/generate_manifest.py \
@@ -189,9 +202,9 @@ jobs:
             --source-commit "$SOURCE_COMMIT" \
             --source-mode "$SOURCE_MODE" \
             --artifact-url "$ARTIFACT_URL" \
-            --build-flags "Release;LLAMA_BUILD_IS_DEV=OFF;GGML_NATIVE=OFF;BUILD_SHARED_LIBS=ON;GGML_BACKEND_DL=ON;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=OFF" \
+            --build-flags "Release;LLAMA_BUILD_IS_DEV=OFF;GGML_NATIVE=OFF;BUILD_SHARED_LIBS=ON;GGML_BACKEND_DL=ON;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=ON;CMAKE_CUDA_ARCHITECTURES=75;CUDA_TOOLKIT=13.0" \
             --backend "$BACKEND"
-          python3 scripts/engine/validate_engine.py --root stage/llama-engine --require-ldd-clean
+          python3 scripts/engine/validate_engine.py --root stage/llama-engine --require-ldd-clean --require-cuda
 
       - name: Benchmark Zstandard levels and verify lossless extraction
         shell: bash
@@ -206,7 +219,7 @@ jobs:
           mkdir -p /tmp/llama-final-check
           zstd -d -c dist/llama-engine.tar.zst | tar -xf - -C /tmp/llama-final-check --no-same-owner --no-same-permissions
           python3 scripts/engine/validate_engine.py \
-            --root /tmp/llama-final-check/llama-engine --require-ldd-clean
+            --root /tmp/llama-final-check/llama-engine --require-ldd-clean --require-cuda
           cp stage/llama-engine/manifest.json dist/manifest.json
           test "$(stat -c%s dist/llama-engine.tar.zst)" -le "$((90 * 1024 * 1024))"
 

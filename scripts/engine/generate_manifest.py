@@ -37,7 +37,8 @@ def main() -> None:
     parser.add_argument("--source-mode", choices=["official-asset", "source-build"], required=True)
     parser.add_argument("--artifact-url", default="")
     parser.add_argument("--build-flags", default="")
-    parser.add_argument("--backend", default="cpu")
+    parser.add_argument("--backend", default="cuda-t4-sm75")
+    parser.add_argument("--cuda-architectures", default="75")
     args = parser.parse_args()
 
     root = args.output.parent.resolve()
@@ -62,7 +63,8 @@ def main() -> None:
             result = subprocess.run([ldd, str(target)], cwd=root, text=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                     timeout=30)
-            if result.returncode != 0 or "not found" in result.stdout:
+            missing = [line for line in result.stdout.splitlines() if "not found" in line and "libcuda.so.1" not in line]
+            if result.returncode != 0 or missing:
                 raise RuntimeError(
                     f"Cannot record incomplete dependencies for {target.name}:\n{result.stdout}"
                 )
@@ -91,6 +93,11 @@ def main() -> None:
         "zstd": command_output(["zstd", "--version"]),
         "glibc": command_output(["ldd", "--version"]),
         "backend_requested": args.backend,
+        "cuda_target": {
+            "toolkit_version": "13.0" if args.backend.startswith("cuda") else None,
+            "architectures": args.cuda_architectures if args.backend.startswith("cuda") else None,
+            "runtime_policy": "CUDA toolkit shared libraries bundled; libcuda.so.1 supplied by host NVIDIA driver" if args.backend.startswith("cuda") else None,
+        },
         "build_flags": args.build_flags,
         "cuda": {
             "nvidia_smi": command_output(["nvidia-smi", "--query-gpu=name,driver_version",

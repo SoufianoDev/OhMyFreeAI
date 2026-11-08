@@ -15,10 +15,10 @@ The architecture foundation explicitly prefers compatible official prebuilt llam
 
 1. **Prefer upstream official prebuilt releases.** Pin the exact release tag and artifact filename. Do not follow `latest` or nightly releases automatically in production.
 2. **Use a reproducible build factory only for a demonstrated source-build requirement.** Build from a pinned upstream tag/commit using CMake + Ninja + ccache. Do not migrate llama.cpp to Meson.
-3. **Keep the first target narrow:** Linux x86_64, with CPU and CUDA variants only when the actual Colab runtime evidence justifies both. Do not assume a CUDA version, GPU model, or compute capability before collecting runtime data.
-4. **Build portable CPU variants with dynamic backend loading.** When `GGML_CPU_ALL_VARIANTS=ON` is selected, explicitly enable both `BUILD_SHARED_LIBS=ON` and `GGML_BACKEND_DL=ON`; package and dependency-check every generated backend shared object, not only `llama-server`.\n5. **Separate build and runtime responsibilities.** GitHub Actions builds and validates packages; Colab detects its environment, selects a compatible pinned package, verifies it, and reuses it from Google Drive.
+3. **Keep the first target narrow:** Linux x86_64 CUDA build for the verified Colab Tesla T4 (Compute Capability 7.5), using CUDA Toolkit 13.0 to match the observed Colab driver/runtime generation. The CUDA build also contains the CPU backend for fallback. Do not generalize this artifact to other GPUs without testing.
+4. **Build the T4 CUDA backend plus portable CPU variants with dynamic backend loading.** Explicitly enable `GGML_CUDA=ON`, `CMAKE_CUDA_ARCHITECTURES=75`, `BUILD_SHARED_LIBS=ON`, and `GGML_BACKEND_DL=ON`; package and dependency-check every generated backend shared object and required CUDA runtime libraries.\n5. **Separate build and runtime responsibilities.** GitHub Actions builds and validates packages; Colab detects its environment, selects a compatible pinned package, verifies it, and reuses it from Google Drive.
 6. **Record provenance.** Every package must have a manifest recording source tag/commit, build configuration, compiler/toolchain versions, target architecture, CUDA/toolkit details where applicable, required shared libraries, package filename, and SHA-256.
-7. **Validate before publication.** Check archive integrity, expected files, executable version output, dynamic dependencies, and backend/device visibility. A GitHub-hosted CPU runner cannot prove that CUDA inference works on Colab; CUDA runtime acceptance must run on an actual compatible Colab GPU.
+7. **Validate before publication.** Check archive integrity, expected files, executable version output, dynamic dependencies, and backend/device visibility. A GitHub-hosted runner cannot prove that CUDA inference works on Colab; CUDA runtime acceptance must run on the actual Colab T4.
 8. **Preserve rollback.** Keep the previous known-good engine bundle and do not replace it until the new package passes acceptance tests.
 9. **Do not change the proven Colab launcher/Gateway/OpenCode path in this workstream.** Runtime integration is a separate step after the engine package is verified.
 
@@ -48,7 +48,7 @@ Use the upstream-supported CMake project with Ninja as the generator and ccache 
 
 ## Failure policy
 
-- No guessed CUDA target or architecture list.
+- No guessed CUDA target or architecture list; the initial target is evidence-based `sm_75` for the observed T4.
 - No automatic nightly promotion.
 - No repeated full source rebuild on ordinary Colab startup.
 - No silent fallback from CUDA to CPU when CUDA was requested; report the incompatibility explicitly.

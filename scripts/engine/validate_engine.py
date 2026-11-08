@@ -15,6 +15,7 @@ def main() -> int:
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--server", default="bin/llama-server")
     parser.add_argument("--require-ldd-clean", action="store_true")
+    parser.add_argument("--require-cuda", action="store_true")
     args = parser.parse_args()
 
     root = args.root.resolve()
@@ -30,6 +31,10 @@ def main() -> int:
     )
     if version.returncode != 0:
         raise RuntimeError(f"llama-server --version failed:\n{version.stdout}")
+
+    cuda_plugins = sorted(root.glob("bin/libggml-cuda.so*"))
+    if args.require_cuda and not cuda_plugins:
+        raise RuntimeError("CUDA build required, but bin/libggml-cuda.so was not found.")
 
     # --list-devices intentionally lists accelerator devices only in llama.cpp
     # v0.9.0; a CPU-only build correctly prints "(none)". Do not use this
@@ -72,8 +77,9 @@ def main() -> int:
                 [ldd, str(target)], cwd=root, text=True,
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30,
             )
+            # libcuda.so.1 is provided by the Colab host NVIDIA driver.
             missing = [line.strip() for line in result.stdout.splitlines()
-                       if "not found" in line]
+                       if "not found" in line and "libcuda.so.1" not in line]
             item = {
                 "file": str(target.relative_to(root)),
                 "exit_code": result.returncode,
@@ -88,6 +94,8 @@ def main() -> int:
 
     report = {
         "status": "passed",
+        "cuda_backend_required": args.require_cuda,
+        "cuda_backend_plugins": [p.name for p in cuda_plugins],
         "server": str(server.relative_to(root)),
         "version_output": version.stdout.strip(),
         "device_enumeration_output": devices.stdout.strip(),
@@ -96,7 +104,7 @@ def main() -> int:
         "cpu_backend_validation": "portable x86-64 plugin presence checked; actual initialization requires model-backed smoke test",
         "dependency_targets_checked": len(dependency_checks),
         "dependency_checks": dependency_checks,
-        "gpu_readiness": "NOT_TESTED — requires a compatible real Colab GPU",
+        "gpu_readiness": "CUDA plugin packaged; actual T4 device initialization remains a Colab acceptance gate",
         "inference_readiness": "NOT_TESTED — requires a model-backed smoke test",
     }
     print(json.dumps(report, indent=2))
