@@ -24,6 +24,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--source-ref", required=True)
+    parser.add_argument("--source-commit", default=os.environ.get("SOURCE_COMMIT", ""))
     parser.add_argument("--source-mode", choices=["official-asset", "source-build"], required=True)
     parser.add_argument("--artifact-url", default="")
     parser.add_argument("--build-flags", default="")
@@ -36,6 +37,7 @@ def main() -> None:
         "created_utc": datetime.now(timezone.utc).isoformat(),
         "source_repository": "https://github.com/ggml-org/llama.cpp",
         "source_ref": args.source_ref,
+        "source_commit": args.source_commit or None,
         "source_mode": args.source_mode,
         "official_artifact_url": args.artifact_url or None,
         "platform": platform.platform(),
