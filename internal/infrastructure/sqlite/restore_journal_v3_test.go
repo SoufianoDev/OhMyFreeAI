@@ -48,7 +48,8 @@ func TestRestoreJournalV3RoundTripPersistsIntentAndContentIdentities(t *testing.
 		got.PreviousSHA256 != journal.PreviousSHA256 || got.PreviousSize != journal.PreviousSize {
 		t.Fatalf("journal content identities were not preserved: %#v", got)
 	}
-	if got.CandidateQuarantinePath != filepath.Join(root, ".candidate-quarantine.db") {
+	wantQuarantinePath := canonicalTestRestorePath(t, filepath.Join(root, ".candidate-quarantine.db"))
+	if got.CandidateQuarantinePath != wantQuarantinePath {
 		t.Fatalf("quarantine path = %q", got.CandidateQuarantinePath)
 	}
 }
