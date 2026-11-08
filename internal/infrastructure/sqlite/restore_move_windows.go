@@ -90,6 +90,7 @@ func renameRestoreHandleNoReplace(source, destinationDirectory windows.Handle, d
 
 	const fixedHeaderSize = 20
 	const minimumInformationSize = 24
+	const fileRenameInformationExClass = 65
 	bufferSize := fixedHeaderSize + nameBytes
 	if bufferSize < minimumInformationSize {
 		bufferSize = minimumInformationSize
@@ -107,20 +108,23 @@ func renameRestoreHandleNoReplace(source, destinationDirectory windows.Handle, d
 		binary.LittleEndian.PutUint16(buffer[fixedHeaderSize+i*2:fixedHeaderSize+i*2+2], unit)
 	}
 
-	err = windows.SetFileInformationByHandle(
+	var ioStatus windows.IO_STATUS_BLOCK
+	err = windows.NtSetInformationFile(
 		source,
-		windows.FileRenameInfoEx,
+		&ioStatus,
 		&buffer[0],
 		uint32(len(buffer)),
+		fileRenameInformationExClass,
 	)
 	runtime.KeepAlive(buffer)
 	runtime.KeepAlive(source)
 	runtime.KeepAlive(destinationDirectory)
+	runtime.KeepAlive(&ioStatus)
 	if err != nil {
-		if errors.Is(err, windows.ERROR_ALREADY_EXISTS) || errors.Is(err, windows.ERROR_FILE_EXISTS) {
+		if errors.Is(err, windows.STATUS_OBJECT_NAME_COLLISION) {
 			return fmt.Errorf("%w: %v", os.ErrExist, err)
 		}
-		return fmt.Errorf("SetFileInformationByHandle(FileRenameInfoEx): %w", err)
+		return fmt.Errorf("NtSetInformationFile(FileRenameInformationEx): %w", err)
 	}
 	return nil
 }
