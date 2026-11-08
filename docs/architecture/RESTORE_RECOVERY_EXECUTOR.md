@@ -326,3 +326,17 @@ This is a design clarification only. No move code, ACL evaluator, permission rep
 - Microsoft [SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle) — the source handle must carry appropriate access for the requested operation.
 - Microsoft [FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info) — relative destination resolution through a directory handle and no-replace behavior.
 - Microsoft [File Security and Access Rights](https://learn.microsoft.com/en-us/windows/win32/fileio/file-security-and-access-rights) — access is granted against the object's security descriptor and caller token.
+
+
+## Legacy Restore entry points fail-closed — 2026-11-08
+
+A call-site audit found an older callable restore path in `backup.Manager.Restore`, which delegated to `sqlite.RestoreDatabase` and published files through path-based `os.Rename`. It was not exposed by the current Wails `AppService` or CLI, but package-level callers and tests could still invoke it.
+
+Both entry points now return `sqlite.ErrRestoreExecutorUnavailable` immediately:
+
+- `backup.Manager.Restore` does not inspect/extract the archive, create staging directories, or touch the target.
+- `sqlite.RestoreDatabase` does not open or mutate source/target paths.
+- Export and archive inspection remain available.
+- Tests assert the disabled entry points preserve existing source and target bytes.
+
+This gate does not remove the pure recovery planner, journal, staging primitives, or isolated no-replace move adapters. It prevents the older direct restore sequence from being used before those components are composed into the qualified journaled executor. Restore remains unavailable in the application.
