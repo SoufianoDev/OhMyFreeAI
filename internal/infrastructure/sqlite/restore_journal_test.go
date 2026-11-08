@@ -20,6 +20,7 @@ func validTestRestoreJournal(root string) RestoreJournal {
 		Phase:         RestorePhasePrepared,
 		TargetPath:    filepath.Join(root, "state.db"),
 		StagingPath:   filepath.Join(root, ".restore-stage.db"),
+		PreviousDatabaseExisted: boolPointer(true),
 		ArchiveSHA256: strings.Repeat("a", 64),
 		ArchiveSize:   4096,
 		UpdatedAt:     time.Now().UTC(),
