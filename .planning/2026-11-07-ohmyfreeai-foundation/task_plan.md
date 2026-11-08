@@ -146,3 +146,14 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Repository source of truth: https://github.com/SoufianoDev/OhMyFreeAI
 - Planning skill source: https://github.com/OthmanAdi/planning-with-files
 - The exact Planning with Files initializer could not be executed in this container because GitHub DNS/network access is unavailable and connector files are not mounted into the shell. Preserve the shipped template structure and use the permitted manual fallback; validate the format with the available validator source when possible.
+
+
+## Continuation — platform no-replace restore move primitive
+
+- Added a test-first contract for moveRestoreFileNoReplace: regular-file move, destination collision preserving both files, symlink/non-regular source rejection, same-directory restriction, and concurrent destination collision (exactly one winner).
+- Confirmed RED on test-only commit 61a19ea5932bbda9ef722e8789c5af42cabe4c45: Root Go CI run 42438137306, Ubuntu job 128601331157, failed at go vet with the expected undefined symbol.
+- Implemented shared validation plus Linux renameat2(RENAME_NOREPLACE), Windows MoveFileEx(MOVEFILE_WRITE_THROUGH) without replacement/copy flags, and an explicit unsupported-platform fail-closed implementation.
+- Declared existing golang.org/x/sys v0.49.0 as a direct dependency; no new module version was introduced.
+- Latest code commit: d717eac7096d98c3b59b1b9ebd39aa1cff6e2d93.
+- Root Go CI 42438368020: Ubuntu + Windows passed; Linux race detector passed. SQLite driver matrix 42438368022: 4/4 passed. Wails 42438368038 and distro matrix 42438368003 are pending; Ubuntu 22.04 from the previous matrix is being retried separately.
+- Next: close the pending Wails/distro checks, then implement the durable executor around these primitives with intent-before-mutation journaling, identity revalidation, directory sync, process-death tests and idempotent recovery. Do not wire startup recovery or enable Restore until all safety gates pass.
