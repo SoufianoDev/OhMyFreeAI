@@ -4,6 +4,19 @@ These scripts prepare and validate a Linux engine bundle. They do not select an
 upstream version automatically and do not claim that CUDA works merely because
 a binary contains CUDA support.
 
+## Discover the Colab runtime
+
+Run this in the target Colab session before choosing a CUDA package:
+
+```bash
+python3 scripts/engine/detect_environment.py > colab-engine-environment.json
+```
+
+The report records Linux/CPU details, memory, disk, NVIDIA driver/GPU
+information, and CUDA compiler/runtime evidence when available. Missing GPU
+tools are reported as unavailable; they are not treated as proof of a CPU-only
+runtime or as a reason to guess a CUDA target.
+
 ## Package and benchmark
 
 ```bash
