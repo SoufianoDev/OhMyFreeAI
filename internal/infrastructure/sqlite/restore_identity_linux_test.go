@@ -137,7 +137,7 @@ func TestOpenVerifiedRestoreArtifactRetainsHandleAfterPathReplacement(t *testing
 	path := filepath.Join(stateDirectory, "candidate.sqlite")
 	movedPath := filepath.Join(stateDirectory, "original.sqlite")
 	original := []byte("original verified SQLite candidate")
-	replacement := []byte("replacement candidate with same length")
+	replacement := []byte("replaced verified SQLite candidate")
 	if len(original) != len(replacement) {
 		t.Fatal("test fixtures must have equal lengths")
 	}
