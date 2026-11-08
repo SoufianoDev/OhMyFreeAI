@@ -212,11 +212,6 @@ func TestPlanRestoreRecoveryFailsClosedOnAmbiguousStates(t *testing.T) {
 			journal: recoveryTestJournal(RestorePhasePublished, true),
 			files: recoveryFiles(RestoreFileUnreadable, RestoreFilePrevious, RestoreFileMissing, RestoreFileMissing),
 		},
-		{
-			name: "intent phase is not auto-recovered before executor exists",
-			journal: recoveryTestJournal(RestorePhasePublishing, false),
-			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
-		},
 	}
 
 	for _, test := range tests {
@@ -280,6 +275,141 @@ func TestPlanRestoreRecoveryRejectsCollidingPaths(t *testing.T) {
 			}
 			if plan != (RestoreRecoveryPlan{}) {
 				t.Fatalf("colliding paths returned actionable plan: %#v", plan)
+			}
+		})
+	}
+}
+
+
+func TestPlanRestoreRecoveryIntentPhaseTruthTables(t *testing.T) {
+	tests := []struct {
+		name string
+		phase RestorePhase
+		hadPrevious bool
+		files RestoreRecoveryFiles
+		wantPreservePrevious bool
+		wantPublishCandidate bool
+		wantPreserveTarget bool
+		wantRestoreRollback bool
+	}{
+		{
+			name: "preserving previous before move",
+			phase: RestorePhasePreservingPrevious, hadPrevious: true,
+			files: recoveryFiles(RestoreFilePrevious, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
+			wantPreservePrevious: true,
+		},
+		{
+			name: "preserving previous after move",
+			phase: RestorePhasePreservingPrevious, hadPrevious: true,
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFilePrevious, RestoreFileMissing),
+		},
+		{
+			name: "publishing with previous database before move",
+			phase: RestorePhasePublishing, hadPrevious: true,
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFilePrevious, RestoreFileMissing),
+			wantPublishCandidate: true,
+		},
+		{
+			name: "publishing with previous database after move",
+			phase: RestorePhasePublishing, hadPrevious: true,
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFilePrevious, RestoreFileMissing),
+		},
+		{
+			name: "first publication before move",
+			phase: RestorePhasePublishing, hadPrevious: false,
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
+			wantPublishCandidate: true,
+		},
+		{
+			name: "first publication after move",
+			phase: RestorePhasePublishing, hadPrevious: false,
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
+		},
+		{
+			name: "restoring previous before candidate quarantine",
+			phase: RestorePhaseRestoringPrevious, hadPrevious: true,
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFilePrevious, RestoreFileMissing),
+			wantPreserveTarget: true, wantRestoreRollback: true,
+		},
+		{
+			name: "restoring previous after candidate quarantine",
+			phase: RestorePhaseRestoringPrevious, hadPrevious: true,
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFilePrevious, RestoreFileCandidate),
+			wantRestoreRollback: true,
+		},
+		{
+			name: "restoring previous after rollback move",
+			phase: RestorePhaseRestoringPrevious, hadPrevious: true,
+			files: recoveryFiles(RestoreFilePrevious, RestoreFileMissing, RestoreFileMissing, RestoreFileCandidate),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plan, err := PlanRestoreRecovery(recoveryTestJournal(test.phase, test.hadPrevious), test.files)
+			if err != nil {
+				t.Fatalf("PlanRestoreRecovery() error = %v", err)
+			}
+			if plan.Action != RestoreRecoveryResumeIntent ||
+				plan.PreservePrevious != test.wantPreservePrevious ||
+				plan.PublishCandidate != test.wantPublishCandidate ||
+				plan.PreserveTarget != test.wantPreserveTarget ||
+				plan.RestoreRollback != test.wantRestoreRollback {
+				t.Fatalf("PlanRestoreRecovery() = %#v", plan)
+			}
+		})
+	}
+}
+
+func TestPlanRestoreRecoveryIntentPhasesRejectContradictoryStates(t *testing.T) {
+	tests := []struct {
+		name string
+		journal RestoreJournal
+		files RestoreRecoveryFiles
+	}{
+		{
+			name: "preserving previous has both target and rollback",
+			journal: recoveryTestJournal(RestorePhasePreservingPrevious, true),
+			files: recoveryFiles(RestoreFilePrevious, RestoreFileCandidate, RestoreFilePrevious, RestoreFileMissing),
+		},
+		{
+			name: "preserving previous has neither target nor rollback",
+			journal: recoveryTestJournal(RestorePhasePreservingPrevious, true),
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
+		},
+		{
+			name: "publishing candidate appears at both paths",
+			journal: recoveryTestJournal(RestorePhasePublishing, true),
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileCandidate, RestoreFilePrevious, RestoreFileMissing),
+		},
+		{
+			name: "publishing candidate missing",
+			journal: recoveryTestJournal(RestorePhasePublishing, false),
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
+		},
+		{
+			name: "restoring previous candidate lost",
+			journal: recoveryTestJournal(RestorePhaseRestoringPrevious, true),
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFilePrevious, RestoreFileMissing),
+		},
+		{
+			name: "restoring previous has previous at both paths",
+			journal: recoveryTestJournal(RestorePhaseRestoringPrevious, true),
+			files: recoveryFiles(RestoreFilePrevious, RestoreFileMissing, RestoreFilePrevious, RestoreFileCandidate),
+		},
+		{
+			name: "first database cannot enter restoring previous",
+			journal: recoveryTestJournal(RestorePhaseRestoringPrevious, false),
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plan, err := PlanRestoreRecovery(test.journal, test.files)
+			if !errors.Is(err, ErrRestoreRecoveryAmbiguous) {
+				t.Fatalf("PlanRestoreRecovery() = %#v, %v; want ErrRestoreRecoveryAmbiguous", plan, err)
+			}
+			if plan != (RestoreRecoveryPlan{}) {
+				t.Fatalf("contradictory state returned an actionable plan: %#v", plan)
 			}
 		})
 	}
