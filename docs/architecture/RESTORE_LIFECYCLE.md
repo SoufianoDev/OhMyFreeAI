@@ -67,3 +67,17 @@ The durable journal storage primitive is implemented in `sqlite/restore_journal.
 A pure `PlanRestoreRecovery` decision layer now maps validated journal phases plus observed target/staging/rollback presence into conservative actions. It performs no filesystem mutations. It preserves the original target before publication, restores a preserved database after an interrupted publication, preserves a first-ever published candidate for manual review, and requires verification for committed state. Contradictory states return a typed ambiguity error. Tests cover normal phase decisions and fail-closed combinations. Neither the planner nor the journal is connected to `RestoreDatabase` or application startup. The newest rollback-metadata and path-collision hardening changes have not yet passed a fresh CI run.
 
 The remaining blockers are a collision-safe filesystem recovery executor, startup recovery before canonical Store open, a coordinated application-level restore/rollback/reopen service, durable-phase process-death simulation, and deterministic failure-injection tests across every phase. `sqlite.RestoreDatabase` currently performs its own staging and target publication, but it does not use the journal. Restore therefore remains disabled until the full transaction and recovery coordinator are implemented and verified.
+
+
+## CI evidence — 2026-11-08
+
+The latest journal path-hardening commit `31b9a963c1403bee223f0d9da632f8e570d9ffa6` passed all four required GitHub Actions workflows:
+
+- Root Go CI: Ubuntu and Windows passed; run [42431721560](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42431721560).
+- SQLite driver evaluation: modernc and ncruces on Ubuntu and Windows passed (4/4); run [42431721488](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42431721488).
+- Wails v3.0.0 platform proof: Ubuntu and Windows passed (2/2); run [42431721597](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42431721597).
+- Linux distribution compatibility: all eight distributions passed (8/8), including Ubuntu 22.04 GTK3/WebKit2GTK 4.1, Debian 12 and Fedora GTK3; run [42431721639](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42431721639), attempt 2.
+
+Ubuntu 22.04's first attempt timed out waiting for the frontend-to-Go WebView bridge. The targeted rerun passed, with the bridge smoke test succeeding twice and the application reopen check passing. No code change was made in response to that transient failure.
+
+These results verify the current foundation and journal/planner tests. They do not constitute verification of a filesystem recovery executor or a complete restore transaction. Restore remains disabled.
