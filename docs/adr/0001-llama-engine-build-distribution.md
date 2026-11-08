@@ -16,11 +16,11 @@ The architecture foundation explicitly prefers compatible official prebuilt llam
 1. **Prefer upstream official prebuilt releases.** Pin the exact release tag and artifact filename. Do not follow `latest` or nightly releases automatically in production.
 2. **Use a reproducible build factory only for a demonstrated source-build requirement.** Build from a pinned upstream tag/commit using CMake + Ninja + ccache. Do not migrate llama.cpp to Meson.
 3. **Keep the first target narrow:** Linux x86_64, with CPU and CUDA variants only when the actual Colab runtime evidence justifies both. Do not assume a CUDA version, GPU model, or compute capability before collecting runtime data.
-4. **Separate build and runtime responsibilities.** GitHub Actions builds and validates packages; Colab detects its environment, selects a compatible pinned package, verifies it, and reuses it from Google Drive.
-5. **Record provenance.** Every package must have a manifest recording source tag/commit, build configuration, compiler/toolchain versions, target architecture, CUDA/toolkit details where applicable, required shared libraries, package filename, and SHA-256.
-6. **Validate before publication.** Check archive integrity, expected files, executable version output, dynamic dependencies, and backend/device visibility. A GitHub-hosted CPU runner cannot prove that CUDA inference works on Colab; CUDA runtime acceptance must run on an actual compatible Colab GPU.
-7. **Preserve rollback.** Keep the previous known-good engine bundle and do not replace it until the new package passes acceptance tests.
-8. **Do not change the proven Colab launcher/Gateway/OpenCode path in this workstream.** Runtime integration is a separate step after the engine package is verified.
+4. **Build portable CPU variants with dynamic backend loading.** When `GGML_CPU_ALL_VARIANTS=ON` is selected, explicitly enable both `BUILD_SHARED_LIBS=ON` and `GGML_BACKEND_DL=ON`; package and dependency-check every generated backend shared object, not only `llama-server`.\n5. **Separate build and runtime responsibilities.** GitHub Actions builds and validates packages; Colab detects its environment, selects a compatible pinned package, verifies it, and reuses it from Google Drive.
+6. **Record provenance.** Every package must have a manifest recording source tag/commit, build configuration, compiler/toolchain versions, target architecture, CUDA/toolkit details where applicable, required shared libraries, package filename, and SHA-256.
+7. **Validate before publication.** Check archive integrity, expected files, executable version output, dynamic dependencies, and backend/device visibility. A GitHub-hosted CPU runner cannot prove that CUDA inference works on Colab; CUDA runtime acceptance must run on an actual compatible Colab GPU.
+8. **Preserve rollback.** Keep the previous known-good engine bundle and do not replace it until the new package passes acceptance tests.
+9. **Do not change the proven Colab launcher/Gateway/OpenCode path in this workstream.** Runtime integration is a separate step after the engine package is verified.
 
 ## Branch artifact policy
 
