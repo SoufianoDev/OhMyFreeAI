@@ -134,6 +134,9 @@ jobs:
           echo "SOURCE_COMMIT=$(git -C /tmp/llama-src rev-parse HEAD)" >> "$GITHUB_ENV"
           cmake -S /tmp/llama-src -B /tmp/llama-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/tmp/llama-install \
+            -DCMAKE_INSTALL_BINDIR=bin \
+            -DCMAKE_INSTALL_LIBDIR=bin \
             -DGGML_NATIVE=OFF \
             -DBUILD_SHARED_LIBS=ON \
             -DGGML_BACKEND_DL=ON \
@@ -147,7 +150,9 @@ jobs:
             -DLLAMA_BUILD_TESTS=OFF \
             -DLLAMA_BUILD_EXAMPLES=OFF
           cmake --build /tmp/llama-build --config Release --parallel 2 --target llama-server
-          cp -a /tmp/llama-build/bin/. stage/llama-engine/bin/
+          cmake --install /tmp/llama-build --config Release
+          test -x /tmp/llama-install/bin/llama-server
+          cp -a /tmp/llama-install/bin/. stage/llama-engine/bin/
           cp /tmp/llama-src/LICENSE stage/llama-engine/LICENSE
 
       - name: Generate provenance and validate engine
