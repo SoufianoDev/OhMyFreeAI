@@ -976,3 +976,12 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Corrected implementation commit: d6f6bb54c9f72cfcd118087e4468e7d425e83251.
 - Current validation runs for this corrected commit: Root CI 42496496153, Wails 42496496135, SQLite driver evaluation 42496496199, and Linux distro matrix 42496496136. They were pending at the time of this note; no GREEN claim.
 - No legacy FileRenameInformation fallback is added. NTFS is the initial target; filesystems that reject class 65 remain unsupported. The source path is still opened by pathname and parent-component reparse traversal is not pinned; the future executor must enforce a private canonical state directory. Restore remains disabled.
+
+
+## CI closure — Windows handle-bound move — 2026-11-08
+
+- Root CI 42496659593: Ubuntu SUCCESS (including go test -race); Windows SUCCESS (go vet/tests/build/Python/frontend/architecture).
+- SQLite driver evaluation 42496659645: SUCCESS 4/4 across modernc/ncruces on Ubuntu/Windows.
+- Wails platform proof 42496659732: SUCCESS 2/2. Ubuntu native app, CLI, WebView-to-Go bridge and DB reopen passed; Windows native app/executable passed.
+- Linux distro matrix 42496659764: 4/8 passed (Arch, Fedora 44 GTK4, Ubuntu 24.04 GTK4, Debian 13 GTK4); openSUSE and three GTK3 legacy lanes still running. No 8/8 claim.
+- Next security task: open the source leaf relative to the pinned Windows directory handle using NtCreateFile; preserve fail-closed behavior. Restore remains disabled.

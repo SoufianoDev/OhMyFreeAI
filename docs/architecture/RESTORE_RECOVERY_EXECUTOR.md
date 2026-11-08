@@ -281,24 +281,27 @@ This is API-surface verification and ABI design only. No Windows handle-bound re
 
 ## Windows handle-bound no-replace move implementation — 2026-11-08
 
-The first implementation attempt called Win32 SetFileInformationByHandle with FileRenameInfoEx class 22 and a non-null RootDirectory handle. The Windows Root CI run 42496232166 exposed a real incompatibility: all regular-move and collision tests returned ERROR_INVALID_PARAMETER. Ubuntu tests passed, but the Windows test suite did not.
+The Windows move primitive uses the native NtSetInformationFile API with FileRenameInformationEx class 65. This is deliberately not the Win32 SetFileInformationByHandle class 22: the first experiment with a non-null RootDirectory returned ERROR_INVALID_PARAMETER on Windows. Microsoft's Win32 documentation lists FileRenameInfo (3), while the native FILE_INFORMATION_CLASS table documents FileRenameInformationEx (65), available from Windows 10 version 1709.
 
-The correction uses the native NtSetInformationFile API with FileRenameInformationEx class 65. Microsoft's FILE_INFORMATION_CLASS documentation identifies class 65 as available starting with Windows 10 version 1709. The native API accepts the rooted relative destination semantics described by MS-FSCC; the Win32 SetFileInformationByHandle documentation lists FileRenameInfo (3), not the Ex class, in its supported-class table.
+The adapter:
+- Opens the source with DELETE and FILE_READ_ATTRIBUTES, using FILE_FLAG_OPEN_REPARSE_POINT.
+- Opens and retains the destination directory handle with FILE_FLAG_BACKUP_SEMANTICS and FILE_FLAG_OPEN_REPARSE_POINT.
+- Inspects both handles and rejects source directories, reparse points and devices, plus destination handles that are not non-reparse directories.
+- Builds the native FILE_RENAME_INFORMATION_EX payload with zero flags, zero reserved field, 64-bit RootDirectory, UTF-16 leaf name, byte length excluding NUL, and at least 24 bytes.
+- Calls NtSetInformationFile with class 65. STATUS_OBJECT_NAME_COLLISION maps to os.ErrExist. There is no replacement flag or legacy fallback.
 
-The adapter now:
-- Opens the source with DELETE and FILE_READ_ATTRIBUTES plus FILE_FLAG_OPEN_REPARSE_POINT.
-- Opens and retains the destination directory with FILE_FLAG_BACKUP_SEMANTICS and FILE_FLAG_OPEN_REPARSE_POINT.
-- Rejects a source directory, reparse point, or device, and rejects a destination handle that is not a non-reparse directory.
-- Builds the native FILE_RENAME_INFORMATION_EX payload with zero flags, zero reserved field, a 64-bit RootDirectory handle, UTF-16 leaf name, byte length excluding NUL, and the protocol minimum 24-byte size.
-- Calls NtSetInformationFile with class 65. Destination collision status STATUS_OBJECT_NAME_COLLISION maps to os.ErrExist.
-- Has no MoveFileExW, SetFileInformationByHandle, os.Rename, copy/delete, replacement, or legacy-class fallback.
+### Verification
 
-The source-handle substitution and destination-collision tests were added first in test-only commit b398c546a3737f689d0ce7be9204f20b97e4b627 and produced observed RED in Windows Root CI run 42496137044 / job 128778788124. The first implementation commit 18aa3a3455857d5a68cd80afeb92a674ca6d1eca failed Windows tests as described above. Corrected implementation commit is d6f6bb54c9f72cfcd118087e4468e7d425e83251.
+- Test-only commit b398c546a3737f689d0ce7be9204f20b97e4b627 produced observed RED in Windows Root CI run 42496137044.
+- First implementation via SetFileInformationByHandle failed Windows tests with ERROR_INVALID_PARAMETER in run 42496232166; the failure was diagnosed and corrected rather than bypassed.
+- Corrected implementation: d6f6bb54c9f72cfcd118087e4468e7d425e83251. Test cleanup commit: c85c3350d6dd9c0557805be62a6761f1a8110129.
+- Root CI 42496659593 passed Ubuntu and Windows; Ubuntu race detector passed.
+- SQLite driver evaluation 42496659645 passed 4/4.
+- Wails platform proof 42496659732 passed 2/2, including Ubuntu WebView-to-Go and DB reopen plus Windows executable verification.
+- Linux distribution matrix 42496659764 had 4/8 jobs pass at this update; the other four were still running. No 8/8 claim.
 
-Current CI runs for the corrected implementation are Root CI 42496496153, Wails 42496496135, SQLite driver evaluation 42496496199, and Linux distribution matrix 42496496136. They were pending at the time this note was written.
+### Explicit limitations and next step
 
-### Explicit limitations
+The destination directory is still opened by path and the source file is still opened by pathname. The next Windows hardening step is to open the source leaf relative to the already-opened destination directory handle using NtCreateFile and OBJECT_ATTRIBUTES.RootDirectory, with FILE_OPEN_REPARSE_POINT and FILE_SYNCHRONOUS_IO_NONALERT plus SYNCHRONIZE access. The future executor must enforce the private canonical state-directory boundary, verify identities immediately before mutation, persist journal intent and recover ambiguous move results/process death.
 
-The source path is still opened by pathname; intermediate parent components are not pinned using an NT-relative open. The future executor must enforce a private canonical state directory and revalidate file identity from the opened handle immediately before mutation. Native class 65 is not treated as portable to every filesystem; no legacy fallback is allowed, so providers that reject it remain unsupported. The primitive does not hash the opened file, sync namespace metadata, persist journal intent, reconcile ambiguous errors, or recover after process death.
-
-Restore remains disabled.
+The native class is not assumed to work on every filesystem/provider. Unsupported providers fail closed. No full executor, startup recovery or app-level Restore service exists. Restore remains disabled.

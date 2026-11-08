@@ -8,7 +8,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 StoreController integration is complete and verified. The Wails composition root and AppService retain the controller; configuration Load/Save and GUI/CLI backup export hold shared leases for their full operations; shutdown drains through the controller. The controller tests cover writer preference, cancellation, panic/failure fail-closed behavior, replacement, close draining, configuration Load/Save and backup export. On commit 3a814ff960e57da2e60bb7fc7dd697461af8bda1, Root CI 42475338115 passed Ubuntu and Windows (Linux race detector passed), SQLite driver evaluation 42475338112 passed 4/4, Wails proof 42475338129 passed 2/2, and the Linux distribution matrix 42475338092 passed 8/8.
 
-The planner's staged-candidate rollback gap is now closed by the truth-table and planner updates in commits 5a183916, dd771f6e and 47bbe3e. The current task is the Windows no-replace rename boundary: replace the path-based MoveFileExW primitive with a source-handle-bound FileRenameInfoEx operation, test the source-handle identity under path replacement, and keep Restore disabled. The handle-bound implementation is now on the branch; current root/Wails/driver CI must be closed before treating it as green. The durable filesystem executor, process-death recovery matrix, and startup integration remain future work.
+The planner's staged-candidate rollback gap is closed by commits 5a183916, dd771f6e and 47bbe3e. The Windows no-replace rename boundary is now implemented with NtSetInformationFile(FileRenameInformationEx class 65), rooted at a retained directory handle and operating on an opened source handle. On code/test commit c85c3350, Root CI 42496659593 passed Ubuntu and Windows (including Linux race detector), SQLite driver evaluation 42496659645 passed 4/4, and Wails platform proof 42496659732 passed 2/2. Linux distro matrix 42496659764 has 4/8 jobs passed and 4 still running at this update. Restore remains disabled. The next security task is to open the source leaf relative to the already-pinned Windows directory handle with NtCreateFile, then enforce the private canonical state-directory boundary before implementing the durable executor. Process-death recovery and startup integration remain future work.
 
 ## Current Phase
 
@@ -85,6 +85,8 @@ Phase 4
   - [x] Record explicit previous-database state and paired candidate/previous content identities in journal v3
   - [x] Add an identity-aware pure recovery planner, intent-phase truth tables and fail-closed ambiguity tests
   - [x] Add Linux/Windows no-replace move primitives; common behavioral tests now run on both platforms
+  - [x] Replace Windows path-based MoveFileExW with native NtSetInformationFile(FileRenameInformationEx=65), rooted directory handle and opened source handle
+  - [x] Add Windows source-handle substitution and no-replace collision tests; observe RED then GREEN on Windows CI
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
@@ -224,3 +226,13 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Corrected implementation commit: d6f6bb54c9f72cfcd118087e4468e7d425e83251.
 - Current validation runs for this corrected commit: Root CI 42496496153, Wails 42496496135, SQLite driver evaluation 42496496199, and Linux distro matrix 42496496136. They were pending at the time of this note; no GREEN claim.
 - No legacy FileRenameInformation fallback is added. NTFS is the initial target; filesystems that reject class 65 remain unsupported. The source path is still opened by pathname and parent-component reparse traversal is not pinned; the future executor must enforce a private canonical state directory. Restore remains disabled.
+
+
+## CI closure — Windows handle-bound move — 2026-11-08
+
+- Root CI run 42496659593 passed Ubuntu and Windows. Ubuntu passed go vet, go test, go test -race, build, Python compile/tests, frontend syntax and architecture checks. Windows passed go vet, go test, build, Python compile/tests, frontend syntax and architecture checks; race is Linux-only.
+- SQLite driver evaluation run 42496659645 passed 4/4: modernc and ncruces on Ubuntu 24.04 and Windows.
+- Wails platform proof run 42496659732 passed 2/2. Ubuntu passed native build, CLI smoke, executable verification, two-launch WebView-to-Go bridge and database reopen; Windows passed native build and executable verification.
+- Linux distribution matrix run 42496659764: Arch Linux, Fedora 44 GTK4, Ubuntu 24.04 GTK4 and Debian 13 GTK4 passed. openSUSE Tumbleweed, Ubuntu 22.04 GTK3, Fedora 44 legacy GTK3 and Debian 12 GTK3 were still running at this update. Do not claim 8/8 yet.
+- Current code/test commit: c85c3350d6dd9c0557805be62a6761f1a8110129. The Windows handle-bound implementation itself is in d6f6bb54c9f72cfcd118087e4468e7d425e83251.
+- Restore remains disabled. The move primitive still opens the destination directory by path and the source by pathname; next close the source-open race by using NtCreateFile with RootDirectory set to the already-opened directory handle. The future executor must also enforce a private canonical state directory and journal/recovery invariants.

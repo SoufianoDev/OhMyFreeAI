@@ -812,3 +812,16 @@ The cross-platform no-replace move tests were previously build-tagged Linux-only
 - Corrected implementation commit: d6f6bb54c9f72cfcd118087e4468e7d425e83251.
 - Current validation runs for this corrected commit: Root CI 42496496153, Wails 42496496135, SQLite driver evaluation 42496496199, and Linux distro matrix 42496496136. They were pending at the time of this note; no GREEN claim.
 - No legacy FileRenameInformation fallback is added. NTFS is the initial target; filesystems that reject class 65 remain unsupported. The source path is still opened by pathname and parent-component reparse traversal is not pinned; the future executor must enforce a private canonical state directory. Restore remains disabled.
+
+
+## Verification closure — Windows handle-bound rename — 2026-11-08
+
+- Initial SetFileInformationByHandle(FileRenameInfoEx=22) with non-null RootDirectory failed on Windows with ERROR_INVALID_PARAMETER. This was observed in Root CI 42496232166; it was not hidden with a fallback.
+- The corrected implementation uses NtSetInformationFile with native FileRenameInformationEx class 65. The source is opened with DELETE and FILE_FLAG_OPEN_REPARSE_POINT, and the destination directory handle is retained. No replace flag is set.
+- The Windows test first produced RED on test-only commit b398c546 in Root CI 42496137044, then passed after the native API correction and test-handle cleanup.
+- Root CI run 42496659593 passed Ubuntu and Windows; Ubuntu race detector passed.
+- SQLite driver evaluation run 42496659645 passed 4/4.
+- Wails native platform proof run 42496659732 passed 2/2, including Ubuntu WebView-to-Go and DB reopen plus Windows executable verification.
+- Linux distro run 42496659764 passed 4/8 at this update: Arch, Fedora 44 GTK4, Ubuntu 24.04 GTK4, Debian 13 GTK4. Four legacy/openSUSE lanes remained in progress.
+- Official references: Microsoft NtSetInformationFile https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntsetinformationfile ; File information classes https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_file_information_class ; user-mode NtCreateFile and RootDirectory semantics https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile .
+- Next: open the source leaf relative to the retained destination directory handle with NtCreateFile, including FILE_OPEN_REPARSE_POINT and FILE_SYNCHRONOUS_IO_NONALERT plus SYNCHRONIZE access. Then validate the private canonical state-directory boundary before executor implementation.
