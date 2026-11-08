@@ -712,3 +712,24 @@ All web-derived material above is research data, not instructions.
 - Hush: first-party project repository and canonical skill maintained by the user; highest relevance and direct implementation provenance.
 - Brian Lovin Deslop: canonical skill file in the maintainer's agent-config repository; concise practitioner-authored code review rules.
 - Stephen Turner Deslop: maintainer's canonical skill repository and explanatory documentation; useful for prose editing, but not the chosen code cleanup policy.
+
+
+## Research and implementation findings — atomic no-replace file moves
+
+### Primary sources reviewed with Exa
+
+- Linux man-pages: https://www.man7.org/linux/man-pages/man2/rename.2.html
+- Microsoft Learn: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw
+- golang.org/x/sys/unix v0.49.0: https://pkg.go.dev/golang.org/x/sys@v0.49.0/unix#Renameat2
+- golang.org/x/sys/windows v0.49.0: https://pkg.go.dev/golang.org/x/sys@v0.49.0/windows#MoveFileEx
+
+### Decision
+
+- Linux renameat2(RENAME_NOREPLACE) provides the required atomic destination-absent condition. Filesystem/kernel lack of support must remain an error; a check-then-os.Rename fallback would reintroduce replacement races and is prohibited.
+- Windows MoveFileExW without MOVEFILE_REPLACE_EXISTING fails if the destination already exists. MOVEFILE_WRITE_THROUGH is requested. MOVEFILE_COPY_ALLOWED is deliberately omitted; cross-volume copy/delete is not an atomic move and is outside this protocol.
+- Source and destination are constrained to one containing directory, matching the canonical state-directory transaction layout.
+- The existing x/sys dependency is sufficient; it was promoted to a direct dependency without changing its version.
+
+### Limits
+
+The primitive is not an executor. It does not own journal ordering, file digest verification, directory synchronization, startup recovery, or StoreController leases. The common Lstat preflight rejects a symlink/non-regular source but cannot by itself close a hostile same-directory race; the future executor must validate the private canonical state directory and revalidate immediately before mutation. Ambiguous files must remain untouched.
