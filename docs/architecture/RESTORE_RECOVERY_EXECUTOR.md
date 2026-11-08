@@ -203,3 +203,40 @@ Restore remains disabled. Before Windows Restore can be enabled, the full execut
 ### Verification boundary
 
 Test-first commits `f876c42f215a80340245fb4334af6ab2ba9caa97` and `db2eddd33ff7c76a216c8dfce67565c0506841c3` added the journal publication and Windows fail-closed deletion tests before implementation. Their GitHub Actions attempts were cancelled before test execution because later commits superseded them; therefore no RED result is claimed. Implementation commits: `a51e9589c77795441a56de56670db17ec8ed1756`, `45c5329e0524c736b8c31eda1c833a0326a18ea3`, `cbccd640b8aa154b58abc293ea054613fafa36f5`, `a68bba150a627b143c9cf95ca6a1ed918de742d8`, `1cfd08056d2ecfa1afe31910c38cfde0886b415b`, `673782ca5aa49c0c32bfadb17234a20bdfdb4924`, and `48bc9401ea070bea00cb155fe7ab91c4b72b2f6e`. CI for the latest code revision is not yet verified; the Ubuntu root job is queued and the Windows root job was cancelled in the latest attempt. Do not infer success.
+## Handle-relative filesystem boundary research — 2026-11-08
+
+A second review found that the current move primitive's Lstat preflight followed by a path-based rename is not, by itself, a defense against a hostile concurrent writer replacing the source entry between inspection and mutation. The journal's canonical path validation also does not close that race. The executor must state and enforce its filesystem threat model instead of describing the preflight as no-follow atomicity.
+
+### Linux
+
+- renameat2(old_dirfd, old_leaf, new_dirfd, new_leaf, RENAME_NOREPLACE) accepts directory file descriptors and resolves relative names from those pinned directory handles. It provides atomic destination no-replace behavior where the filesystem supports the flag.
+- openat2 can constrain opening paths beneath a pinned directory with RESOLVE_BENEATH | RESOLVE_NO_MAGICLINKS | RESOLVE_NO_SYMLINKS; O_NOFOLLOW alone only affects the final component.
+- renameat2 does not accept an already-open source file descriptor and has no openat2-style resolution flags. A pre-opened/hash-verified source FD therefore does not, by itself, bind the later rename to that exact inode.
+- Consequently, Linux execution must use pinned directory handles, validated single-component leaf names, a state directory whose permissions prevent untrusted concurrent namespace mutation, and identity revalidation immediately before each rename. Unsupported RENAME_NOREPLACE filesystems remain fail-closed. If the state directory cannot be proven private, automatic execution is unsupported.
+
+### Windows
+
+- SetFileInformationByHandle operates on an already-open source file handle. FILE_RENAME_INFO documents a RootDirectory handle for resolving a relative destination name and specifies that a destination collision fails when replacement is false.
+- The newer FileRenameInfoEx protocol structure defines a flags field; with FILE_RENAME_REPLACE_IF_EXISTS omitted, the rename must fail if the destination exists. Its RootDirectory is a directory handle for a relative destination. This is a better fit than a path-based MoveFileExW for binding the source object and destination directory.
+- Microsoft documents that file-information classes may vary across OS releases and underlying drivers. The Win32 SetFileInformationByHandle documentation's published class table does not list FileRenameInfoEx, despite the protocol structure documentation. Treat the Ex class as an explicitly qualified capability, not a universal Windows promise.
+- Windows implementation must open source with reparse-point-aware semantics, reject reparse points, retain source and destination-directory handles through the rename, omit replacement flags, and fail closed when the class/provider is unsupported. Qualification is NTFS-specific until separately tested on another filesystem. This does not remove the separate journal namespace durability and deletion limitations already recorded above.
+
+### Required implementation order
+
+1. Add platform capability probes and tests for the exact rename information class/flags before wiring any executor.
+2. Replace path-only source handling with pinned directory handles and validated leaf names on Linux; use a retained source handle plus destination directory handle on qualified Windows.
+3. Verify file identity from an opened handle, not by hashing a pathname and assuming it still names the same object.
+4. Keep the state directory private against untrusted writers for the entire transaction. A check-then-rename race cannot be solved by a comment or another Lstat.
+5. Add race-oriented tests that replace source/destination entries between inspection and mutation, plus process-death tests around each namespace operation.
+6. Keep unsupported filesystem/provider combinations disabled. Do not fall back to os.Rename, MoveFileExW, or a weaker path-based operation to make a test pass.
+
+### Sources reviewed
+
+- Linux [renameat2(2)](https://man7.org/linux/man-pages/man2/renameat2.2.html): directory-FD-relative names and RENAME_NOREPLACE.
+- Linux [openat2(2)](https://man7.org/linux/man-pages/man2/openat2.2.html): beneath/no-symlink resolution controls.
+- Go [traversal-resistant file APIs](https://go.dev/blog/osroot): os.Root protections and its current operation boundaries.
+- Microsoft [SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle): source-handle-based file metadata operations and provider variability.
+- Microsoft [FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info): no-replace collision behavior and destination RootDirectory.
+- Microsoft [MS-FSCC FileRenameInformationEx](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c): Ex flags and mandatory no-replace behavior when the replacement flag is absent.
+
+This research changes the executor implementation gate; it does not implement an executor and does not authorize Restore activation.
