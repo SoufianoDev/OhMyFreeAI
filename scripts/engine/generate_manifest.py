@@ -41,8 +41,9 @@ def main() -> None:
     args = parser.parse_args()
 
     root = args.output.parent.resolve()
+    output_path = args.output.resolve()
     files = []
-    for path in sorted(p for p in root.rglob("*") if p.is_file() and p != args.output):
+    for path in sorted(p for p in root.rglob("*") if p.is_file() and p.resolve() != output_path):
         files.append({
             "path": path.relative_to(root).as_posix(),
             "size_bytes": path.stat().st_size,
