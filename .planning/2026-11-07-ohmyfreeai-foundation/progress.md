@@ -1005,3 +1005,16 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Commits: `2b03aa5ac3fdb59d324bc3f82dd9fff2a6f41754` (test) and `ec04873559af502cdc30cb771cc42fd608198db7` (Linux stat metadata import).
 - GitHub Actions Linux distribution matrix run `42530270176` was queued at the time of this update. No test pass is claimed yet.
 - ACL policy remains unresolved and unapproved. No ACL code, executor, startup recovery, or Restore activation was changed.
+
+
+## Retained verified Restore artifact handle — 2026-11-08T22:38Z
+
+- Reviewed the restore executor design gate and current identity-inspection implementation. The prior API hashed bytes from an opened handle but returned only SHA-256/size and closed the handle, leaving a future path-reopen TOCTOU gap.
+- Added `verifiedRestoreArtifact` and `openVerifiedRestoreArtifact`. The returned object retains the exact `*os.File` whose bytes were hashed, stores its content identity, and rewinds the handle for subsequent reads. Callers that need to consume or move the artifact must retain this object and use its handle rather than reopen its path.
+- Kept `inspectRestoreArtifact` as a compatibility wrapper; it calls the new helper and closes the handle after returning the identity.
+- Added Linux regression test `TestOpenVerifiedRestoreArtifactRetainsHandleAfterPathReplacement`: after verification, it renames the original directory entry, creates a same-size replacement at the old path, and confirms the retained descriptor still reads the original verified bytes.
+- Code commits: `cd40e0cace51585e0a61f9e766608b206e677fdf` (handle-retaining API), `997c49eb1d0b1241a8a2ea687305eef01e50d1dd` (regression test), `a3757e15111aca44ac1583532de23420da7c3cbb` (equal-length fixture correction).
+- Review: read repository Hush, Deslop Code, Go patterns, Go testing and TDD instructions. Kept comments only for the non-obvious handle-identity invariant. No unrelated files or dependencies changed.
+- TDD evidence limitation: the test was not executed in a test-only RED commit before production code because this session has no repository shell checkout. Do not claim a locally observed RED/GREEN cycle. GitHub Actions is the verification path.
+- On final code/test commit `a3757e1`, Root CI run `42531140501`: Ubuntu job passed; Windows job was still running. Wails `42531140616` and SQLite driver matrix `42531140524` were still running; Linux distro matrix `42531140567` was queued/in progress. No full-matrix pass is claimed here.
+- Restore remains disabled. No filesystem executor, startup recovery, application Restore service/UI, ACL policy or permission repair was implemented. The future executor must retain this handle through identity revalidation and the actual filesystem mutation; metadata checks alone are not a lock.
