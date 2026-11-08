@@ -1,8 +1,14 @@
 # llama.cpp Engine Packaging Tools
 
-These scripts prepare and validate a Linux engine bundle. They do not select an
-upstream version automatically and do not claim that CUDA works merely because
-a binary contains CUDA support.
+These scripts prepare and validate a Linux engine bundle. They do not select a
+moving upstream branch or claim that CUDA works merely because a binary
+contains CUDA support.
+
+The initial manual workflow defaults to the stable `v0.9.0` source tag and a
+CPU-only source build. This is deliberate: the v0.9.0 release page identifies
+a separate nightly build asset rather than a stable Linux binary bundle. The
+official-asset path remains available only when an exact official release
+asset URL is supplied and pinned to its matching tag.
 
 ## Discover the Colab runtime
 
