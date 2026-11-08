@@ -1,48 +1,48 @@
 {
   "format": "tar+zstd",
   "source_directory": "llama-engine",
-  "source_tree_sha256": "38b37b59bcebf196f7a018b223e55ae0e49bc8aeb99b7a0a15548317e379e026",
+  "source_tree_sha256": "a5797c20823bca1376a51a010cc8350d7f0e327057e98d5de7e93effd0c8956e",
   "selection_rule": "smallest archive within 15% of fastest measured extraction",
   "max_size_mib": 90.0,
   "selected_level": 15,
   "selected_archive": "llama-engine.tar.zst",
-  "selected_archive_bytes": 13351100,
-  "selected_archive_sha256": "601ad9198ebb57a6556954f89f52280f5e4dc471adfc02a0fda5a8e7a815f924",
+  "selected_archive_bytes": 13328262,
+  "selected_archive_sha256": "302acba151d40d983a19fbc2bbb59809890655173b65b7eef80aad5263393b9f",
   "benchmarks": [
     {
       "level": 3,
-      "archive_bytes": 16236886,
-      "compression_seconds": 0.1322,
-      "extraction_seconds": 0.0706,
-      "sha256": "8cf29066510b482ccb0c049f70f8b16b204e2bf1dad3f8cf059ac76a8d23f8d1"
+      "archive_bytes": 16156662,
+      "compression_seconds": 0.1736,
+      "extraction_seconds": 0.0914,
+      "sha256": "3031e13c9f6e1616622ef04b61466cf27ffca73f14e80392699e39f64fa56a55"
     },
     {
       "level": 6,
-      "archive_bytes": 15300357,
-      "compression_seconds": 0.3081,
-      "extraction_seconds": 0.0634,
-      "sha256": "c4458718109f9f00e17bcc0b9e2d1a945ed8c9014f98bb3763c1170b1a1840e5"
+      "archive_bytes": 15209109,
+      "compression_seconds": 0.3316,
+      "extraction_seconds": 0.0897,
+      "sha256": "03baa535806bbc7aa466a2877c0058aced4721cc875045d44e7b25e3a22a393f"
     },
     {
       "level": 9,
-      "archive_bytes": 13596082,
-      "compression_seconds": 0.4648,
-      "extraction_seconds": 0.0634,
-      "sha256": "14bb1794e63bf68b17e8cec362e3af0d87f088981f0dfe0d409b0f9a5bf92eb4"
+      "archive_bytes": 13557301,
+      "compression_seconds": 0.4654,
+      "extraction_seconds": 0.0833,
+      "sha256": "467711874682ab52d26dd7a0b0b6935d1694187eef8353db9ae2b31241205911"
     },
     {
       "level": 15,
-      "archive_bytes": 13351100,
-      "compression_seconds": 2.776,
-      "extraction_seconds": 0.0677,
-      "sha256": "601ad9198ebb57a6556954f89f52280f5e4dc471adfc02a0fda5a8e7a815f924"
+      "archive_bytes": 13328262,
+      "compression_seconds": 2.2774,
+      "extraction_seconds": 0.0744,
+      "sha256": "302acba151d40d983a19fbc2bbb59809890655173b65b7eef80aad5263393b9f"
     },
     {
       "level": 19,
-      "archive_bytes": 11311074,
-      "compression_seconds": 9.8505,
-      "extraction_seconds": 0.0761,
-      "sha256": "69926a6db1659fe4d09e0d914fbdd09de2ae12bdf2d6e271f3d5edc4157e5bf4"
+      "archive_bytes": 11218366,
+      "compression_seconds": 9.0986,
+      "extraction_seconds": 0.0927,
+      "sha256": "e3acade2551db29c654bb6ac2e7141410cc3cb9d77b8650ddd8cdf3f6bf9b0a3"
     }
   ]
 }
