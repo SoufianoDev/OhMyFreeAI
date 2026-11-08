@@ -113,17 +113,54 @@ func openRestoreArtifactRoot(path string) (windows.Handle, error) {
 	default:
 		return windows.InvalidHandle, fmt.Errorf("restore state directory must be on a supported local drive")
 	}
-	current, err := windows.CreateFile(
-		rootPtr,
-		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+
+	// A drive letter is itself an Object Manager symbolic link. Resolve its
+	// current target once, reject SUBST and non-volume mappings, then open the
+	// direct volume device path rather than traversing the DOS device alias.
+	deviceName, err := windows.UTF16PtrFromString(volume)
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("encode restore drive name: %w", err)
+	}
+	deviceBuffer := make([]uint16, 1024)
+	deviceLength, err := windows.QueryDosDevice(deviceName, &deviceBuffer[0], uint32(len(deviceBuffer)))
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("resolve restore drive device: %w", err)
+	}
+	devicePath := windows.UTF16ToString(deviceBuffer[:deviceLength])
+	if !strings.HasPrefix(devicePath, `\\Device\\`) ||
+		strings.Contains(strings.TrimPrefix(devicePath, `\\Device\\`), `\\`) {
+		return windows.InvalidHandle, fmt.Errorf("restore drive is not mapped directly to a local volume device")
+	}
+
+	volumePath, err := windows.NewNTUnicodeString(strings.TrimRight(devicePath, `\\`) + `\\`)
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("encode restore NT volume path: %w", err)
+	}
+	attributes := windows.OBJECT_ATTRIBUTES{
+		ObjectName: volumePath,
+		Attributes: windows.OBJ_CASE_INSENSITIVE,
+	}
+	attributes.Length = uint32(unsafe.Sizeof(attributes))
+	var ioStatus windows.IO_STATUS_BLOCK
+	var current windows.Handle
+	err = windows.NtCreateFile(
+		&current,
+		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
+		&attributes,
+		&ioStatus,
 		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
+		windows.FILE_ATTRIBUTE_NORMAL,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		windows.FILE_OPEN,
+		windows.FILE_DIRECTORY_FILE|windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT,
+		0,
 		0,
 	)
+	runtime.KeepAlive(volumePath)
+	runtime.KeepAlive(&attributes)
+	runtime.KeepAlive(&ioStatus)
 	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("open restore volume root: %w", err)
+		return windows.InvalidHandle, fmt.Errorf("open restore volume root by device path: %w", err)
 	}
 	if err := validateRestoreArtifactDirectoryHandle(current); err != nil {
 		_ = windows.CloseHandle(current)
