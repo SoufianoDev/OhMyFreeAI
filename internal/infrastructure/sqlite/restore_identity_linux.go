@@ -5,9 +5,36 @@ package sqlite
 import (
 	"fmt"
 	"os"
+	"syscall"
 
 	"golang.org/x/sys/unix"
 )
+
+
+func restoreArtifactMetadataUnchanged(before, after os.FileInfo) (bool, error) {
+	beforeStat, ok := before.Sys().(*syscall.Stat_t)
+	if !ok {
+		return false, fmt.Errorf("unexpected Linux stat metadata type %T", before.Sys())
+	}
+	afterStat, ok := after.Sys().(*syscall.Stat_t)
+	if !ok {
+		return false, fmt.Errorf("unexpected Linux stat metadata type %T", after.Sys())
+	}
+
+	// ctime is inode status-change time, not creation time. Compare the
+	// pinned file object's identity and metadata around hashing; this catches
+	// chmod/chown/link-count and content updates even when size/mtime are
+	// restored. It is detection, not a filesystem-independent lock.
+	return beforeStat.Dev == afterStat.Dev &&
+		beforeStat.Ino == afterStat.Ino &&
+		beforeStat.Mode == afterStat.Mode &&
+		beforeStat.Nlink == afterStat.Nlink &&
+		beforeStat.Uid == afterStat.Uid &&
+		beforeStat.Gid == afterStat.Gid &&
+		beforeStat.Size == afterStat.Size &&
+		beforeStat.Mtim == afterStat.Mtim &&
+		beforeStat.Ctim == afterStat.Ctim, nil
+}
 
 func openRestoreArtifactFile(stateDirectory, path string) (*os.File, error) {
 	root, relative, err := restoreArtifactRelativePath(stateDirectory, path)
