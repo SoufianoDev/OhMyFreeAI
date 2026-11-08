@@ -17,7 +17,7 @@ import (
 
 const (
 	restoreJournalFileName = "restore-journal.json"
-	restoreJournalVersion  = 2
+	restoreJournalVersion  = 3
 	maxRestoreJournalBytes = 16 << 10
 )
 
@@ -26,12 +26,16 @@ var ErrRestoreJournalInvalid = errors.New("SQLite restore journal is invalid")
 type RestorePhase string
 
 const (
-	RestorePhasePrepared          RestorePhase = "prepared"
-	RestorePhaseStaging           RestorePhase = "staging"
-	RestorePhasePreviousPreserved RestorePhase = "previous-preserved"
-	RestorePhasePublished         RestorePhase = "published"
-	RestorePhaseReopening         RestorePhase = "reopening"
-	RestorePhaseCommitted         RestorePhase = "committed"
+	RestorePhasePrepared           RestorePhase = "prepared"
+	RestorePhaseStaging            RestorePhase = "staging"
+	RestorePhasePreservingPrevious RestorePhase = "preserving-previous"
+	RestorePhasePreviousPreserved  RestorePhase = "previous-preserved"
+	RestorePhasePublishing         RestorePhase = "publishing"
+	RestorePhasePublished          RestorePhase = "published"
+	RestorePhaseReopening           RestorePhase = "reopening"
+	RestorePhaseRestoringPrevious  RestorePhase = "restoring-previous"
+	RestorePhaseCommitted          RestorePhase = "committed"
+	RestorePhaseRolledBack         RestorePhase = "rolled-back"
 )
 
 // RestoreJournal records only recovery metadata. Archive identity is content
@@ -42,9 +46,14 @@ type RestoreJournal struct {
 	Phase          RestorePhase `json:"phase"`
 	TargetPath     string       `json:"target_path"`
 	StagingPath    string       `json:"staging_path"`
-	RollbackPath   string       `json:"rollback_path,omitempty"`
-	PreviousDatabaseExisted *bool `json:"previous_database_existed"`
-	ArchiveSHA256  string       `json:"archive_sha256"`
+	RollbackPath             string       `json:"rollback_path,omitempty"`
+	CandidateQuarantinePath  string       `json:"candidate_quarantine_path"`
+	PreviousDatabaseExisted  *bool        `json:"previous_database_existed"`
+	CandidateSHA256          string       `json:"candidate_sha256,omitempty"`
+	CandidateSize            uint64       `json:"candidate_size_bytes,omitempty"`
+	PreviousSHA256           string       `json:"previous_sha256,omitempty"`
+	PreviousSize             uint64       `json:"previous_size_bytes,omitempty"`
+	ArchiveSHA256            string       `json:"archive_sha256"`
 	ArchiveSize    uint64       `json:"archive_size_bytes"`
 	UpdatedAt      time.Time    `json:"updated_at"`
 }
@@ -239,6 +248,36 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 			return RestoreJournal{}, fmt.Errorf("%w: rollback path collides with another transaction path", ErrRestoreJournalInvalid)
 		}
 	}
+	journal.CandidateQuarantinePath, err = canonicalStatePath(root, journal.CandidateQuarantinePath)
+	if err != nil {
+		return RestoreJournal{}, err
+	}
+	transactionPaths := []string{journal.TargetPath, journal.StagingPath, journal.CandidateQuarantinePath}
+	if journal.RollbackPath != "" {
+		transactionPaths = append(transactionPaths, journal.RollbackPath)
+	}
+	for i := range transactionPaths {
+		for j := i + 1; j < len(transactionPaths); j++ {
+			if samePath(transactionPaths[i], transactionPaths[j]) {
+				return RestoreJournal{}, fmt.Errorf("%w: transaction paths collide", ErrRestoreJournalInvalid)
+			}
+		}
+	}
+	if err := validateRestoreContentIdentity(journal.CandidateSHA256, journal.CandidateSize, "candidate", false); err != nil {
+		return RestoreJournal{}, err
+	}
+	candidateRequired := journal.Phase == RestorePhasePublishing ||
+		journal.Phase == RestorePhasePublished ||
+		journal.Phase == RestorePhaseReopening ||
+		journal.Phase == RestorePhaseRestoringPrevious ||
+		journal.Phase == RestorePhaseCommitted ||
+		journal.Phase == RestorePhaseRolledBack
+	if candidateRequired && journal.CandidateSHA256 == "" {
+		return RestoreJournal{}, fmt.Errorf("%w: candidate identity is required in phase %q", ErrRestoreJournalInvalid, journal.Phase)
+	}
+	if err := validateRestoreContentIdentity(journal.PreviousSHA256, journal.PreviousSize, "previous database", *journal.PreviousDatabaseExisted); err != nil {
+		return RestoreJournal{}, err
+	}
 	return journal, nil
 }
 
@@ -277,10 +316,23 @@ func canonicalStatePath(root, path string) (string, error) {
 	return resolvedCandidate, nil
 }
 
+func validateRestoreContentIdentity(digest string, size uint64, label string, required bool) error {
+	if digest == "" && size == 0 && !required {
+		return nil
+	}
+	decoded, err := hex.DecodeString(digest)
+	if err != nil || len(decoded) != sha256.Size || strings.ToLower(digest) != digest || size == 0 {
+		return fmt.Errorf("%w: %s SHA-256/size identity is invalid", ErrRestoreJournalInvalid, label)
+	}
+	return nil
+}
+
 func validRestorePhase(phase RestorePhase) bool {
 	switch phase {
-	case RestorePhasePrepared, RestorePhaseStaging, RestorePhasePreviousPreserved,
-		RestorePhasePublished, RestorePhaseReopening, RestorePhaseCommitted:
+	case RestorePhasePrepared, RestorePhaseStaging, RestorePhasePreservingPrevious,
+		RestorePhasePreviousPreserved, RestorePhasePublishing, RestorePhasePublished,
+		RestorePhaseReopening, RestorePhaseRestoringPrevious, RestorePhaseCommitted,
+		RestorePhaseRolledBack:
 		return true
 	default:
 		return false
