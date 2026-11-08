@@ -22,8 +22,9 @@ type RestoreContentIdentity struct {
 }
 
 // verifiedRestoreArtifact owns the exact file handle whose bytes were hashed.
-// Callers that will later consume or move the artifact must retain this object
-// and use file; reopening a path would discard the identity guarantee.
+// Callers that will later consume the artifact's bytes must retain this object
+// and use file; reopening a path would discard the identity guarantee. This
+// read-only handle is not sufficient for Windows handle-based rename.
 type verifiedRestoreArtifact struct {
 	file     *os.File
 	identity RestoreContentIdentity
