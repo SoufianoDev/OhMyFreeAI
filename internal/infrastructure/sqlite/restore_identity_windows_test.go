@@ -62,3 +62,41 @@ func TestInspectRestoreArtifactAcceptsWindowsShortPathAlias(t *testing.T) {
 		t.Fatalf("artifact size = %d, want %d", got.Size, len(content))
 	}
 }
+
+
+// TestOpenRestoreArtifactRootRejectsAncestorSubstitution verifies that opening
+// the canonical state path cannot be redirected through a replaced ancestor.
+// The canonical path is resolved first, then its parent is replaced by a
+// directory symlink before the root handle is opened.
+func TestOpenRestoreArtifactRootRejectsAncestorSubstitution(t *testing.T) {
+	base := t.TempDir()
+	parent := filepath.Join(base, "state-parent")
+	stateDirectory := filepath.Join(parent, "state")
+	outsideParent := filepath.Join(base, "outside-parent")
+	outsideState := filepath.Join(outsideParent, "state")
+	if err := os.MkdirAll(stateDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(outsideState, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	canonical, err := canonicalStateDirectory(stateDirectory)
+	if err != nil {
+		t.Fatalf("canonicalize state directory: %v", err)
+	}
+
+	movedParent := filepath.Join(base, "original-state-parent")
+	if err := os.Rename(parent, movedParent); err != nil {
+		t.Fatalf("move original state parent: %v", err)
+	}
+	if err := os.Symlink(outsideParent, parent); err != nil {
+		t.Skipf("directory symlinks are unavailable: %v", err)
+	}
+
+	handle, err := openRestoreArtifactRoot(canonical)
+	if err == nil {
+		_ = windows.CloseHandle(handle)
+		t.Fatal("openRestoreArtifactRoot() followed a substituted ancestor directory")
+	}
+}
