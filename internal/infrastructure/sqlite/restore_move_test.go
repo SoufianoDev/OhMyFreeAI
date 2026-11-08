@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -123,4 +124,64 @@ func TestMoveRestoreFileNoReplace(t *testing.T) {
 			t.Fatalf("source was changed: %v", err)
 		}
 	})
+}
+
+func TestMoveRestoreFileNoReplaceConcurrentCollision(t *testing.T) {
+	directory := t.TempDir()
+	destination := filepath.Join(directory, "target.db")
+	sources := []string{
+		filepath.Join(directory, "candidate-a.db"),
+		filepath.Join(directory, "candidate-b.db"),
+	}
+	for i, source := range sources {
+		if err := os.WriteFile(source, []byte{byte('a' + i)}, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	start := make(chan struct{})
+	results := make(chan error, len(sources))
+	var workers sync.WaitGroup
+	for _, source := range sources {
+		workers.Add(1)
+		go func(source string) {
+			defer workers.Done()
+			<-start
+			results <- moveRestoreFileNoReplace(source, destination)
+		}(source)
+	}
+	close(start)
+	workers.Wait()
+	close(results)
+
+	successes := 0
+	collisions := 0
+	for err := range results {
+		switch {
+		case err == nil:
+			successes++
+		case errors.Is(err, os.ErrExist):
+			collisions++
+		default:
+			t.Fatalf("unexpected move error: %v", err)
+		}
+	}
+	if successes != 1 || collisions != 1 {
+		t.Fatalf("successes = %d, collisions = %d; want 1 each", successes, collisions)
+	}
+
+	remainingSources := 0
+	for _, source := range sources {
+		if _, err := os.Lstat(source); err == nil {
+			remainingSources++
+		} else if !errors.Is(err, os.ErrNotExist) {
+			t.Fatal(err)
+		}
+	}
+	if remainingSources != 1 {
+		t.Fatalf("remaining source files = %d, want 1", remainingSources)
+	}
+	if _, err := os.Stat(destination); err != nil {
+		t.Fatalf("destination missing after successful move: %v", err)
+	}
 }
