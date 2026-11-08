@@ -840,3 +840,24 @@ Linux distribution compatibility run 42496659764 completed SUCCESS, 8/8:
 - Debian 12 / legacy GTK3-WebKit2GTK 4.1
 
 Together with Root CI 42496659593 (Ubuntu + Windows, Linux race detector), Wails 42496659732 (2/2), and SQLite driver evaluation 42496659645 (4/4), the code/test revision c85c3350 is green across all current validation workflows. This is CI compatibility evidence, not bare-metal certification of every distro release or filesystem.
+
+
+## Windows relative source open — NtCreateFile — 2026-11-08
+
+### Primary documentation
+
+- Microsoft NtCreateFile: https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntcreatefile — RootDirectory may be a directory handle; a relative ObjectName is resolved against that handle. FILE_OPEN_REPARSE_POINT opens the final reparse point itself. FILE_SYNCHRONOUS_IO_NONALERT requires SYNCHRONIZE access.
+- Pinned x/sys v0.49.0: https://github.com/golang/sys/blob/v0.49.0/windows/syscall_windows.go — NtCreateFile and NewNTUnicodeString bindings; OBJECT_ATTRIBUTES and IO_STATUS_BLOCK types are in types_windows.go.
+- Microsoft OBJECT_ATTRIBUTES: https://learn.microsoft.com/en-us/windows/win32/api/ntdef/ns-ntdef-_object_attributes — RootDirectory and relative ObjectName semantics.
+
+### Implementation and test evidence
+
+- Test-only commit 3f111002 produced observed compile-time RED in Windows Root CI run 42497376480 / job 128782981057: openRestoreSourceRelative was undefined.
+- Implemented openRestoreSourceRelative with NtCreateFile and a one-component NTUnicodeString. RootDirectory is the already-opened destination directory handle. The operation uses FILE_OPEN_REPARSE_POINT, FILE_NON_DIRECTORY_FILE and FILE_SYNCHRONOUS_IO_NONALERT; SYNCHRONIZE is requested as required by the synchronous-I/O option.
+- The regression test moves the directory after its handle is opened, creates a replacement directory at the old path, and verifies the opened candidate is still taken from the original directory handle.
+- A first compile attempt used nil for NtCreateFile's uintptr EA buffer and failed vet. Corrected to zero in commit c89d532a.
+- Root CI 42497620421 passed Ubuntu and Windows, including the Windows Go tests and Ubuntu race detector. SQLite driver evaluation 42497620420 passed 4/4. Wails run 42497620429 remained in progress and distro matrix 42497620422 was queued at the time of this note.
+
+### Remaining limitation
+
+The destination directory is still initially opened by a full path through CreateFile. FILE_FLAG_OPEN_REPARSE_POINT protects only the final component, not every ancestor. Before an executor exists, implement component-by-component directory opening from a trusted volume root, reject every reparse component, and verify private directory permissions/ACL. Source identity hashing/revalidation from the opened handle is also still executor work. Restore remains disabled.

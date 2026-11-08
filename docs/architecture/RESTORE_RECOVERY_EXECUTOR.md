@@ -281,38 +281,23 @@ This is API-surface verification and ABI design only. No Windows handle-bound re
 
 ## Windows handle-bound no-replace move implementation — 2026-11-08
 
-The Windows move primitive uses the native NtSetInformationFile API with FileRenameInformationEx class 65. This is deliberately not the Win32 SetFileInformationByHandle class 22: the first experiment with a non-null RootDirectory returned ERROR_INVALID_PARAMETER on Windows. Microsoft's Win32 documentation lists FileRenameInfo (3), while the native FILE_INFORMATION_CLASS table documents FileRenameInformationEx (65), available from Windows 10 version 1709.
+The Windows move uses NtSetInformationFile with native FileRenameInformationEx class 65. The source file is now opened relative to the retained destination directory handle using NtCreateFile and OBJECT_ATTRIBUTES.RootDirectory, rather than by re-resolving the source's full path.
 
-The adapter:
-- Opens the source with DELETE and FILE_READ_ATTRIBUTES, using FILE_FLAG_OPEN_REPARSE_POINT.
-- Opens and retains the destination directory handle with FILE_FLAG_BACKUP_SEMANTICS and FILE_FLAG_OPEN_REPARSE_POINT.
-- Inspects both handles and rejects source directories, reparse points and devices, plus destination handles that are not non-reparse directories.
-- Builds the native FILE_RENAME_INFORMATION_EX payload with zero flags, zero reserved field, 64-bit RootDirectory, UTF-16 leaf name, byte length excluding NUL, and at least 24 bytes.
-- Calls NtSetInformationFile with class 65. STATUS_OBJECT_NAME_COLLISION maps to os.ErrExist. There is no replacement flag or legacy fallback.
+- Opens the destination directory handle and retains it through source open and rename.
+- Opens the source leaf relative to that handle using NtCreateFile, FILE_OPEN_REPARSE_POINT, FILE_NON_DIRECTORY_FILE and FILE_SYNCHRONOUS_IO_NONALERT, requesting SYNCHRONIZE, DELETE and FILE_READ_ATTRIBUTES.
+- Inspects source and directory handles; rejects reparse points, directories and devices as applicable.
+- Uses native FileRenameInformationEx class 65 with zero flags and the same retained directory handle as RootDirectory. Destination collision maps to os.ErrExist; no replacement or legacy fallback is used.
 
 ### Verification
 
-- Test-only commit b398c546a3737f689d0ce7be9204f20b97e4b627 produced observed RED in Windows Root CI run 42496137044.
-- First implementation via SetFileInformationByHandle failed Windows tests with ERROR_INVALID_PARAMETER in run 42496232166; the failure was diagnosed and corrected rather than bypassed.
-- Corrected implementation: d6f6bb54c9f72cfcd118087e4468e7d425e83251. Test cleanup commit: c85c3350d6dd9c0557805be62a6761f1a8110129.
-- Root CI 42496659593 passed Ubuntu and Windows; Ubuntu race detector passed.
-- SQLite driver evaluation 42496659645 passed 4/4.
-- Wails platform proof 42496659732 passed 2/2, including Ubuntu WebView-to-Go and DB reopen plus Windows executable verification.
-- Linux distribution matrix 42496659764 completed SUCCESS, 8/8: Arch, Fedora 44 GTK4, Ubuntu 24.04 GTK4, Debian 13 GTK4, openSUSE Tumbleweed, Ubuntu 22.04 GTK3, Fedora 44 legacy GTK3 and Debian 12 GTK3.
+- The source-directory substitution test was added first in commit 3f1110029423cdf5893732f086af8d385dd02b8d and produced observed RED in Root CI 42497376480 / Windows job 128782981057.
+- The first implementation attempt failed vet because NtCreateFile's EA-buffer parameter is uintptr, not a pointer; corrected to zero in commit c89d532a3ba04d43c7d2ccbed1675319c6f90ee8.
+- Root CI 42497620421 passed Ubuntu and Windows; Ubuntu race detector passed.
+- SQLite driver evaluation 42497620420 passed 4/4.
+- Wails run 42497620429 was in progress and Linux distro matrix 42497620422 was queued at this update.
 
 ### Explicit limitations and next step
 
-The destination directory is still opened by path and the source file is still opened by pathname. The next Windows hardening step is to open the source leaf relative to the already-opened destination directory handle using NtCreateFile and OBJECT_ATTRIBUTES.RootDirectory, with FILE_OPEN_REPARSE_POINT and FILE_SYNCHRONOUS_IO_NONALERT plus SYNCHRONIZE access. The future executor must enforce the private canonical state-directory boundary, verify identities immediately before mutation, persist journal intent and recover ambiguous move results/process death.
+The destination directory is still initially opened by full path through CreateFile. FILE_FLAG_OPEN_REPARSE_POINT protects only the final component, not all ancestors. Next, open the canonical state-directory path component-by-component from a trusted volume root, reject every reparse component, and verify private directory permissions/ACL. The future executor must hash and revalidate source identity from the opened handle immediately before mutation, persist intent before every move, sync the required namespace state, reconcile ambiguous results and recover process death.
 
-The native class is not assumed to work on every filesystem/provider. Unsupported providers fail closed. No full executor, startup recovery or app-level Restore service exists. Restore remains disabled.
-
-
-### Final CI closure — 2026-11-08
-
-The corrected handle-bound move implementation and Windows tests are covered by a fully green validation set on code/test commit c85c3350:
-- Root CI 42496659593 — Ubuntu and Windows passed; Ubuntu race detector passed.
-- SQLite driver evaluation 42496659645 — 4/4 passed.
-- Wails platform proof 42496659732 — 2/2 passed; Linux WebView-to-Go and database reopen passed.
-- Linux distribution compatibility 42496659764 — 8/8 passed across GTK4/WebKit6 and legacy GTK3/WebKit2GTK 4.1 lanes.
-
-These CI results do not certify every bare-metal distribution release, Windows filesystem provider, or power-loss behavior. Restore remains disabled.
+The native rename class is not assumed to work on every filesystem/provider. Unsupported providers fail closed. No full executor, startup recovery or app-level Restore service exists. Restore remains disabled.

@@ -8,7 +8,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 StoreController integration is complete and verified. The Wails composition root and AppService retain the controller; configuration Load/Save and GUI/CLI backup export hold shared leases for their full operations; shutdown drains through the controller. The controller tests cover writer preference, cancellation, panic/failure fail-closed behavior, replacement, close draining, configuration Load/Save and backup export. On commit 3a814ff960e57da2e60bb7fc7dd697461af8bda1, Root CI 42475338115 passed Ubuntu and Windows (Linux race detector passed), SQLite driver evaluation 42475338112 passed 4/4, Wails proof 42475338129 passed 2/2, and the Linux distribution matrix 42475338092 passed 8/8.
 
-The planner's staged-candidate rollback gap is closed by commits 5a183916, dd771f6e and 47bbe3e. The Windows no-replace rename boundary is now implemented with NtSetInformationFile(FileRenameInformationEx class 65), rooted at a retained directory handle and operating on an opened source handle. On code/test commit c85c3350, Root CI 42496659593 passed Ubuntu and Windows (including Linux race detector), SQLite driver evaluation 42496659645 passed 4/4, and Wails platform proof 42496659732 passed 2/2. Linux distro matrix 42496659764 passed 8/8. Restore remains disabled. The next security task is to open the source leaf relative to the already-pinned Windows directory handle with NtCreateFile, then enforce the private canonical state-directory boundary before implementing the durable executor. Process-death recovery and startup integration remain future work.
+The planner's staged-candidate rollback gap is closed by commits 5a183916, dd771f6e and 47bbe3e. The Windows no-replace rename boundary is now implemented with NtSetInformationFile(FileRenameInformationEx class 65), rooted at a retained directory handle and operating on an opened source handle. On code/test commit c85c3350, Root CI 42496659593 passed Ubuntu and Windows (including Linux race detector), SQLite driver evaluation 42496659645 passed 4/4, and Wails platform proof 42496659732 passed 2/2. Linux distro matrix 42496659764 passed 8/8. Restore remains disabled. The Windows source leaf is now opened relative to the retained destination directory handle using NtCreateFile and OBJECT_ATTRIBUTES.RootDirectory, with FILE_OPEN_REPARSE_POINT and synchronous-I/O requirements. Root CI 42497620421 passed Ubuntu and Windows (including Linux race detector); SQLite driver evaluation 42497620420 passed 4/4. Wails 42497620429 is still running and distro matrix 42497620422 is queued. The next security task is to open the canonical state-directory path component-by-component without following reparse points, verify its private permissions/ACL and qualify the filesystem before building the durable executor. Process-death recovery and startup integration remain future work.
 
 ## Current Phase
 
@@ -87,6 +87,7 @@ Phase 4
   - [x] Add Linux/Windows no-replace move primitives; common behavioral tests now run on both platforms
   - [x] Replace Windows path-based MoveFileExW with native NtSetInformationFile(FileRenameInformationEx=65), rooted directory handle and opened source handle
   - [x] Add Windows source-handle substitution and no-replace collision tests; observe RED then GREEN on Windows CI
+  - [x] Open Windows source leaf relative to the already-pinned directory handle with NtCreateFile; verify directory-path substitution test on Windows CI
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
@@ -247,3 +248,15 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
   - SQLite drivers 42496659645: 4/4 SUCCESS.
   - Linux distributions 42496659764: 8/8 SUCCESS.
 - The current branch also contains the separately committed Wails v3.1 compatibility ADR index update and this Restore CI record. No production code changed after c85c3350.
+
+
+## Windows relative source open — 2026-11-08
+
+- Added a Windows-only test that opens the state-directory handle, renames that directory to a different path, creates a replacement directory at the old path, then requires the source open and rename to operate inside the original pinned directory.
+- Observed RED on test-only commit 3f1110029423cdf5893732f086af8d385dd02b8d: Root CI run 42497376480 / Windows job 128782981057 failed at go vet with the expected undefined openRestoreSourceRelative symbol.
+- Implemented source opening through x/sys/windows.NtCreateFile with OBJECT_ATTRIBUTES.RootDirectory set to the retained destination directory handle. It opens one validated leaf component with FILE_OPEN_REPARSE_POINT | FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT and requests SYNCHRONIZE, DELETE and FILE_READ_ATTRIBUTES. This prevents re-resolving the source parent path after the destination directory handle has been opened.
+- The first implementation attempt passed nil for NtCreateFile's uintptr EA-buffer argument and failed go vet. Corrected to zero in commit c89d532a3ba04d43c7d2ccbed1675319c6f90ee8.
+- Root CI run 42497620421 passed Ubuntu and Windows; Ubuntu race detector passed. SQLite driver evaluation 42497620420 passed 4/4.
+- Wails run 42497620429 was still in progress and Linux distribution matrix 42497620422 was queued at this update.
+- Remaining boundary: the destination directory itself is still opened by a full path with CreateFile. OPEN_REPARSE_POINT protects its final component, not every ancestor. Next, open the canonical state path component-by-component from a trusted volume root, reject reparse points at each step, and verify private directory permissions/ACL. The executor must still hash and revalidate identity from the opened source handle before mutation.
+- Restore remains disabled.
