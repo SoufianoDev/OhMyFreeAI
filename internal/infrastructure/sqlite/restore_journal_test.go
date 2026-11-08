@@ -281,3 +281,17 @@ func TestReadRestoreJournalRejectsInconsistentRollbackMetadata(t *testing.T) {
 		t.Fatalf("read journal with unexpected rollback path error = %v, want ErrRestoreJournalInvalid", err)
 	}
 }
+
+
+func TestWriteRestoreJournalRejectsNonRegularTransactionPaths(t *testing.T) {
+	root := t.TempDir()
+	directory := filepath.Join(root, "stage-directory")
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatalf("create staging directory: %v", err)
+	}
+	journal := validTestRestoreJournal(root)
+	journal.StagingPath = directory
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("write with directory staging path error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
