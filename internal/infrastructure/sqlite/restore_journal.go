@@ -10,7 +10,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -115,7 +114,7 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close SQLite restore journal: %w", err)
 	}
-	if err := os.Rename(temporaryPath, journalPath); err != nil {
+	if err := publishRestoreJournal(temporaryPath, journalPath); err != nil {
 		return fmt.Errorf("publish SQLite restore journal: %w", err)
 	}
 	published = true
@@ -179,10 +178,7 @@ func RemoveRestoreJournal(stateDirectory string) error {
 	} else {
 		return fmt.Errorf("inspect SQLite restore journal: %w", statErr)
 	}
-	if err := os.Remove(journalPath); err != nil {
-		return fmt.Errorf("remove SQLite restore journal: %w", err)
-	}
-	return syncRestoreDirectory(root)
+	return removeRestoreJournal(root, journalPath)
 }
 
 func canonicalStateDirectory(path string) (string, error) {
@@ -342,19 +338,3 @@ func validRestorePhase(phase RestorePhase) bool {
 	}
 }
 
-func syncRestoreDirectory(path string) error {
-	// Windows does not expose directory handles that support File.Sync through
-	// the standard library; file contents are still synced before rename.
-	if runtime.GOOS == "windows" {
-		return nil
-	}
-	directory, err := os.Open(path)
-	if err != nil {
-		return fmt.Errorf("open SQLite restore state directory for sync: %w", err)
-	}
-	defer directory.Close()
-	if err := directory.Sync(); err != nil {
-		return fmt.Errorf("sync SQLite restore state directory: %w", err)
-	}
-	return nil
-}
