@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate an extracted llama.cpp engine bundle without claiming GPU readiness."""
+"""Validate llama.cpp server and every bundled dynamic backend dependency."""
 from __future__ import annotations
 
 import argparse
@@ -31,34 +31,40 @@ def main() -> int:
     if version.returncode != 0:
         raise RuntimeError(f"llama-server --version failed:\n{version.stdout}")
 
-    ldd_result = None
     ldd = shutil.which("ldd")
     if args.require_ldd_clean and not ldd:
         raise RuntimeError("ldd is required for dependency validation but was not found in PATH")
+
+    # Dynamic backend loading means the server executable is not the only ELF
+    # runtime component. Check every bundled shared object as well.
+    targets = [server, *sorted(p for p in root.rglob("*.so*") if p.is_file())]
+    dependency_checks = []
     if ldd:
-        ldd_result = subprocess.run(
-            [ldd, str(server)], cwd=root, text=True,
-            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30,
-        )
-        if args.require_ldd_clean and ldd_result.returncode != 0:
-            raise RuntimeError(
-                f"ldd failed with exit code {ldd_result.returncode}:\\n{ldd_result.stdout}"
+        for target in targets:
+            result = subprocess.run(
+                [ldd, str(target)], cwd=root, text=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30,
             )
-        missing = [line.strip() for line in ldd_result.stdout.splitlines()
-                   if "not found" in line]
-        if missing and args.require_ldd_clean:
-            raise RuntimeError("Missing shared libraries:\n" + "\n".join(missing))
+            missing = [line.strip() for line in result.stdout.splitlines()
+                       if "not found" in line]
+            item = {
+                "file": str(target.relative_to(root)),
+                "exit_code": result.returncode,
+                "missing_shared_libraries": missing,
+                "output": result.stdout.strip(),
+            }
+            dependency_checks.append(item)
+            if args.require_ldd_clean and (result.returncode != 0 or missing):
+                raise RuntimeError(
+                    f"Dependency validation failed for {item['file']}:\n{result.stdout}"
+                )
 
     report = {
         "status": "passed",
         "server": str(server.relative_to(root)),
         "version_output": version.stdout.strip(),
-        "ldd_available": bool(ldd),
-        "ldd_exit_code": ldd_result.returncode if ldd_result else None,
-        "missing_shared_libraries": (
-            [line.strip() for line in ldd_result.stdout.splitlines()
-             if "not found" in line] if ldd_result else []
-        ),
+        "dependency_targets_checked": len(dependency_checks),
+        "dependency_checks": dependency_checks,
         "gpu_readiness": "NOT_TESTED — requires a compatible real Colab GPU",
         "inference_readiness": "NOT_TESTED — requires a model-backed smoke test",
     }
