@@ -59,6 +59,7 @@ func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 	want.TargetPath = canonicalTestRestorePath(t, journal.TargetPath)
 	want.StagingPath = canonicalTestRestorePath(t, journal.StagingPath)
 	want.RollbackPath = canonicalTestRestorePath(t, journal.RollbackPath)
+	want.CandidateQuarantinePath = canonicalTestRestorePath(t, journal.CandidateQuarantinePath)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("read journal = %#v, want %#v", got, want)
 	}
