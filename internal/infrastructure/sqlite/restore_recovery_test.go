@@ -43,7 +43,6 @@ func TestPlanRestoreRecoveryConservativeDecisions(t *testing.T) {
 		wantRemoveStaging bool
 		wantPreserveStaging bool
 		wantPreserveTarget bool
-		wantPreserveStaging bool
 		wantRestoreRollback bool
 		wantVerifyTarget bool
 	}{
@@ -291,6 +290,7 @@ func TestPlanRestoreRecoveryIntentPhaseTruthTables(t *testing.T) {
 		wantPreservePrevious bool
 		wantPublishCandidate bool
 		wantPreserveTarget bool
+		wantPreserveStaging bool
 		wantRestoreRollback bool
 	}{
 		{
