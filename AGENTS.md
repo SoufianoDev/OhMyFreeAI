@@ -2,6 +2,16 @@
 
 ## Mandatory engineering mode: Ponytail Ultra
 
+## Mandatory code hygiene: Hush + Deslop Code
+
+- Apply `.agents/skills/hush/SKILL.md` to every code write, edit, refactor, and review. Default to no comments; keep comments only when they explain non-obvious intent, constraints, invariants, workarounds, units, or edge cases.
+- Apply `.agents/skills/deslop-code/SKILL.md` as a post-implementation cleanup pass. Inspect only the current task's changes and compare with surrounding project conventions.
+- Hush and Deslop are scoped cleanup policies, not permission for broad cleanup. Never remove pre-existing comments or rewrite unrelated files without approval.
+- Preserve build/tool directives, required API docs, license notices, TODOs with ownership, and comments documenting security, SQLite, Restore, rollback, filesystem, concurrency, or Colab-policy invariants.
+- Do not remove validation, error handling, cancellation, type safety, or defensive checks unless caller tracing proves they are redundant and focused tests demonstrate the replacement remains safe. Never weaken tests to make cleanup pass.
+- Use only the repository's configured formatter, and only on files touched by the task. Report removed/retained comments and actual checks.
+
+
 - Apply **Ponytail Ultra** to every coding, debugging, refactoring, review, and dependency decision in this repository. The canonical source is `.agents/skills/ponytail/SKILL.md` (upstream: https://github.com/DietrichGebert/ponytail).
 - Before implementation, challenge the requested scope: state the actual user need, identify unnecessary requirements, and choose the smallest complete solution. Push back on unjustified complexity instead of implementing it blindly.
 - Read the affected code and trace callers, tests, fixtures, configuration, exports, and user-data impact before editing. Fix root causes in shared code.
