@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-GUI and CLI backup export/inspect are implemented. StoreController is wired into Wails configuration and GUI/CLI backup export. The durable journal primitive is implemented (schema v2 with explicit prior-database existence), and a pure, fail-closed recovery planner has tests. First obtain fresh green CI for the Windows path-normalization and Linux Xvfb-display fixes plus the planner; then build the filesystem recovery executor and crash-injection suite. Keep Restore disabled and Colab remote inference policy-gated.
+GUI and CLI backup export/inspect are implemented. StoreController is wired into Wails configuration and GUI/CLI backup export. The durable journal primitive is currently schema v2 and the pure recovery planner is conservative but not crash-complete. The next implementation gate is a strict v3 journal with durable intent phases, candidate quarantine path, paired candidate/previous database content identities, and planner identity inputs. Then add atomic Linux/Windows no-replace moves and process-death executor tests. Keep Restore disabled and Colab remote inference policy-gated.
 
 ## Current Phase
 
