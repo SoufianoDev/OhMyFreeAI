@@ -994,3 +994,14 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - SQLite driver evaluation 42496659645 passed 4/4.
 - Linux distribution compatibility 42496659764 passed 8/8 across modern GTK4/WebKit6 and legacy GTK3/WebKit2GTK 4.1 lanes.
 - Current Restore code remains low-level only. No durable executor, startup recovery, app-level Restore service, or Restore UI is enabled.
+
+
+## Linux restore artifact identity regression test — 2026-11-08
+
+- Added `TestRestoreArtifactMetadataDetectsContentChangeWhenMtimeIsRestored` in `internal/infrastructure/sqlite/restore_identity_linux_test.go`.
+- The test modifies file contents in place without changing size, restores the original mtime, confirms the filesystem exposed the update through inode ctime, then verifies the metadata comparator rejects the changed inode state.
+- On filesystems whose timestamp resolution does not expose the mutation through ctime, the test skips explicitly rather than reporting a false pass.
+- This closes a test-coverage gap; it does not make ctime a lock or eliminate every concurrent-write race. The opened file handle must still be retained and protected through the eventual restore executor's validation/use sequence.
+- Commits: `2b03aa5ac3fdb59d324bc3f82dd9fff2a6f41754` (test) and `ec04873559af502cdc30cb771cc42fd608198db7` (Linux stat metadata import).
+- GitHub Actions Linux distribution matrix run `42530270176` was queued at the time of this update. No test pass is claimed yet.
+- ACL policy remains unresolved and unapproved. No ACL code, executor, startup recovery, or Restore activation was changed.
