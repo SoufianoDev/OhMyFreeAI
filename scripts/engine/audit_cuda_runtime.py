@@ -12,9 +12,9 @@ def main():
  for target in targets:
   if not target.is_file(): continue
   r=subprocess.run(["ldd",str(target)],text=True,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,env=env,timeout=45)
-  if r.returncode: raise RuntimeError(f"ldd failed for {target}:\\n{r.stdout}")
+  if r.returncode: raise RuntimeError(f"ldd failed for {target}:\n{r.stdout}")
   for line in r.stdout.splitlines():
-   m=re.match(r"\\s*(\\S+)\\s+=>\\s+(/\\S+)",line)
+   m=re.match(r"\s*(\S+)\s+=>\s+(/\S+)",line)
    if m and m.group(1).startswith(PREFIXES): found[m.group(1)]=m.group(2)
  missing=[x for x in REQUIRED if x not in found]
  if missing: raise RuntimeError("Required CUDA runtime dependencies unresolved: "+", ".join(missing))
