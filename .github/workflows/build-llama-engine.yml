@@ -1,0 +1,183 @@
+name: Build and package llama.cpp engine
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_mode:
+        description: "Use an exact upstream release asset, or build from a pinned source ref"
+        type: choice
+        required: true
+        default: official-asset
+        options:
+          - official-asset
+          - source-build
+      source_ref:
+        description: "Exact upstream release tag or commit (never use latest or a moving branch)"
+        type: string
+        required: true
+      artifact_url:
+        description: "Exact official Linux x86_64 CPU asset URL; required for official-asset mode"
+        type: string
+        required: false
+      backend:
+        description: "Initial CI target. CUDA is deliberately not built or certified here."
+        type: choice
+        required: true
+        default: cpu
+        options:
+          - cpu
+
+permissions:
+  contents: write
+
+concurrency:
+  group: llama-engine-build-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-package:
+    if: github.ref == 'refs/heads/feature/llama-engine-build-factory'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout project branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/llama-engine-build-factory
+          fetch-depth: 0
+
+      - name: Validate inputs and install tools
+        shell: bash
+        env:
+          SOURCE_MODE: ${{ inputs.source_mode }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          ARTIFACT_URL: ${{ inputs.artifact_url }}
+        run: |
+          set -euo pipefail
+          test -n "$SOURCE_REF"
+          if [[ "$SOURCE_REF" == "latest" || "$SOURCE_REF" == "master" || "$SOURCE_REF" == "main" ]]; then
+            echo "::error::source_ref must be an immutable release tag or commit, not a moving ref."
+            exit 1
+          fi
+          if [[ "$SOURCE_MODE" == "official-asset" ]]; then
+            test -n "$ARTIFACT_URL" || {
+              echo "::error::artifact_url is required for official-asset mode."
+              exit 1
+            }
+            case "$ARTIFACT_URL" in
+              https://github.com/ggml-org/llama.cpp/releases/download/*) ;;
+              *) echo "::error::Only official ggml-org/llama.cpp release asset URLs are accepted."; exit 1 ;;
+            esac
+          fi
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake ninja-build ccache zstd curl tar
+          python3 -m py_compile scripts/engine/*.py
+          mkdir -p stage/llama-engine/bin dist
+
+      - name: Fetch official release asset
+        if: inputs.source_mode == 'official-asset'
+        shell: bash
+        env:
+          ARTIFACT_URL: ${{ inputs.artifact_url }}
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/llama-official
+          curl --fail --location --retry 3 --retry-delay 2 "$ARTIFACT_URL" -o /tmp/llama-official/engine-asset
+          tar -xf /tmp/llama-official/engine-asset -C /tmp/llama-official
+          SERVER="$(find /tmp/llama-official -type f -name llama-server -perm -u+x -print -quit)"
+          test -n "$SERVER" || {
+            echo "::error::The supplied official asset does not contain an executable llama-server."
+            exit 1
+          }
+          cp -a "$(dirname "$SERVER")/." stage/llama-engine/bin/
+          if [[ -f /tmp/llama-official/LICENSE ]]; then
+            cp /tmp/llama-official/LICENSE stage/llama-engine/LICENSE
+          else
+            LICENSE_FILE="$(find /tmp/llama-official -type f -name LICENSE -print -quit || true)"
+            if [[ -n "$LICENSE_FILE" ]]; then cp "$LICENSE_FILE" stage/llama-engine/LICENSE; fi
+          fi
+
+      - name: Checkout pinned llama.cpp source
+        if: inputs.source_mode == 'source-build'
+        shell: bash
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git /tmp/llama-src
+          git -C /tmp/llama-src fetch --depth 1 origin "$SOURCE_REF"
+          git -C /tmp/llama-src checkout --detach FETCH_HEAD
+          git -C /tmp/llama-src rev-parse HEAD | tee stage/source-commit.txt
+          cmake -S /tmp/llama-src -B /tmp/llama-build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/stage/llama-engine" \
+            -DGGML_NATIVE=OFF \
+            -DGGML_CPU_ALL_VARIANTS=ON \
+            -DGGML_CUDA=OFF \
+            -DLLAMA_BUILD_SERVER=ON \
+            -DLLAMA_BUILD_TESTS=OFF \
+            -DLLAMA_BUILD_EXAMPLES=OFF
+          cmake --build /tmp/llama-build --config Release --parallel 2
+          cmake --install /tmp/llama-build
+          cp /tmp/llama-src/LICENSE stage/llama-engine/LICENSE
+
+      - name: Generate provenance and validate engine
+        shell: bash
+        env:
+          SOURCE_MODE: ${{ inputs.source_mode }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          ARTIFACT_URL: ${{ inputs.artifact_url }}
+          BACKEND: ${{ inputs.backend }}
+        run: |
+          set -euo pipefail
+          python3 scripts/engine/generate_manifest.py \
+            --output stage/llama-engine/manifest.json \
+            --source-ref "$SOURCE_REF" \
+            --source-mode "$SOURCE_MODE" \
+            --artifact-url "$ARTIFACT_URL" \
+            --backend "$BACKEND"
+          python3 scripts/engine/validate_engine.py --root stage/llama-engine --require-ldd-clean
+
+      - name: Benchmark Zstandard levels and verify lossless extraction
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/engine/package_engine.py \
+            --source stage/llama-engine \
+            --output-dir dist \
+            --levels 3 6 9 15 19 \
+            --max-size-mib 90
+          zstd -t dist/llama-engine.tar.zst
+          mkdir -p /tmp/llama-final-check
+          zstd -d -c dist/llama-engine.tar.zst | tar -xf - -C /tmp/llama-final-check --no-same-owner --no-same-permissions
+          python3 scripts/engine/validate_engine.py \
+            --root /tmp/llama-final-check/llama-engine --require-ldd-clean
+          cp stage/llama-engine/manifest.json dist/manifest.json
+          test "$(stat -c%s dist/llama-engine.tar.zst)" -le "$((90 * 1024 * 1024))"
+
+      - name: Publish the accepted bundle to this branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p engine
+          cp dist/llama-engine.tar.zst engine/
+          cp dist/llama-engine.tar.zst.sha256 engine/
+          cp dist/manifest.json engine/
+          cp dist/compression-report.json engine/
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add engine/llama-engine.tar.zst engine/llama-engine.tar.zst.sha256 engine/manifest.json engine/compression-report.json
+          git diff --cached --quiet && { echo "No engine bundle changes to publish."; exit 0; }
+          git commit -m "Add validated llama.cpp engine bundle"
+          git push origin HEAD:feature/llama-engine-build-factory
+
+      - name: Upload diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: llama-engine-build-reports
+          path: |
+            dist/compression-report.json
+            stage/llama-engine/manifest.json
+          if-no-files-found: ignore
+          retention-days: 7
