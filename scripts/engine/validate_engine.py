@@ -33,6 +33,8 @@ def main() -> int:
 
     ldd_result = None
     ldd = shutil.which("ldd")
+    if args.require_ldd_clean and not ldd:
+        raise RuntimeError("ldd is required for dependency validation but was not found in PATH")
     if ldd:
         ldd_result = subprocess.run(
             [ldd, str(server)], cwd=root, text=True,
