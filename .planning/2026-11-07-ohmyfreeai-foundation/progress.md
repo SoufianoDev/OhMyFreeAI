@@ -917,3 +917,13 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Code commits: a51e9589, 45c5329e, cbccd640, a68bba15, 1cfd0805, 673782ca, 48bc9401.
 - Latest CI for code revision 48bc9401 has not completed: Ubuntu root job queued, Windows root job cancelled; Wails and distro jobs queued. Pending is not pass.
 - Remaining limitation: Windows MoveFileExW write-through is used as the documented platform barrier for publication, but its explicit flag guarantee is not a complete proof of power-loss recovery for every same-volume filesystem/storage stack. Windows Restore remains disabled until the full NTFS executor/restart matrix is tested; other filesystem classes remain unqualified.
+
+
+## CI closure — platform-specific journal namespace barriers — 2026-11-08
+
+- Code commit 6b582b3f1ee5537fb4f5c15c209e8fe02a75bc68 passed Root Go CI run 42439943545: Ubuntu and Windows both SUCCESS.
+- Ubuntu: go vet, go test, go test -race, build, Python compile/tests, frontend JavaScript syntax and architecture boundary checks all passed.
+- Windows: go vet, go test, build, Python compile/tests, frontend JavaScript syntax and architecture boundary checks all passed; Linux-only race step skipped.
+- Current eight-distro matrix run 42439943571 remained queued. This is pending, not a pass.
+- The new tests verify journal publication replacement and Windows fail-closed removal. Test-only workflows were cancelled before execution, so no RED evidence is claimed.
+- Restore remains disabled. Windows publication uses MoveFileExW write-through; full Windows power-loss guarantees and non-NTFS support remain unqualified. Windows journal deletion remains unsupported and preserves the journal.

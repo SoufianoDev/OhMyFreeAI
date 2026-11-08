@@ -178,3 +178,12 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Implementation commits: a51e958, 45c5329, cbccd640, a68bba1, 1cfd080, 673782c, 48bc940.
 - Latest code CI is pending: Ubuntu root job queued, Windows root job cancelled; Wails and distro jobs queued. Do not claim pass.
 - Next: close current CI, then design and implement the executor only after the platform durability boundary is explicit. Windows remains unqualified for full power-loss Restore until NTFS-specific process-death/restart evidence exists.
+
+
+### Verification closure — journal namespace barriers
+
+- Code revision 6b582b3f1ee5537fb4f5c15c209e8fe02a75bc68 passed Root Go CI run 42439943545: Ubuntu SUCCESS and Windows SUCCESS.
+- Ubuntu passed go vet, go test, go test -race, build, Python compile/tests, frontend syntax and architecture checks.
+- Windows passed go vet, go test, build, Python compile/tests, frontend syntax and architecture checks; Linux-only race step was skipped as expected.
+- Eight-distro matrix run 42439943571 remained queued when recorded; no distro-matrix success is claimed for this revision.
+- Test-first commits for journal namespace changes were cancelled before test execution. No RED evidence is claimed for that subtask.
