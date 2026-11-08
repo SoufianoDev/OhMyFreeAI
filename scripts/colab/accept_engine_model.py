@@ -64,7 +64,25 @@ def run_checked(command: list[str], *, timeout: int = 300, env=None) -> str:
     return result.stdout.strip()
 
 
-def download_verified(url: str, destination: Path, expected_sha256: str) -> None:
+def ensure_aria2() -> str:
+    aria2 = shutil.which("aria2c")
+    if aria2:
+        return aria2
+
+    say("aria2c is missing; installing it from the Colab Ubuntu repositories.")
+    apt = shutil.which("apt-get")
+    if not apt:
+        raise RuntimeError("aria2c is missing and apt-get is unavailable.")
+    run_checked([apt, "update", "-qq"], timeout=600)
+    run_checked([apt, "install", "-y", "-qq", "aria2"], timeout=600)
+    aria2 = shutil.which("aria2c")
+    if not aria2:
+        raise RuntimeError("aria2 installation completed but aria2c was not found.")
+    return aria2
+
+
+def download_verified(url: str, destination: Path, expected_sha256: str,
+                      aria2: str) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     if destination.is_file() and sha256(destination) == expected_sha256:
         say(f"Already downloaded and checksum verified: {destination.name}")
@@ -73,32 +91,57 @@ def download_verified(url: str, destination: Path, expected_sha256: str) -> None
         destination.unlink()
 
     partial = destination.with_name(destination.name + ".part")
-    curl = shutil.which("curl")
-    if not curl:
-        raise RuntimeError("curl is required in the Colab runtime.")
+    control_file = Path(str(partial) + ".aria2")
 
     def fetch(resume: bool) -> subprocess.CompletedProcess:
         command = [
-            curl, "--location", "--fail", "--show-error",
-            "--retry", "5", "--retry-all-errors", "--connect-timeout", "30",
-            "--output", str(partial),
+            aria2,
+            "--continue=true" if resume else "--continue=false",
+            "--allow-overwrite=true",
+            "--auto-file-renaming=false",
+            "--file-allocation=none",
+            "--check-integrity=true",
+            "--max-concurrent-downloads=1",
+            "--max-connection-per-server=16",
+            "--split=16",
+            "--min-split-size=1M",
+            "--connect-timeout=30",
+            "--timeout=60",
+            "--max-tries=5",
+            "--retry-wait=3",
+            "--max-file-not-found=5",
+            "--summary-interval=1",
+            "--console-log-level=notice",
+            "--show-console-readout=true",
+            "--human-readable=true",
+            "--download-result=hide",
+            "--dir", str(destination.parent),
+            "--out", partial.name,
+            url,
         ]
-        if resume:
-            command += ["--continue-at", "-"]
-        command.append(url)
-        return subprocess.run(command, text=True, stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT, timeout=7200)
+        say(
+            f"aria2: {destination.name} | 16 connections/server | "
+            "16 segments | live progress every second"
+        )
+        # Inherit the terminal so aria2 can continuously refresh its progress line.
+        return subprocess.run(command, timeout=7200)
 
-    say(f"Downloading {destination.name}.")
-    result = fetch(partial.exists() and partial.stat().st_size > 0)
-    # A stale/complete partial can make curl resume fail with HTTP 416.
-    # Discard only that partial and retry once from byte zero.
-    if result.returncode != 0 and partial.exists():
-        say("Resume failed; discarding the partial file and retrying cleanly.")
-        partial.unlink()
+    resume = partial.is_file() and partial.stat().st_size > 0 and control_file.is_file()
+    result = fetch(resume)
+    if result.returncode != 0:
+        say(
+            f"aria2 download returned {result.returncode}; clearing only this "
+            "incomplete download and retrying from zero."
+        )
+        partial.unlink(missing_ok=True)
+        control_file.unlink(missing_ok=True)
         result = fetch(False)
     if result.returncode != 0:
-        raise RuntimeError(f"Download failed for {destination.name}:\n{result.stdout[-4000:]}")
+        raise RuntimeError(
+            f"aria2 failed downloading {destination.name} (exit {result.returncode})."
+        )
+    if not partial.is_file():
+        raise RuntimeError(f"aria2 reported success but did not create {partial}.")
 
     actual = sha256(partial)
     if actual != expected_sha256:
@@ -107,6 +150,7 @@ def download_verified(url: str, destination: Path, expected_sha256: str) -> None
             f"got {actual}. Partial file retained for diagnosis."
         )
     partial.replace(destination)
+    control_file.unlink(missing_ok=True)
     say(f"SHA-256 verified: {actual}")
 
 
@@ -284,12 +328,13 @@ def main() -> int:
     if free_disk < 9.0:
         raise RuntimeError(f"Only {free_disk:.2f} GiB disk space is free; at least 9 GiB is required.")
 
-    download_verified(ENGINE_URL, ENGINE_ARCHIVE, ENGINE_SHA256)
+    aria2 = ensure_aria2()
+    download_verified(ENGINE_URL, ENGINE_ARCHIVE, ENGINE_SHA256, aria2)
     model_url = (
         f"https://huggingface.co/{HF_REPO}/resolve/{HF_REVISION}/"
         f"{MODEL_FILE}?download=true"
     )
-    download_verified(model_url, MODEL_PATH, MODEL_SHA256)
+    download_verified(model_url, MODEL_PATH, MODEL_SHA256, aria2)
     if MODEL_PATH.stat().st_size != MODEL_BYTES:
         raise RuntimeError(
             f"Unexpected GGUF size {MODEL_PATH.stat().st_size}; expected {MODEL_BYTES}."
