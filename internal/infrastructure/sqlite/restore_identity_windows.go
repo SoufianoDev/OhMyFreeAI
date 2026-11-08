@@ -131,7 +131,7 @@ func openRestoreArtifactRoot(path string) (windows.Handle, error) {
 		return windows.InvalidHandle, fmt.Errorf("restore state directory cannot be a volume root")
 	}
 	components := strings.FieldsFunc(relative, func(r rune) bool {
-		return r == '\\\\' || r == '/'
+		return r == '\\' || r == '/'
 	})
 	if len(components) == 0 {
 		_ = windows.CloseHandle(current)
