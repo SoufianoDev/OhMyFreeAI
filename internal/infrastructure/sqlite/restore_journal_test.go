@@ -21,6 +21,7 @@ func validTestRestoreJournal(root string) RestoreJournal {
 		Phase:         RestorePhasePrepared,
 		TargetPath:    filepath.Join(root, "state.db"),
 		StagingPath:   filepath.Join(root, ".restore-stage.db"),
+		RollbackPath:  filepath.Join(root, ".restore-rollback.db"),
 		PreviousDatabaseExisted: boolPointer(true),
 		ArchiveSHA256: strings.Repeat("a", 64),
 		ArchiveSize:   4096,
@@ -190,6 +191,7 @@ func TestRestoreJournalPreservesExplicitNoPreviousDatabase(t *testing.T) {
 	root := t.TempDir()
 	journal := validTestRestoreJournal(root)
 	journal.PreviousDatabaseExisted = boolPointer(false)
+	journal.RollbackPath = ""
 	if err := WriteRestoreJournal(root, journal); err != nil {
 		t.Fatalf("write journal with no previous database: %v", err)
 	}
@@ -231,5 +233,51 @@ func TestReadRestoreJournalRejectsLegacyVersionOne(t *testing.T) {
 	}
 	if _, err := ReadRestoreJournal(root); !errors.Is(err, ErrRestoreJournalInvalid) {
 		t.Fatalf("read version-one journal error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
+
+func TestWriteRestoreJournalRejectsInconsistentRollbackMetadata(t *testing.T) {
+	root := t.TempDir()
+	journal := validTestRestoreJournal(root)
+	journal.RollbackPath = ""
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("write with missing rollback path error = %v, want ErrRestoreJournalInvalid", err)
+	}
+
+	journal = validTestRestoreJournal(root)
+	journal.PreviousDatabaseExisted = boolPointer(false)
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("write unexpected rollback path error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
+func TestReadRestoreJournalRejectsInconsistentRollbackMetadata(t *testing.T) {
+	root := t.TempDir()
+	journal := validTestRestoreJournal(root)
+	journal.RollbackPath = ""
+	data, err := json.Marshal(journal)
+	if err != nil {
+		t.Fatalf("marshal journal without rollback path: %v", err)
+	}
+	path := filepath.Join(root, restoreJournalFileName)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write journal without rollback path: %v", err)
+	}
+	if _, err := ReadRestoreJournal(root); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("read journal without rollback path error = %v, want ErrRestoreJournalInvalid", err)
+	}
+
+	journal = validTestRestoreJournal(root)
+	journal.PreviousDatabaseExisted = boolPointer(false)
+	data, err = json.Marshal(journal)
+	if err != nil {
+		t.Fatalf("marshal journal with unexpected rollback path: %v", err)
+	}
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatalf("write journal with unexpected rollback path: %v", err)
+	}
+	if _, err := ReadRestoreJournal(root); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("read journal with unexpected rollback path error = %v, want ErrRestoreJournalInvalid", err)
 	}
 }
