@@ -191,11 +191,10 @@ func canonicalStateDirectory(path string) (string, error) {
 	if err != nil || !info.IsDir() {
 		return "", fmt.Errorf("%w: state directory is not a directory", ErrRestoreJournalInvalid)
 	}
-	// Keep the caller's absolute spelling for stable round-trips. On Windows,
-	// EvalSymlinks may rewrite a long temporary path to its 8.3 alias; using
-	// that resolved spelling in journal fields makes equivalent paths compare
-	// unequal to the paths supplied by the transaction owner.
-	return filepath.Clean(absolute), nil
+	// Persist the resolved spelling consistently. Windows may expose the same
+	// directory through both a long path and an 8.3 alias; mixing those forms
+	// across journal writes and reads breaks exact round-trip comparisons.
+	return filepath.Clean(resolved), nil
 }
 
 func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJournal, error) {
@@ -261,7 +260,7 @@ func canonicalStatePath(root, path string) (string, error) {
 	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
 		return "", fmt.Errorf("%w: transaction path escapes the application state directory", ErrRestoreJournalInvalid)
 	}
-	return absolute, nil
+	return resolvedCandidate, nil
 }
 
 func validRestorePhase(phase RestorePhase) bool {
