@@ -244,6 +244,11 @@ func canonicalStatePath(root, path string) (string, error) {
 		return "", fmt.Errorf("%w: resolve transaction path parent: %v", ErrRestoreJournalInvalid, err)
 	}
 	canonical := filepath.Join(parent, filepath.Base(absolute))
+	if info, statErr := os.Lstat(absolute); statErr == nil && info.Mode()&os.ModeSymlink != 0 {
+		return "", fmt.Errorf("%w: transaction path must not be a symbolic link", ErrRestoreJournalInvalid)
+	} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+		return "", fmt.Errorf("%w: inspect transaction path: %v", ErrRestoreJournalInvalid, statErr)
+	}
 	relative, err := filepath.Rel(root, canonical)
 	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
 		return "", fmt.Errorf("%w: transaction path escapes the application state directory", ErrRestoreJournalInvalid)
