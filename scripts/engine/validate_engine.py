@@ -39,7 +39,7 @@ def main() -> int:
     )
     if devices.returncode != 0 or "CPU" not in devices.stdout.upper():
         raise RuntimeError(
-            "llama-server could not enumerate a CPU backend from the staged bundle:\\n"
+            "llama-server could not enumerate a CPU backend from the staged bundle:\n"
             + devices.stdout
         )
 
