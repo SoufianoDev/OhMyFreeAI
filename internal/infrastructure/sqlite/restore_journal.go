@@ -57,8 +57,8 @@ type RestoreJournal struct {
 	UpdatedAt      time.Time    `json:"updated_at"`
 }
 
-// WriteRestoreJournal durably replaces the journal using a same-directory
-// temporary file, file sync, atomic rename and directory sync.
+// WriteRestoreJournal durably publishes the journal using a same-directory
+// temporary file and the platform-specific namespace persistence barrier.
 func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	root, err := canonicalStateDirectory(stateDirectory)
 	if err != nil {
@@ -118,9 +118,6 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 		return fmt.Errorf("publish SQLite restore journal: %w", err)
 	}
 	published = true
-	if err := syncRestoreDirectory(root); err != nil {
-		return err
-	}
 	return nil
 }
 
@@ -160,9 +157,9 @@ func ReadRestoreJournal(stateDirectory string) (RestoreJournal, error) {
 	return journal, nil
 }
 
-// RemoveRestoreJournal removes the committed/recovered journal and syncs the
-// containing directory. Callers must first finish recovery and retain rollback
-// artifacts according to the application cleanup policy.
+// RemoveRestoreJournal removes the committed/recovered journal when the
+// platform can durably persist the namespace change. Callers must first finish
+// recovery and retain rollback artifacts according to the application policy.
 func RemoveRestoreJournal(stateDirectory string) error {
 	root, err := canonicalStateDirectory(stateDirectory)
 	if err != nil {
