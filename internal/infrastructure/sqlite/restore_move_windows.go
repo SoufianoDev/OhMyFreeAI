@@ -71,7 +71,7 @@ func openRestoreSourceRelative(directory windows.Handle, sourceLeaf string) (win
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		windows.FILE_OPEN,
 		windows.FILE_NON_DIRECTORY_FILE|windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT,
-		nil,
+		0,
 		0,
 	)
 	runtime.KeepAlive(objectName)
