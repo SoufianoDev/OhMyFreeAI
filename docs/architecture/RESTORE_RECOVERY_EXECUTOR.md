@@ -133,7 +133,7 @@ The pure planner now receives explicit per-path identity outcomes for target, st
 
 Completed-phase decisions require the expected content identity at each relevant path. Candidate publication rollback requires a verified previous database at rollback and a verified candidate either at target or already in quarantine. Committed verification requires the candidate at target and retains the previous rollback. Rolled-back verification requires the previous database at target and the candidate retained in quarantine.
 
-The planner intentionally rejects `preserving-previous`, `publishing`, and `restoring-previous` intent phases until the executor's move-by-move truth tables and no-replace operations are implemented. This is a deliberate fail-closed boundary, not a claim of automatic crash recovery.
+The planner now accepts the staged-candidate state under `restoring-previous`, so an executor can persist rollback intent before moving staging to quarantine and safely resume after a crash. All other staging combinations remain ambiguous. This is a planner decision only, not automatic crash recovery.
 
 
 ## Intent-phase planner truth tables and no-replace move primitive — 2026-11-08
@@ -147,6 +147,7 @@ The pure planner now has explicit decisions for all three durable intent phases.
 | publishing | Candidate at staging, target missing, rollback matches prior-DB expectation, quarantine missing | PublishCandidate=true |
 | publishing | Candidate already at target, staging missing, rollback matches expectation, quarantine missing | Resume without repeating the move |
 | restoring-previous | Candidate at target, previous DB at rollback, quarantine missing, staging missing | Preserve target candidate, then restore rollback |
+| restoring-previous | Candidate at staging, target missing, previous DB at rollback, quarantine missing | Preserve staged candidate in quarantine, then restore rollback |
 | restoring-previous | Candidate at quarantine, previous DB at rollback, target and staging missing | Restore rollback |
 | restoring-previous | Candidate at quarantine, previous DB already at target, rollback and staging missing | Resume without repeating the move |
 

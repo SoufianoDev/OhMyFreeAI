@@ -395,6 +395,11 @@ func TestPlanRestoreRecoveryIntentPhasesRejectContradictoryStates(t *testing.T) 
 			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
+			name: "restoring previous candidate appears at staging and quarantine",
+			journal: recoveryTestJournal(RestorePhaseRestoringPrevious, true),
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFilePrevious, RestoreFileCandidate),
+		},
+		{
 			name: "restoring previous candidate lost",
 			journal: recoveryTestJournal(RestorePhaseRestoringPrevious, true),
 			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFilePrevious, RestoreFileMissing),

@@ -231,10 +231,20 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 		}, nil
 
 	case RestorePhaseRestoringPrevious:
-		if !hadPrevious || files.Staging != RestoreFileMissing {
-			return ambiguous("restoring-previous requires an existing previous database and no staging artifact")
+		if !hadPrevious {
+			return ambiguous("restoring-previous requires an existing previous database")
 		}
 		switch {
+		case files.Target == RestoreFileMissing && files.Staging == RestoreFileCandidate &&
+			files.Rollback == RestoreFilePrevious && files.Quarantine == RestoreFileMissing:
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryResumeIntent,
+				PreserveStaging: true,
+				RestoreRollback: true,
+				Reason: "candidate remains staged; quarantine it before restoring the previous database",
+			}, nil
+		case files.Staging != RestoreFileMissing:
+			return ambiguous("restoring-previous has an unexpected staging artifact")
 		case files.Target == RestoreFileCandidate && files.Rollback == RestoreFilePrevious && files.Quarantine == RestoreFileMissing:
 			return RestoreRecoveryPlan{
 				Action: RestoreRecoveryResumeIntent,
