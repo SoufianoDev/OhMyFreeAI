@@ -167,7 +167,7 @@ def configure_cuda_runtime() -> tuple[dict, object]:
                 paths.append(str(libdir))
 
     paths = list(dict.fromkeys(paths))
-    if not any(Path(p).glob("libcudart.so*") for p in paths):
+    if not any(any(Path(p).glob("libcudart.so*")) for p in paths):
         raise RuntimeError("Could not locate libcudart in PyTorch/NVIDIA runtime libraries.")
     env = os.environ.copy()
     env["LD_LIBRARY_PATH"] = os.pathsep.join(
