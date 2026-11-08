@@ -1031,3 +1031,40 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - The latest branch head before this planning update was a71a8a66a025b4c9bae64110b34b515d1c249818; the latest code/test commit remains its parent 3fdd53b3a416d3abeb4d022ce574456d36924e7f. This update is documentation-only.
 - Next: close the Ubuntu 22.04 retry; then design, but do not implement, a single identity-bound no-replace publication contract. It must address Linux's directory-leaf mutation race and Windows same-handle READ_DATA+DELETE requirements. Do not proceed to the executor until the private state-directory/ACL policy is explicitly approved.
 - Not checked: local repository-shell tests (no local checkout/toolchain access in this session), real-host filesystem behavior, ACL semantics, power-loss recovery, or production Restore integration.
+
+
+## Fail-closed legacy Restore gate — 2026-11-08T23:48Z
+
+### Code changes
+
+- `sqlite.RestoreDatabase` now returns `ErrRestoreExecutorUnavailable` immediately. The prior path-based publication sequence using `os.Rename` is no longer reachable through this entry point.
+- `backup.Manager.Restore` now returns the same error before inspecting/extracting the archive or touching the target.
+- `AppService` still exposes backup export and archive inspection only; no Restore GUI or CLI route was added.
+- Added tests proving both entry points fail closed and preserve source/target bytes.
+- Removed five `store_test.go` tests that required the legacy restore implementation to execute. Those tests are no longer valid while Restore is intentionally disabled.
+- Backup creation and archive inspection are unchanged.
+
+### Commits on `foundation/restore-file-identity-inspection`
+
+- `8594f8efa93840c75ab7087a52080a646b2b857a` — disable legacy SQLite restore.
+- `27a2e9e5df606b29d8909f282128e2fc5a5aa57a` — disable backup Manager restore.
+- `8ff5b25ccbbee5822e4450d7e3911874b2d94481` — assert backup Manager restore fails closed.
+- `edbbcb89266e4d264c5ae2199870d966da8ba33c` — assert SQLite restore fails closed.
+- `d2db9c73c444dea12c0a663263325d45b7e17e47` — remove obsolete tests expecting direct restore.
+- `a786272f28aed793e810ffef9e16ac5defd03476` — document the legacy restore gate and verified-handle/move integration boundary.
+
+### CI status for code commit `d2db9c73c444dea12c0a663263325d45b7e17e47`
+
+- Root Go CI: run `42536767313` — Ubuntu in progress; Windows queued at this update.
+- SQLite driver matrix: run `42536767309` — queued.
+- Wails platform proof: run `42536767327` — queued.
+- Linux distribution matrix: run `42536767356` — several jobs in progress; remaining jobs queued.
+- The preceding CI run on `edbbcb8` failed because five old `store_test.go` tests still expected the removed behavior. Those expectations were removed in `d2db9c7`. Do not claim the new CI passed until these runs complete.
+- No local shell/test execution is claimed; GitHub Actions is the validation source.
+
+### Safety boundary
+
+- Restore remains unavailable and fail-closed.
+- No filesystem executor, startup recovery, Restore UI/CLI route, ACL evaluator, or permission repair was enabled.
+- ACL policy remains unapproved.
+- Backup export and archive inspection remain available.
