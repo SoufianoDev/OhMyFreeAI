@@ -63,6 +63,41 @@ func TestInspectRestoreArtifactNormalizesWindowsPathCase(t *testing.T) {
 	}
 }
 
+
+func TestInspectRestoreArtifactAcceptsNestedArtifactPath(t *testing.T) {
+	stateDirectory := t.TempDir()
+	artifactDirectory := filepath.Join(stateDirectory, "restore", "candidates")
+	if err := os.MkdirAll(artifactDirectory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(artifactDirectory, "candidate.sqlite")
+	content := []byte("nested verified SQLite restore candidate")
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := inspectRestoreArtifact(stateDirectory, path)
+	if err != nil {
+		t.Fatalf("inspectRestoreArtifact() rejected a nested artifact: %v", err)
+	}
+	sum := sha256.Sum256(content)
+	want := RestoreContentIdentity{SHA256: hex.EncodeToString(sum[:]), Size: uint64(len(content))}
+	if got != want {
+		t.Fatalf("inspectRestoreArtifact() = %#v, want %#v", got, want)
+	}
+}
+
+func TestInspectRestoreArtifactRejectsEmptyFile(t *testing.T) {
+	stateDirectory := t.TempDir()
+	path := filepath.Join(stateDirectory, "empty.sqlite")
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := inspectRestoreArtifact(stateDirectory, path); err == nil {
+		t.Fatal("inspectRestoreArtifact() accepted an empty artifact")
+	}
+}
+
 func TestInspectRestoreArtifactRejectsUnsafePaths(t *testing.T) {
 	stateDirectory := t.TempDir()
 	outsideDirectory := t.TempDir()

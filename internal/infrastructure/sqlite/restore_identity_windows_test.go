@@ -5,6 +5,7 @@ package sqlite
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"golang.org/x/sys/windows"
@@ -22,7 +23,21 @@ func TestInspectRestoreArtifactAcceptsWindowsShortPathAlias(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	required, err := windows.GetShortPathName(pathPtr, nil, 0)
+	longRequired, err := windows.GetLongPathName(pathPtr, nil, 0)
+	if err != nil {
+		t.Fatalf("query long Windows path: %v", err)
+	}
+	longBuffer := make([]uint16, longRequired)
+	longLength, err := windows.GetLongPathName(pathPtr, &longBuffer[0], uint32(len(longBuffer)))
+	if err != nil {
+		t.Fatalf("resolve long Windows path: %v", err)
+	}
+	longPath := windows.UTF16ToString(longBuffer[:longLength])
+	longPathPtr, err := windows.UTF16PtrFromString(longPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	required, err := windows.GetShortPathName(longPathPtr, nil, 0)
 	if err != nil {
 		t.Fatalf("query short Windows path: %v", err)
 	}
@@ -30,12 +45,12 @@ func TestInspectRestoreArtifactAcceptsWindowsShortPathAlias(t *testing.T) {
 		t.Fatal("Windows returned an empty short path")
 	}
 	buffer := make([]uint16, required)
-	length, err := windows.GetShortPathName(pathPtr, &buffer[0], uint32(len(buffer)))
+	length, err := windows.GetShortPathName(longPathPtr, &buffer[0], uint32(len(buffer)))
 	if err != nil {
 		t.Fatalf("resolve short Windows path: %v", err)
 	}
 	shortPath := windows.UTF16ToString(buffer[:length])
-	if filepath.Clean(shortPath) == filepath.Clean(path) {
+	if strings.EqualFold(filepath.Clean(shortPath), filepath.Clean(longPath)) {
 		t.Skip("the filesystem did not provide a distinct 8.3 short path")
 	}
 
