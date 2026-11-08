@@ -234,3 +234,91 @@ func TestPlanRestoreRecoveryRejectsCollidingPaths(t *testing.T) {
 		})
 	}
 }
+
+func TestPlanRestoreRecoveryRequiresVerifiedFileIdentities(t *testing.T) {
+	journal := recoveryTestJournal(RestorePhasePublished, true)
+	journal.CandidateSHA256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+	journal.CandidateSize = 200
+	journal.PreviousSHA256 = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+	journal.PreviousSize = 300
+
+	tests := []struct {
+		name  string
+		files RestoreRecoveryFiles
+		want  RestoreRecoveryAction
+		wantErr bool
+	}{
+		{
+			name: "verified candidate and previous permit rollback plan",
+			files: RestoreRecoveryFiles{
+				Target: RestoreFileCandidate,
+				Rollback: RestoreFilePrevious,
+				Staging: RestoreFileMissing,
+				Quarantine: RestoreFileMissing,
+			},
+			want: RestoreRecoveryRestorePrevious,
+		},
+		{
+			name: "candidate digest mismatch is ambiguous",
+			files: RestoreRecoveryFiles{
+				Target: RestoreFileMismatch,
+				Rollback: RestoreFilePrevious,
+				Staging: RestoreFileMissing,
+				Quarantine: RestoreFileMissing,
+			},
+			wantErr: true,
+		},
+		{
+			name: "previous digest mismatch is ambiguous",
+			files: RestoreRecoveryFiles{
+				Target: RestoreFileCandidate,
+				Rollback: RestoreFileMismatch,
+				Staging: RestoreFileMissing,
+				Quarantine: RestoreFileMissing,
+			},
+			wantErr: true,
+		},
+		{
+			name: "unreadable candidate is ambiguous",
+			files: RestoreRecoveryFiles{
+				Target: RestoreFileUnreadable,
+				Rollback: RestoreFilePrevious,
+				Staging: RestoreFileMissing,
+				Quarantine: RestoreFileMissing,
+			},
+			wantErr: true,
+		},
+		{
+			name: "unverified staging artifact cannot be deleted",
+			files: RestoreRecoveryFiles{
+				Target: RestoreFilePrevious,
+				Staging: RestoreFileUnverified,
+				Rollback: RestoreFileMissing,
+				Quarantine: RestoreFileMissing,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			phaseJournal := journal
+			if test.name == "unverified staging artifact cannot be deleted" {
+				phaseJournal = recoveryTestJournal(RestorePhaseStaging, true)
+			}
+			plan, err := PlanRestoreRecovery(phaseJournal, test.files)
+			if test.wantErr {
+				if !errors.Is(err, ErrRestoreRecoveryAmbiguous) {
+					t.Fatalf("PlanRestoreRecovery() = %#v, %v; want ambiguity", plan, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("PlanRestoreRecovery() error = %v", err)
+			}
+			if plan.Action != test.want {
+				t.Fatalf("PlanRestoreRecovery() action = %q; want %q", plan.Action, test.want)
+			}
+		})
+	}
+}
