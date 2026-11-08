@@ -23,6 +23,15 @@ func validTestRestoreJournal(root string) RestoreJournal {
 	}
 }
 
+func canonicalTestRestorePath(t *testing.T, path string) string {
+	t.Helper()
+	parent, err := filepath.EvalSymlinks(filepath.Dir(path))
+	if err != nil {
+		t.Fatalf("resolve test path parent: %v", err)
+	}
+	return filepath.Join(parent, filepath.Base(path))
+}
+
 func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 	root := t.TempDir()
 	journal := validTestRestoreJournal(root)
@@ -35,8 +44,12 @@ func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read initial restore journal: %v", err)
 	}
-	if got != journal {
-		t.Fatalf("read journal = %#v, want %#v", got, journal)
+	want := journal
+	want.TargetPath = canonicalTestRestorePath(t, journal.TargetPath)
+	want.StagingPath = canonicalTestRestorePath(t, journal.StagingPath)
+	want.RollbackPath = canonicalTestRestorePath(t, journal.RollbackPath)
+	if got != want {
+		t.Fatalf("read journal = %#v, want %#v", got, want)
 	}
 	info, err := os.Stat(filepath.Join(root, restoreJournalFileName))
 	if err != nil {
