@@ -150,7 +150,7 @@ jobs:
             -DLLAMA_BUILD_TESTS=OFF \
             -DLLAMA_BUILD_EXAMPLES=OFF
           cmake --build /tmp/llama-build --config Release --parallel 2 --target llama-server
-          cmake --install /tmp/llama-build --config Release
+          cmake --build /tmp/llama-build --config Release --parallel 2 --target install
           test -x /tmp/llama-install/bin/llama-server
           cp -a /tmp/llama-install/bin/. stage/llama-engine/bin/
           cp /tmp/llama-src/LICENSE stage/llama-engine/LICENSE
