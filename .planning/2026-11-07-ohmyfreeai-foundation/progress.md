@@ -894,3 +894,13 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Verified on d717eac: Root Go CI run 42438368020 passed Ubuntu + Windows (including Linux go test -race ./...); SQLite driver matrix run 42438368022 passed 4/4. Wails run 42438368038 and eight-distro matrix run 42438368003 were still in progress at the time of writing.
 - The preceding distro run 42437541325 finished with 7/8; Ubuntu 22.04 built and passed CLI smoke but timed out waiting for the WebView-to-Go call. A targeted retry of that lane is in progress. This remains an environment-sensitive failure until a successful retry is observed.
 - Restore remains disabled. The primitive is not called by an executor. Not yet implemented: journaled move orchestration, content identity revalidation around each move, directory sync and restart reconciliation, crash-injection tests, startup recovery and shared application Restore service.
+
+
+## CI closure update — 2026-11-08T02:27Z
+
+- On code commit d717eac7096d98c3b59b1b9ebd39aa1cff6e2d93, Root Go CI run 42438368020 completed SUCCESS on Ubuntu and Windows. Ubuntu passed go vet, go test, go test -race, build, Python tests, frontend syntax and architecture checks. Windows passed the native equivalent except the Linux-only race step.
+- SQLite driver evaluation run 42438368022 completed SUCCESS, 4/4 (modernc and ncruces on Ubuntu and Windows).
+- Wails native platform run 42438368038 completed SUCCESS, 2/2. Ubuntu built the actual application, passed native CLI smoke, executable verification, WebView-to-Go bridge and database reopen. Windows built and verified the native executable.
+- The previous eight-distro matrix run 42437541325 initially had Ubuntu 22.04 GTK3 fail at the WebView-to-Go smoke timeout. Re-running only that failed job succeeded; the latest attempt is 8/8 successful. No code change was made to claim a fix; this is a successful retry of an intermittent smoke failure.
+- The new full distro matrix for d717eac, run 42438368003, was still running when this note was written. Keep its status separate from the successful prior-run retry.
+- The no-replace primitive is verified by Linux and Windows unit tests, but is still not integrated into a durable executor. Restore remains disabled.
