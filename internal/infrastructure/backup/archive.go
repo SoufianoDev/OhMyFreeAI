@@ -254,46 +254,11 @@ func (m Manager) Inspect(ctx context.Context, archivePath string) (Manifest, err
 	return manifest, nil
 }
 
+// Restore is intentionally unavailable until the journaled, identity-bound
+// filesystem executor is implemented and qualified on Linux and Windows.
+// Backup creation and inspection remain available.
 func (m Manager) Restore(ctx context.Context, archivePath, targetDatabasePath string) (string, error) {
-	if m.Migrations == nil {
-		return "", ErrBackupManagerConfig
-	}
-	if err := validateArchiveExtension(archivePath); err != nil {
-		return "", err
-	}
-	absoluteArchive, err := filepath.Abs(archivePath)
-	if err != nil {
-		return "", fmt.Errorf("resolve backup archive: %w", err)
-	}
-	if err := ctx.Err(); err != nil {
-		return "", err
-	}
-	absoluteTarget, err := filepath.Abs(targetDatabasePath)
-	if err != nil {
-		return "", fmt.Errorf("resolve restore database target: %w", err)
-	}
-	if sameArchivePath(absoluteArchive, absoluteTarget) {
-		return "", ErrInvalidBackupPath
-	}
-	targetDirectory := filepath.Dir(absoluteTarget)
-	if err := os.MkdirAll(targetDirectory, 0o700); err != nil {
-		return "", fmt.Errorf("create restore staging directory: %w", err)
-	}
-	stagingDirectory, err := os.MkdirTemp(targetDirectory, ".ohmyfreeai-archive-restore-*")
-	if err != nil {
-		return "", fmt.Errorf("create restore staging directory: %w", err)
-	}
-	defer os.RemoveAll(stagingDirectory)
-
-	snapshotPath := filepath.Join(stagingDirectory, databaseName)
-	if _, err := extractArchive(ctx, absoluteArchive, snapshotPath); err != nil {
-		return "", err
-	}
-	rollbackPath, err := sqlite.RestoreDatabase(ctx, snapshotPath, absoluteTarget, m.Migrations, m.MigrationDir)
-	if err != nil {
-		return "", fmt.Errorf("restore OhMyFreeAI backup: %w", err)
-	}
-	return rollbackPath, nil
+	return "", sqlite.ErrRestoreExecutorUnavailable
 }
 
 func extractArchive(ctx context.Context, archivePath, snapshotPath string) (Manifest, error) {
