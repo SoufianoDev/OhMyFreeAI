@@ -201,6 +201,16 @@ func (m Manager) Create(ctx context.Context, store *sqlite.Store, destinationPat
 	return nil
 }
 
+// CreateWithStoreController holds a shared lease until the complete archive is published.
+func (m Manager) CreateWithStoreController(ctx context.Context, controller *sqlite.StoreController, destinationPath string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return controller.WithShared(ctx, func(store *sqlite.Store) error {
+		return m.Create(ctx, store, destinationPath)
+	})
+}
+
 // Inspect validates the complete archive and returns its manifest without
 // changing the live application database. Extraction is isolated in a
 // temporary directory that is removed before the method returns.

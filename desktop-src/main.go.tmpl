@@ -157,9 +157,7 @@ func (operations localBackupOperations) Export(ctx context.Context, destination 
 	if operations.storeController == nil {
 		return fmt.Errorf("local application database is unavailable")
 	}
-	return operations.storeController.WithShared(ctx, func(store *sqlite.Store) error {
-		return operations.manager.Create(ctx, store, destination)
-	})
+	return operations.manager.CreateWithStoreController(ctx, operations.storeController, destination)
 }
 
 func (operations localBackupOperations) Inspect(ctx context.Context, archivePath string) (appcli.BackupInspection, error) {

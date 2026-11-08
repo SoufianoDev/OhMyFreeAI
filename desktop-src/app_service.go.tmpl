@@ -75,9 +75,7 @@ func (s *AppService) ExportBackup() (BackupExportResult, error) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
-	if err := s.storeController.WithShared(ctx, func(store *sqlite.Store) error {
-		return s.backupManager.Create(ctx, store, path)
-	}); err != nil {
+	if err := s.backupManager.CreateWithStoreController(ctx, s.storeController, path); err != nil {
 		return BackupExportResult{}, fmt.Errorf("export backup: %w", err)
 	}
 	return BackupExportResult{FileName: filepath.Base(path)}, nil
