@@ -95,12 +95,21 @@ func openRestoreArtifactFile(stateDirectory, path string) (*os.File, error) {
 }
 
 func openRestoreArtifactRoot(path string) (windows.Handle, error) {
-	pathPtr, err := windows.UTF16PtrFromString(path)
-	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("encode restore state directory: %w", err)
+	path = filepath.Clean(path)
+	volume := filepath.VolumeName(path)
+	// The state directory is local application data. Reject UNC and device
+	// namespace paths rather than treating a remote/provider root as trusted.
+	if len(volume) != 2 || volume[1] != ':' {
+		return windows.InvalidHandle, fmt.Errorf("restore state directory must be on a local drive")
 	}
-	handle, err := windows.CreateFile(
-		pathPtr,
+
+	volumeRoot := volume + string(filepath.Separator)
+	rootPtr, err := windows.UTF16PtrFromString(volumeRoot)
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("encode restore volume root: %w", err)
+	}
+	current, err := windows.CreateFile(
+		rootPtr,
 		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		nil,
@@ -109,13 +118,40 @@ func openRestoreArtifactRoot(path string) (windows.Handle, error) {
 		0,
 	)
 	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("open restore state directory: %w", err)
+		return windows.InvalidHandle, fmt.Errorf("open restore volume root: %w", err)
 	}
-	if err := validateRestoreArtifactDirectoryHandle(handle); err != nil {
-		_ = windows.CloseHandle(handle)
-		return windows.InvalidHandle, err
+	if err := validateRestoreArtifactDirectoryHandle(current); err != nil {
+		_ = windows.CloseHandle(current)
+		return windows.InvalidHandle, fmt.Errorf("validate restore volume root: %w", err)
 	}
-	return handle, nil
+
+	relative := strings.TrimLeft(strings.TrimPrefix(path, volume), `\\/`)
+	if relative == "" {
+		_ = windows.CloseHandle(current)
+		return windows.InvalidHandle, fmt.Errorf("restore state directory cannot be a volume root")
+	}
+	components := strings.FieldsFunc(relative, func(r rune) bool {
+		return r == '\\\\' || r == '/'
+	})
+	if len(components) == 0 {
+		_ = windows.CloseHandle(current)
+		return windows.InvalidHandle, fmt.Errorf("restore state directory has no path components")
+	}
+
+	// Resolve one component at a time relative to a pinned parent handle.
+	// FILE_OPEN_REPARSE_POINT opens each entry itself; validation rejects it
+	// before that handle can become the next RootDirectory. This avoids the
+	// ancestor traversal that remains possible when CreateFile opens the full
+	// canonical path with FILE_FLAG_OPEN_REPARSE_POINT.
+	for _, component := range components {
+		next, openErr := openRestoreArtifactDirectoryRelative(current, component)
+		_ = windows.CloseHandle(current)
+		if openErr != nil {
+			return windows.InvalidHandle, fmt.Errorf("open restore state directory component %q: %w", component, openErr)
+		}
+		current = next
+	}
+	return current, nil
 }
 
 func openRestoreArtifactDirectoryRelative(parent windows.Handle, leaf string) (windows.Handle, error) {
