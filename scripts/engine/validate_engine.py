@@ -31,16 +31,31 @@ def main() -> int:
     if version.returncode != 0:
         raise RuntimeError(f"llama-server --version failed:\n{version.stdout}")
 
-    # This exercises ggml's runtime backend discovery from the executable
-    # directory and proves that at least one compatible CPU backend loads.
+    # --list-devices intentionally lists accelerator devices only in llama.cpp
+    # v0.9.0; a CPU-only build correctly prints "(none)". Do not use this
+    # output as a CPU-backend health check.
     devices = subprocess.run(
         [str(server), "--list-devices"], cwd=root, text=True,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30,
     )
-    if devices.returncode != 0 or "CPU" not in devices.stdout.upper():
+    if devices.returncode != 0:
         raise RuntimeError(
-            "llama-server could not enumerate a CPU backend from the staged bundle:\n"
-            + devices.stdout
+            "llama-server --list-devices failed:\n" + devices.stdout
+        )
+
+    # With GGML_BACKEND_DL=ON, the CPU implementation is shipped as a
+    # dynamically loaded plugin. Verify the generic x86-64 variant is present;
+    # actual backend initialization still requires a model-backed smoke test.
+    cpu_plugins = sorted(root.glob("bin/libggml-cpu-*.so"))
+    if not cpu_plugins:
+        raise RuntimeError(
+            "No dynamically loaded CPU backend plugin found in bin/ "
+            "(expected libggml-cpu-*.so)."
+        )
+    generic_cpu = root / "bin/libggml-cpu-x64.so"
+    if not generic_cpu.is_file():
+        raise RuntimeError(
+            "Missing portable x86-64 CPU backend plugin: bin/libggml-cpu-x64.so"
         )
 
     ldd = shutil.which("ldd")
@@ -76,6 +91,9 @@ def main() -> int:
         "server": str(server.relative_to(root)),
         "version_output": version.stdout.strip(),
         "device_enumeration_output": devices.stdout.strip(),
+        "cpu_backend_plugin_count": len(cpu_plugins),
+        "cpu_backend_plugins": [p.name for p in cpu_plugins],
+        "cpu_backend_validation": "portable x86-64 plugin presence checked; actual initialization requires model-backed smoke test",
         "dependency_targets_checked": len(dependency_checks),
         "dependency_checks": dependency_checks,
         "gpu_readiness": "NOT_TESTED — requires a compatible real Colab GPU",
