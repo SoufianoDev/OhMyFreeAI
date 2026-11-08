@@ -607,3 +607,146 @@ func TestStoreControllerConfigRepositoryRoundTrip(t *testing.T) {
 		t.Fatalf("close controller: %v", err)
 	}
 }
+
+
+func holdExclusiveSQLiteLock(t *testing.T, store *Store) func() error {
+	t.Helper()
+	ctx := context.Background()
+	dsn, err := dataSourceName(store.Path())
+	if err != nil {
+		t.Fatalf("build lock database DSN: %v", err)
+	}
+	lockDB, err := sql.Open(driverName, dsn)
+	if err != nil {
+		t.Fatalf("open lock database: %v", err)
+	}
+	lockDB.SetMaxOpenConns(1)
+	lockDB.SetMaxIdleConns(1)
+
+	var journalMode string
+	if err := lockDB.QueryRowContext(ctx, "PRAGMA journal_mode=DELETE").Scan(&journalMode); err != nil {
+		_ = lockDB.Close()
+		t.Fatalf("switch test database to rollback journal mode: %v", err)
+	}
+	if journalMode != "delete" {
+		_ = lockDB.Close()
+		t.Fatalf("journal mode = %q, want delete", journalMode)
+	}
+
+	conn, err := lockDB.Conn(ctx)
+	if err != nil {
+		_ = lockDB.Close()
+		t.Fatalf("acquire lock connection: %v", err)
+	}
+	if _, err := conn.ExecContext(ctx, "BEGIN EXCLUSIVE"); err != nil {
+		_ = conn.Close()
+		_ = lockDB.Close()
+		t.Fatalf("begin exclusive SQLite transaction: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = conn.Close()
+		_ = lockDB.Close()
+	})
+
+	var once sync.Once
+	var releaseErr error
+	return func() error {
+		once.Do(func() {
+			_, releaseErr = conn.ExecContext(context.Background(), "ROLLBACK")
+		})
+		return releaseErr
+	}
+}
+
+func waitForControllerCounts(t *testing.T, controller *StoreController, minimumReaders, minimumWriters int) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		controller.mu.Lock()
+		readers, writers := controller.readers, controller.waitingWriters
+		controller.mu.Unlock()
+		if readers >= minimumReaders && writers >= minimumWriters {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("controller state readers=%d writers=%d, want at least readers=%d writers=%d", readers, writers, minimumReaders, minimumWriters)
+		}
+		time.Sleep(time.Millisecond)
+	}
+}
+
+func TestStoreControllerConfigOperationsDrainBeforeClose(t *testing.T) {
+	operations := []struct {
+		name string
+		run  func(context.Context, *StoreController) error
+	}{
+		{
+			name: "load",
+			run: func(ctx context.Context, controller *StoreController) error {
+				_, err := controller.Load(ctx)
+				return err
+			},
+		},
+		{
+			name: "save",
+			run: func(ctx context.Context, controller *StoreController) error {
+				return controller.Save(ctx, domainconfig.Defaults())
+			},
+		},
+	}
+
+	for _, operation := range operations {
+		operation := operation
+		t.Run(operation.name, func(t *testing.T) {
+			store := newLifecycleTestStore(t, "state.db")
+			if err := store.Migrate(context.Background(), migrations.Files, "."); err != nil {
+				t.Fatalf("migrate test store: %v", err)
+			}
+			releaseLock := holdExclusiveSQLiteLock(t, store)
+			controller := NewStoreController(store)
+			t.Cleanup(func() {
+				if err := releaseLock(); err != nil {
+					t.Errorf("release SQLite lock: %v", err)
+				}
+				if err := controller.Close(context.Background()); err != nil && !errors.Is(err, ErrStoreUnavailable) {
+					t.Errorf("close controller during cleanup: %v", err)
+				}
+			})
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			operationDone := make(chan error, 1)
+			go func() {
+				operationDone <- operation.run(ctx, controller)
+			}()
+
+			waitForControllerCounts(t, controller, 1, 0)
+			select {
+			case err := <-operationDone:
+				t.Fatalf("configuration %s returned while SQLite was exclusively locked: %v", operation.name, err)
+			case <-time.After(50 * time.Millisecond):
+			}
+
+			closeDone := make(chan error, 1)
+			go func() {
+				closeDone <- controller.Close(context.Background())
+			}()
+			waitForControllerCounts(t, controller, 1, 1)
+			select {
+			case err := <-closeDone:
+				t.Fatalf("controller close completed while configuration %s held a shared lease: %v", operation.name, err)
+			case <-time.After(50 * time.Millisecond):
+			}
+
+			if err := releaseLock(); err != nil {
+				t.Fatalf("release SQLite lock: %v", err)
+			}
+			if err := <-operationDone; err != nil {
+				t.Fatalf("configuration %s after lock release: %v", operation.name, err)
+			}
+			if err := <-closeDone; err != nil {
+				t.Fatalf("controller close after configuration %s: %v", operation.name, err)
+			}
+		})
+	}
+}
