@@ -20,7 +20,10 @@ const (
 	maxRestoreJournalBytes = 16 << 10
 )
 
-var ErrRestoreJournalInvalid = errors.New("SQLite restore journal is invalid")
+var (
+	ErrRestoreJournalInvalid = errors.New("SQLite restore journal is invalid")
+	errRestoreJournalRemovalUnsupported = errors.New("durable SQLite restore journal removal is unsupported on Windows")
+)
 
 type RestorePhase string
 
