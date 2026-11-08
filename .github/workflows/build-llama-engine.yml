@@ -143,7 +143,7 @@ jobs:
             echo "::error::Pinned source mismatch: expected ${EXPECTED_COMMIT:-<unresolved>}, got ${SOURCE_COMMIT}. Refusing to build."
             exit 1
           fi
-          printf '%s\\n' "$SOURCE_COMMIT" | tee stage/source-commit.txt
+          echo "$SOURCE_COMMIT" | tee stage/source-commit.txt
           echo "SOURCE_COMMIT=$SOURCE_COMMIT" >> "$GITHUB_ENV"
           cmake -S /tmp/llama-src -B /tmp/llama-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
