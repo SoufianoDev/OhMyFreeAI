@@ -1,6 +1,13 @@
 name: Build and package llama.cpp engine
 
 on:
+  push:
+    branches:
+      - feature/llama-engine-build-factory
+    paths:
+      - .github/workflows/build-llama-engine.yml
+      - scripts/engine/**
+      - docs/adr/0001-llama-engine-build-distribution.md
   workflow_dispatch:
     inputs:
       source_mode:
@@ -50,9 +57,9 @@ jobs:
       - name: Validate inputs and install tools
         shell: bash
         env:
-          SOURCE_MODE: ${{ inputs.source_mode }}
-          SOURCE_REF: ${{ inputs.source_ref }}
-          ARTIFACT_URL: ${{ inputs.artifact_url }}
+          SOURCE_MODE: ${{ inputs.source_mode || 'source-build' }}
+          SOURCE_REF: ${{ inputs.source_ref || 'v0.9.0' }}
+          ARTIFACT_URL: ${{ inputs.artifact_url || '' }}
         run: |
           set -euo pipefail
           test -n "$SOURCE_REF"
@@ -76,7 +83,7 @@ jobs:
           mkdir -p stage/llama-engine/bin dist
 
       - name: Fetch official release asset
-        if: inputs.source_mode == 'official-asset'
+        if: (inputs.source_mode || 'source-build') == 'official-asset'
         shell: bash
         env:
           SOURCE_REF: ${{ inputs.source_ref }}
@@ -105,7 +112,7 @@ jobs:
           fi
 
       - name: Restore compiler cache
-        if: inputs.source_mode == 'source-build'
+        if: (inputs.source_mode || 'source-build') == 'source-build'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
@@ -147,7 +154,7 @@ jobs:
           SOURCE_MODE: ${{ inputs.source_mode }}
           SOURCE_REF: ${{ inputs.source_ref }}
           ARTIFACT_URL: ${{ inputs.artifact_url }}
-          BACKEND: ${{ inputs.backend }}
+          BACKEND: ${{ inputs.backend || 'cpu' }}
         run: |
           set -euo pipefail
           python3 scripts/engine/generate_manifest.py \
