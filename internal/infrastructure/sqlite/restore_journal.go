@@ -220,15 +220,22 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 	if err != nil {
 		return RestoreJournal{}, err
 	}
-	if journal.TargetPath == journal.StagingPath {
+	if samePath(journal.TargetPath, journal.StagingPath) {
 		return RestoreJournal{}, fmt.Errorf("%w: target and staging paths are identical", ErrRestoreJournalInvalid)
+	}
+	if *journal.PreviousDatabaseExisted {
+		if strings.TrimSpace(journal.RollbackPath) == "" {
+			return RestoreJournal{}, fmt.Errorf("%w: previous database exists but rollback path is missing", ErrRestoreJournalInvalid)
+		}
+	} else if journal.RollbackPath != "" {
+		return RestoreJournal{}, fmt.Errorf("%w: rollback path is unexpected when no previous database exists", ErrRestoreJournalInvalid)
 	}
 	if journal.RollbackPath != "" {
 		journal.RollbackPath, err = canonicalStatePath(root, journal.RollbackPath)
 		if err != nil {
 			return RestoreJournal{}, err
 		}
-		if journal.RollbackPath == journal.TargetPath || journal.RollbackPath == journal.StagingPath {
+		if samePath(journal.RollbackPath, journal.TargetPath) || samePath(journal.RollbackPath, journal.StagingPath) {
 			return RestoreJournal{}, fmt.Errorf("%w: rollback path collides with another transaction path", ErrRestoreJournalInvalid)
 		}
 	}
