@@ -45,8 +45,12 @@ func inspectRestoreArtifact(stateDirectory, path string) (RestoreContentIdentity
 	if err != nil {
 		return identity, fmt.Errorf("%w: restat opened artifact: %v", ErrRestoreArtifactInvalid, err)
 	}
+	metadataStable, metadataErr := restoreArtifactMetadataUnchanged(before, after)
+	if metadataErr != nil {
+		return identity, fmt.Errorf("%w: compare artifact metadata: %v", ErrRestoreArtifactInvalid, metadataErr)
+	}
 	if !after.Mode().IsRegular() || size <= 0 || uint64(size) != uint64(after.Size()) ||
-		before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) {
+		before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) || !metadataStable {
 		return identity, fmt.Errorf("%w: artifact changed while its identity was being read", ErrRestoreArtifactInvalid)
 	}
 
