@@ -783,3 +783,11 @@
 2. Obtain fresh Wails and all-eight-distro results; inspect any remaining WebView failures.
 3. Review and test the version-2 journal schema and pure planner, then implement a conservative filesystem recovery executor with collision-safe candidate preservation and crash-injection tests.
 4. Wire recovery before canonical Store open only after the executor is verified.
+
+
+### Follow-up hardening
+- `04214370dcefb4299a5a38f6bbb16ed851be5c52`: make the pure planner reject unsupported journal versions, invalid phases, empty transaction IDs and empty required paths before returning any action.
+- `950bca04627d46d8103ddfbfe846732d8fe14e8f`: add fail-closed tests for unsupported versions and missing target paths.
+- `947124d4e0abeabcb280f0c0ae38ec5ec79c530a`: update RESTORE_LIFECYCLE.md to distinguish the version-2 journal and pure planner from a filesystem executor or integrated restore.
+- `e8769e665fb316714f89fcbbeba3b42e5c5ccf85`: update the active task plan and next-step ordering.
+- No fresh workflow run/status for these commits is currently exposed by the available GitHub Actions lookup. The fixes are implemented but unverified; do not mark them passed.
