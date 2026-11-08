@@ -45,7 +45,7 @@ concurrency:
 jobs:
   build-package:
     if: github.ref == 'refs/heads/feature/llama-engine-build-factory'
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-22.04
     timeout-minutes: 90
     steps:
       - name: Checkout project branch
