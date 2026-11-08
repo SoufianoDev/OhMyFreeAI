@@ -6,6 +6,7 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import signal
 import select
 import subprocess
 import sys
@@ -67,7 +68,7 @@ def process_diagnostics(process: subprocess.Popen[bytes], display_process: subpr
         socket_state = f"unavailable ({error})"
 
     return (
-        f"Process snapshot (application_pid={process.pid}, app_exit={process.poll()}, "
+        f"Process snapshot (launcher_pid={process.pid}, launcher_exit={process.poll()}, "
         f"xvfb_pid={display_process.pid}, xvfb_exit={display_process.poll()}, "
         f"display={display}, x_socket={socket_state}):\\n"
         + "\\n".join(rows)
@@ -120,14 +121,26 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
             if display_process.poll() is not None:
                 raise RuntimeError("Xvfb exited before the desktop application could start.")
             env["DISPLAY"] = display
+            command = [str(binary)]
+            dbus_runner = shutil.which("dbus-run-session")
+            if dbus_runner:
+                # Model a real desktop session explicitly. Without a session bus,
+                # GLib may try D-Bus autolaunch in a headless container and block
+                # before WebKit creates its web process.
+                command = [dbus_runner, "--", *command]
             process = subprocess.Popen(
-                [str(binary)],
+                command,
                 cwd=binary.parent,
                 env=env,
                 stdout=output,
                 stderr=subprocess.STDOUT,
+                start_new_session=True,
             )
-            print(f"WEBVIEW_SMOKE_START attempt={attempt} display={display}", flush=True)
+            print(
+                f"WEBVIEW_SMOKE_START attempt={attempt} display={display} "
+                f"dbus_session={'enabled' if dbus_runner else 'unavailable'}",
+                flush=True,
+            )
             deadline = time.monotonic() + 60
             initial_call_logged = False
             while time.monotonic() < deadline:
@@ -166,11 +179,17 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
             )
         finally:
             if process is not None and process.poll() is None:
-                process.terminate()
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
                 try:
                     process.wait(timeout=8)
                 except subprocess.TimeoutExpired:
-                    process.kill()
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
                     process.wait(timeout=5)
             if display_process.poll() is None:
                 display_process.terminate()
