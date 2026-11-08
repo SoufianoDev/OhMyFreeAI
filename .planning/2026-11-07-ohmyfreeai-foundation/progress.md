@@ -863,3 +863,15 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - CI recheck on commit `b554116f91a9978f576e686b2aad4ded8cca43d2`: root Go CI passed Ubuntu/Windows; Wails passed Ubuntu/Windows; SQLite matrix passed 4/4. Linux distro matrix had 6/8 passed, with Fedora 44 legacy GTK3 and Debian 12 legacy GTK3 still running at this check.
 - No application runtime code changed in this policy adoption. Restore remains disabled.
 - Next: finish the Linux matrix check, then continue the already-planned identity-aware pure recovery planner. Do not add a generic workflow engine or enable Restore prematurely.
+
+
+## Continuation: Hush + Deslop Code adoption — 2026-11-08T02:00Z
+
+- Confirmed through the connected GitHub account that `SoufianoDev/hush` exists, is public, and uses `dev` as its default branch. Read the canonical `skills/hush/SKILL.md` and MIT license.
+- Researched two distinct Deslop variants with Exa: Stephen Turner's prose-focused skill and Brian Lovin's code-focused `skills/deslop/SKILL.md`. Selected the code-focused variant for this repository; the prose-only rules were not misapplied to code.
+- Added `.agents/skills/hush/SKILL.md` and retained its MIT license at `.agents/skills/hush/LICENSE`. Added project-scoped `.agents/skills/deslop-code/SKILL.md` with explicit safety constraints.
+- Updated root `AGENTS.md`, `.agents/skills/planning-with-files/SKILL.md`, and `.agents/skills/README.md` to require Hush on every code change and Deslop Code as a scoped post-implementation pass. Both policies preserve trust-boundary validation, Restore/SQLite invariants, error handling, tests, and user-owned pre-existing changes.
+- Updated the active task plan and findings with the research decision and next Restore executor gate.
+- Commits: `97c2fb56290791236bc56b74a6f2e578c201b65c` (Hush skill), `72b78f986fa3f086ea0b3f3ab3bed7323c52dbd6` (Hush MIT license), `5cd2f3026f1ea7c93c76c266751e8c9cc2c2f489` (Deslop Code), `dd1f4606a464fef13e550eb6af0f7a8f58b863c7` (AGENTS), `cea6e174a97308a5bd475da6f46caae44e844656` (Planning with Files), `3b7d0c6628bc40d0301a0cb510e5d742b3cacf64` (skills index), followed by plan/findings/progress documentation commits.
+- CI recheck for planner commit `a4218970b8045b8cce03355373bfb6b2ac5586d3`: Root Go CI run `42435761597` passed (Ubuntu + Windows); Wails run `42435761521` passed (2/2); SQLite run `42435761588` passed (4/4). Linux distribution run `42435761590` passed 7/8; Ubuntu 22.04 GTK3 built the native executable and passed CLI smoke, but its WebView-to-Go `GetSnapshot` smoke timed out. The other seven distro lanes passed. This is a remaining CI failure, not a green matrix.
+- No application runtime code changed in this skill adoption. No code tests were run specifically for the documentation/skill changes. Restore remains disabled; remote Colab inference remains policy-gated.
