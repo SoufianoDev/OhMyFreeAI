@@ -31,6 +31,11 @@ def diagnostic_excerpt(path: Path) -> str:
 def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None:
     marker.unlink(missing_ok=True)
     env = os.environ.copy()
+    # Xvfb is launched with -ac, so inherited host/container X11 cookies are
+    # both unnecessary and potentially point to an inaccessible authority file.
+    env.pop("XAUTHORITY", None)
+    env.pop("XAUTHLOCALHOSTNAME", None)
+    env.pop("AUTHFILE", None)
     env.update(
         {
             "OMFAI_WEBVIEW_SMOKE_MARKER": str(marker),
