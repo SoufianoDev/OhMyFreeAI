@@ -135,6 +135,8 @@ jobs:
           cmake -S /tmp/llama-src -B /tmp/llama-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DGGML_NATIVE=OFF \
+            -DBUILD_SHARED_LIBS=ON \
+            -DGGML_BACKEND_DL=ON \
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -163,7 +165,7 @@ jobs:
             --source-commit "$SOURCE_COMMIT" \
             --source-mode "$SOURCE_MODE" \
             --artifact-url "$ARTIFACT_URL" \
-            --build-flags "Release;GGML_NATIVE=OFF;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=OFF" \
+            --build-flags "Release;GGML_NATIVE=OFF;BUILD_SHARED_LIBS=ON;GGML_BACKEND_DL=ON;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=OFF" \
             --backend "$BACKEND"
           python3 scripts/engine/validate_engine.py --root stage/llama-engine --require-ldd-clean
 
