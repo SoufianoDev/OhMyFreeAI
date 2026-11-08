@@ -140,3 +140,23 @@ func TestReadRestoreJournalRejectsSymlink(t *testing.T) {
 		t.Fatalf("read symlink journal error = %v, want ErrRestoreJournalInvalid", err)
 	}
 }
+
+func TestWriteRestoreJournalRejectsSymlinkedTransactionPath(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("creating symlinks may require elevated privileges on Windows")
+	}
+	root := t.TempDir()
+	outside := filepath.Join(root, "outside.db")
+	if err := os.WriteFile(outside, []byte("not a database"), 0o600); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+	link := filepath.Join(root, "stage-link.db")
+	if err := os.Symlink(outside, link); err != nil {
+		t.Fatalf("create staging symlink: %v", err)
+	}
+	journal := validTestRestoreJournal(root)
+	journal.StagingPath = link
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("write with symlinked staging path error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
