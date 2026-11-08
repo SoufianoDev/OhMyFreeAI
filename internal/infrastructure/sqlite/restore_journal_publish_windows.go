@@ -3,14 +3,12 @@
 package sqlite
 
 import (
-	"errors"
 	"fmt"
 	"path/filepath"
 
 	"golang.org/x/sys/windows"
 )
 
-var errRestoreJournalRemovalUnsupported = errors.New("durable SQLite restore journal removal is unsupported on Windows")
 
 func publishRestoreJournal(source, destination string) error {
 	if !samePath(filepath.Dir(source), filepath.Dir(destination)) {
