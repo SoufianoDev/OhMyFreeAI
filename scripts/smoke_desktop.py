@@ -28,9 +28,9 @@ def diagnostic_excerpt(path: Path) -> str:
     return text[:5000] + "\\n... middle of native log omitted ...\\n" + text[-5000:]
 
 
-def process_diagnostics(pid: int, display_process: subprocess.Popen[bytes], display: str) -> str:
+def process_diagnostics(process: subprocess.Popen[bytes], display_process: subprocess.Popen[bytes], display: str) -> str:
     """Capture a bounded Linux process/X11 snapshot without exposing environment variables."""
-    pending = [pid, display_process.pid]
+    pending = [process.pid, display_process.pid]
     seen: set[int] = set()
     rows: list[str] = []
 
@@ -67,7 +67,7 @@ def process_diagnostics(pid: int, display_process: subprocess.Popen[bytes], disp
         socket_state = f"unavailable ({error})"
 
     return (
-        f"Process snapshot (application_pid={pid}, app_exit={None}, "
+        f"Process snapshot (application_pid={process.pid}, app_exit={process.poll()}, "
         f"xvfb_pid={display_process.pid}, xvfb_exit={display_process.poll()}, "
         f"display={display}, x_socket={socket_state}):\\n"
         + "\\n".join(rows)
@@ -157,7 +157,7 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                 time.sleep(0.2)
             output.flush()
             details = log_path.read_text(encoding="utf-8", errors="replace")[-5000:]
-            diagnostics = process_diagnostics(process.pid, display_process, display)
+            diagnostics = process_diagnostics(process, display_process, display)
             raise RuntimeError(
                 "Timed out waiting for the frontend-to-Go GetSnapshot call.\\n"
                 + diagnostics
