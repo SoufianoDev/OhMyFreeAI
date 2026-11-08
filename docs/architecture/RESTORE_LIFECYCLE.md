@@ -2,82 +2,104 @@
 
 ## Status
 
-Archive restore is **not exposed** in the GUI or CLI. `backup.Manager.Restore` and `sqlite.RestoreDatabase` remain infrastructure primitives only. The Wails composition root now owns a `sqlite.StoreController`; configuration persistence and GUI/CLI backup export use its shared leases. This removes the former long-lived raw-Store references from those paths, but does not yet make restore safe: the journal storage primitive and pure recovery planner exist, but there is still no filesystem recovery executor, startup recovery coordinator, or application-level restore transaction.
+Archive restore is **disabled and not exposed** in the GUI or CLI.
 
-## Required ownership boundary
+The repository now contains:
+- An application-lifetime `sqlite.StoreController` with shared/exclusive leases. Configuration persistence and GUI/CLI backup export use shared leases; an exclusive operation drains active readers and prevents new ones.
+- A strict durable restore journal, schema version 3. It records candidate and previous-database SHA-256/size identities, a fixed candidate-quarantine path, canonical state-directory-confined paths, and explicit intent/completion phases.
+- An identity-aware, pure `PlanRestoreRecovery` planner. It receives verified identities for target, staging, rollback and quarantine. Mismatches, unreadable/unverified files, and contradictory states fail closed with an empty plan.
+- A platform-specific no-replace move primitive. Linux pins the directory with `openat2` and uses `renameat2(RENAME_NOREPLACE)`. Windows uses retained directory/source handles and native `NtSetInformationFile(FileRenameInformationEx)` semantics without a replace flag. The Windows operation is provider-dependent and currently qualified only by the repository's CI environment; do not infer support for ReFS, SMB, removable media, or other providers.
 
-- The application-lifetime `sqlite.StoreController` now owns the current `*sqlite.Store` and implements the stable configuration repository port.
-- Configuration `Load`/`Save` and GUI/CLI backup export now acquire shared lifecycle leases and hold them for the complete SQLite/archive operation.
-- Restore acquires an exclusive lifecycle lease, preventing new work and waiting for all in-flight DB operations to finish.
-- No application service may retain or cache a raw Store pointer across lifecycle transitions. The controller is the only owner allowed to close or replace it. Current Wails and CLI composition routes follow this boundary.
-- The desktop adapter and CLI must call the same restore application service; they must not implement separate restore logic.
+Still missing:
+- A filesystem executor that inspects file identities from safely opened handles and executes the planner.
+- Durable journal phase orchestration around every filesystem mutation.
+- A startup recovery coordinator that runs before the canonical Store is opened.
+- A shared application-level restore transaction used by both CLI and GUI.
+- Process-death, race, failure-injection and filesystem-provider qualification for the complete transaction.
 
-## Required restore transaction
+The detailed implementation gate is [Restore Recovery Executor](RESTORE_RECOVERY_EXECUTOR.md). The executor design is authoritative for platform-specific no-replace and race constraints. Do not implement a weaker `os.Rename` fallback.
 
-1. Validate the selected `.omfaibackup` with the complete read-only archive inspector. No live database file is touched at this stage.
-2. Acquire the exclusive Store lifecycle lease; stop accepting DB operations and wait for existing leases to drain.
-3. Checkpoint WAL, close the current Store, and confirm that no target `-wal`, `-shm`, or `-journal` sidecars remain.
-4. Write and fsync a durable restore journal in the application state directory. The journal records the target, archive identity, staging path, rollback path, transaction ID and phase; never include secrets.
-5. Restore into a same-filesystem staging database. Verify SQLite integrity, foreign keys, contiguous migration history and schema compatibility before publishing.
-6. Atomically preserve the previous database as a rollback file and publish the staged database at the canonical target path. Sync the containing directory where supported.
-7. Open the new target through `sqlite.OpenExisting`; run integrity and foreign-key checks, confirm migration history, load and validate application configuration, and verify all required repositories can operate.
-8. Only after verification succeeds, atomically mark the journal committed and publish the new Store through the controller. Keep the rollback file until explicit cleanup policy permits removal.
-9. Release the exclusive lease and report success only after the new Store is live and all post-restore checks pass.
+## Ownership boundary
+
+- The application-lifetime `sqlite.StoreController` owns the current `*sqlite.Store` and is the stable configuration repository.
+- Configuration `Load`/`Save` and backup export hold a shared lease for the complete operation.
+- Restore must acquire an exclusive lease, stop new database work, and wait for all shared leases to drain.
+- No application service may retain a raw Store pointer across a lifecycle transition. Only the controller may publish or close the active Store.
+- CLI and Wails GUI must invoke the same application restore service. They must not implement separate restore logic.
+- If restore or rollback cannot establish a verified usable Store, the controller must remain unavailable (fail closed).
+
+## Required transaction
+
+1. Inspect and validate the selected `.omfaibackup` through the complete read-only archive inspector. Do not touch the live database.
+2. Resolve the canonical private application state directory and validate all transaction paths.
+3. Acquire the exclusive Store lease; drain existing operations and reject new ones.
+4. Checkpoint WAL, close the active Store, and verify that target `-wal`, `-shm`, and `-journal` sidecars are absent.
+5. Create a v3 journal with a cryptographically random transaction ID, fixed staging/rollback/quarantine paths, archive identity, and explicit previous-database metadata.
+6. Build the candidate in same-filesystem staging. Verify SQLite integrity, foreign keys, migration history, schema compatibility, configuration validity, and candidate content identity before publication.
+7. Persist each intent phase before its filesystem mutation. Use the qualified atomic no-replace adapter; verify the moved file identity and required durability barrier before recording the completion phase.
+8. Open the published candidate with `sqlite.OpenExisting`, repeat integrity/foreign-key/migration checks, load and validate configuration, and verify required repositories.
+9. Persist `committed` only after all checks pass. Publish the new Store through the controller only after the durable commit decision. Retain rollback and quarantine artifacts.
+10. Release the exclusive lease and report success only when the new Store is live and verified.
+
+## Journal phases
+
+The v3 state machine records both intent and completed transitions:
+
+```text
+prepared -> staging
+staging -> preserving-previous -> previous-preserved
+previous-preserved -> publishing -> published -> reopening -> committed
+
+published/reopening -> restoring-previous -> rolled-back
+```
+
+For a first-ever database, staging may proceed directly to publishing. A failed first-ever publication has no previous database to restore; preserve the candidate and require manual review. Never manufacture a rollback state that did not exist.
+
+A crash between an intent write and its filesystem operation, or between the operation and its completion write, must be reconciled by inspecting content identities. Presence or filename alone never establishes ownership.
 
 ## Failure and rollback rules
 
-- Before publication, cancellation or validation failure leaves the original database untouched; clean only transaction-owned staging files.
-- After publication but before commit, any open, migration, integrity or configuration failure must close the candidate Store, atomically restore the rollback database, reopen it and verify it before releasing the lifecycle lease.
-- If rollback or reopening the previous database fails, fail closed: do not accept normal DB operations, preserve every recovery file, and report exact paths and phases for manual recovery.
-- Never delete or overwrite the rollback file as part of an unverified retry.
-- Once publication begins, cancellation must not interrupt the rollback/commit decision. Complete the transaction to a verified committed or verified rolled-back state.
-- Never replay inference, downloads or other uncertain external work as part of database restore.
+- Before publication, validation failure or cancellation leaves the original target untouched. Remove only transaction-owned artifacts whose identity has been verified.
+- Once publication begins, cancellation must not interrupt the commit-versus-rollback decision.
+- After publication but before commit, failure must quarantine the verified candidate and restore the verified previous database using no-replace operations.
+- Never overwrite an unexpected destination or invent a new quarantine path after a collision.
+- Never delete rollback or quarantine as part of recovery. Cleanup is a separate explicit retention operation after the user verifies the restored application state.
+- If rollback, reopen, integrity, foreign-key, migration-history or configuration verification fails, preserve all artifacts and keep the StoreController unavailable.
+- Never replay inference, downloads, or other uncertain external work as part of database restore.
 
-## Crash recovery
+## Startup recovery ordering
 
-The existing `sqlite.RestoreDatabase` atomically stages a snapshot and preserves the previous database, but it does not persist a transaction journal. That primitive alone is not sufficient for crash-safe application restore.
+Recovery must run before opening the canonical Store:
 
-On startup, before opening the canonical Store, a recovery coordinator must inspect any durable restore journal:
+1. Resolve and validate the canonical state directory.
+2. Read and strictly validate the bounded v3 journal. Reject v2 and unknown fields.
+3. Inspect target, staging, rollback and quarantine without following symlinks/reparse points. Verify SHA-256 and size from the opened file objects.
+4. Pass verified identities to `PlanRestoreRecovery`.
+5. Execute one idempotent no-replace step at a time, persisting intent/completion phases around each namespace transition.
+6. Verify the final database and configuration.
+7. Open/publish the Store only after recovery is verified committed or verified rolled back.
 
-- `prepared` or `staging`: retain the original target; remove only validated transaction-owned staging artifacts.
-- `previous-preserved` with no published target: put the rollback file back at the canonical path and verify it.
-- `published` or `reopening` without a committed marker: restore the previous database and verify it before normal startup.
-- `committed`: open and verify the new database; keep the rollback file until the configured retention/cleanup policy runs.
-- Unknown, malformed or contradictory journal/filesystem states: fail closed and preserve all files.
+Unknown, malformed, contradictory, unreadable or identity-mismatched states must fail closed and preserve every artifact.
 
-Journal updates must use write-to-temp, fsync, atomic rename and directory sync where supported. Journal paths must be canonicalized and constrained to the application state directory; reject target/staging/rollback path collisions and require rollback metadata to agree with whether a previous database existed; do not trust arbitrary paths from a damaged journal.
+## Required verification before enabling Restore
 
-## Required tests before enabling restore
+- Shared operations drain before exclusive restore; waiting restore prevents reader starvation.
+- Concurrent `Load`, `Save`, and backup export cannot use a closed or stale Store.
+- Cancellation before publication leaves the original database intact.
+- Inject failures at checkpoint, close, extraction, migration, file sync, journal write, each move, directory sync, reopen, integrity, foreign-key, migration-history, config validation, commit and rollback.
+- Simulate process termination before and after every durable journal write and no-replace move.
+- Test destination collisions, source replacement races, symlink/reparse-point substitution, non-regular files, digest mismatches and unsupported filesystem operations.
+- Verify WAL/SHM/journal handling, file permissions, rollback retention and idempotent repeated recovery.
+- Run the transaction matrix on Linux and Windows. Qualify Windows filesystem providers separately; passing NTFS CI does not certify other providers.
+- Verify CLI and GUI see the new repository only after commit.
+- Keep Restore disabled until every required case passes.
 
-- Shared operations block correctly while exclusive restore waits; no operation can use a closed or stale Store.
-- Concurrent `Load`, `Save` and backup export are drained before close; operations arriving during restore receive a typed unavailable/busy state.
-- Cancellation before publication preserves the original DB and cleans only owned staging files.
-- Inject failures at checkpoint, close, extraction, migration, publication, reopen, integrity check, config validation, journal commit and rollback.
-- Simulate process termination after every durable journal phase and verify startup recovery chooses the correct database.
-- Verify rollback DB contents, WAL sidecars, file permissions, fsync/atomic rename behavior and no-overwrite guarantees on Linux and Windows.
-- Verify the Wails AppService and CLI both observe the new repository only after commit; no cached pointer may refer to the closed Store.
-- Retain rollback until the user has had a clear opportunity to confirm the restored application state; never silently delete it.
+## Current verification evidence — 2026-11-08
 
-## Current implementation gap
+The corrected handle-bound no-replace implementation is covered by:
+- Root CI run [42496659593](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42496659593): Ubuntu and Windows passed; Ubuntu race detector passed.
+- SQLite driver evaluation [42496659645](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42496659645): modernc and ncruces passed on Ubuntu and Windows (4/4).
+- Wails platform proof [42496659732](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42496659732): Ubuntu and Windows passed (2/2), including Linux WebView-to-Go and database reopen checks.
+- Linux distribution matrix [42496659764](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42496659764): all eight configured distro lanes passed.
 
-The stable Store controller and shared-lease wiring are implemented. Its tests cover shared/exclusive exclusion, writer preference, cancellation, shutdown draining, failed replacement, panic fail-closed behavior, concurrent lease stress, and configuration repository round-trip. The Linux `go test -race ./...` step passed in CI run `42427211242`.
-
-The durable journal storage primitive is implemented in `sqlite/restore_journal.go`: strict bounded JSON decoding, explicit phase values, content-based archive identity, state-directory path confinement, symlink rejection, same-directory temporary writes, file sync, atomic rename and directory sync where supported. Journal schema version 2 requires an explicit `previous_database_existed` value; missing metadata is rejected rather than interpreted as `false`. Journal validation also requires a rollback path exactly when a previous database existed, rejects unexpected rollback metadata, and rejects case-aware target/staging/rollback path collisions. Windows path spellings are normalized through resolved absolute paths so 8.3 aliases do not break read/write round trips.
-
-A pure `PlanRestoreRecovery` decision layer now maps validated journal phases plus observed target/staging/rollback presence into conservative actions. It performs no filesystem mutations. It preserves the original target before publication, restores a preserved database after an interrupted publication, preserves a first-ever published candidate for manual review, and requires verification for committed state. Contradictory states return a typed ambiguity error. Tests cover normal phase decisions and fail-closed combinations. Neither the planner nor the journal is connected to `RestoreDatabase` or application startup. The newest rollback-metadata and path-collision hardening changes have not yet passed a fresh CI run.
-
-The remaining blockers are a collision-safe filesystem recovery executor, startup recovery before canonical Store open, a coordinated application-level restore/rollback/reopen service, durable-phase process-death simulation, and deterministic failure-injection tests across every phase. `sqlite.RestoreDatabase` currently performs its own staging and target publication, but it does not use the journal. Restore therefore remains disabled until the full transaction and recovery coordinator are implemented and verified.
-
-
-## CI evidence — 2026-11-08
-
-The latest journal path-hardening commit `31b9a963c1403bee223f0d9da632f8e570d9ffa6` passed all four required GitHub Actions workflows:
-
-- Root Go CI: Ubuntu and Windows passed; run [42431721560](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42431721560).
-- SQLite driver evaluation: modernc and ncruces on Ubuntu and Windows passed (4/4); run [42431721488](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42431721488).
-- Wails v3.0.0 platform proof: Ubuntu and Windows passed (2/2); run [42431721597](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42431721597).
-- Linux distribution compatibility: all eight distributions passed (8/8), including Ubuntu 22.04 GTK3/WebKit2GTK 4.1, Debian 12 and Fedora GTK3; run [42431721639](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42431721639), attempt 2.
-
-Ubuntu 22.04's first attempt timed out waiting for the frontend-to-Go WebView bridge. The targeted rerun passed, with the bridge smoke test succeeding twice and the application reopen check passing. No code change was made in response to that transient failure.
-
-These results verify the current foundation and journal/planner tests. They do not constitute verification of a filesystem recovery executor or a complete restore transaction. Restore remains disabled.
+These results verify the current foundation, journal/planner tests, and the no-replace move primitive. They do **not** verify the missing filesystem executor, startup recovery coordinator, complete restore transaction, every Windows filesystem provider, or power-loss durability. Restore remains disabled.
