@@ -17,7 +17,7 @@ import (
 
 const (
 	restoreJournalFileName = "restore-journal.json"
-	restoreJournalVersion  = 1
+	restoreJournalVersion  = 2
 	maxRestoreJournalBytes = 16 << 10
 )
 
@@ -43,6 +43,7 @@ type RestoreJournal struct {
 	TargetPath     string       `json:"target_path"`
 	StagingPath    string       `json:"staging_path"`
 	RollbackPath   string       `json:"rollback_path,omitempty"`
+	PreviousDatabaseExisted *bool `json:"previous_database_existed"`
 	ArchiveSHA256  string       `json:"archive_sha256"`
 	ArchiveSize    uint64       `json:"archive_size_bytes"`
 	UpdatedAt      time.Time    `json:"updated_at"`
@@ -203,6 +204,7 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 		len(journal.TransactionID) > 128 ||
 		!validRestorePhase(journal.Phase) ||
 		journal.ArchiveSize == 0 ||
+		journal.PreviousDatabaseExisted == nil ||
 		journal.UpdatedAt.IsZero() {
 		return RestoreJournal{}, fmt.Errorf("%w: required metadata or phase is invalid", ErrRestoreJournalInvalid)
 	}
