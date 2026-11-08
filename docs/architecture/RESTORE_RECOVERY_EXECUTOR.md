@@ -240,3 +240,11 @@ A second review found that the current move primitive's Lstat preflight followed
 - Microsoft [MS-FSCC FileRenameInformationEx](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c): Ex flags and mandatory no-replace behavior when the replacement flag is absent.
 
 This research changes the executor implementation gate; it does not implement an executor and does not authorize Restore activation.
+
+## Linux directory-handle move hardening — 2026-11-08
+
+The Linux no-replace primitive now opens the common containing directory with `openat2(2)`, requesting `RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS`, then calls `renameat2(2)` with that pinned directory FD and validated leaf names. It no longer resolves the containing directory again through `AT_FDCWD` at the actual rename. Kernels that do not support `openat2` fail closed; there is no path-based fallback.
+
+This closes parent-directory symlink traversal and pins the directory object across the rename. It does **not** bind the source leaf to a previously hashed inode: Linux `renameat2` is name-based. The executor must still enforce a private state directory against untrusted concurrent writers and verify candidate/previous identity immediately before mutation. The move primitive itself is not a complete executor and does not perform directory sync or journal transitions.
+
+The regression test for a symlinked containing directory was committed first in `b529fae0b3f92ad0e6f3a04f9150df9ca78c3895`. Its CI outcome must be checked separately; do not claim a RED result until the run has actually executed the relevant test.
