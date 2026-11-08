@@ -301,3 +301,13 @@ The Windows move uses NtSetInformationFile with native FileRenameInformationEx c
 The destination directory is still initially opened by full path through CreateFile. FILE_FLAG_OPEN_REPARSE_POINT protects only the final component, not all ancestors. Next, open the canonical state-directory path component-by-component from a trusted volume root, reject every reparse component, and verify private directory permissions/ACL. The future executor must hash and revalidate source identity from the opened handle immediately before mutation, persist intent before every move, sync the required namespace state, reconcile ambiguous results and recover process death.
 
 The native rename class is not assumed to work on every filesystem/provider. Unsupported providers fail closed. No full executor, startup recovery or app-level Restore service exists. Restore remains disabled.
+
+
+## Current code revision verification — c89d532a — 2026-11-08
+
+- Root CI 42497620421 passed Ubuntu and Windows; Ubuntu race detector passed. The new Windows relative-source-open regression test ran as part of the Windows Go package suite.
+- SQLite driver evaluation 42497620420 passed 4/4.
+- Wails platform proof 42497620429 passed 2/2, including Linux WebView-to-Go/database reopen and Windows native executable verification.
+- Linux distribution matrix 42497620422 was in progress with 4/8 jobs passed at this update. Do not claim full matrix green for c89d532a yet.
+- Code commit: c89d532a3ba04d43c7d2ccbed1675319c6f90ee8. Current branch also includes docs-only follow-up commits.
+- Remaining Windows path boundary: destination directory path is opened by CreateFile; OPEN_REPARSE_POINT protects its final component only. Next implement component-by-component directory opening from a trusted volume root and verify private ACL/permissions before the executor.

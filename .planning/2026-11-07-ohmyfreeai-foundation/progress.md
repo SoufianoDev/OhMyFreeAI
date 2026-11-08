@@ -994,3 +994,13 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - SQLite driver evaluation 42496659645 passed 4/4.
 - Linux distribution compatibility 42496659764 passed 8/8 across modern GTK4/WebKit6 and legacy GTK3/WebKit2GTK 4.1 lanes.
 - Current Restore code remains low-level only. No durable executor, startup recovery, app-level Restore service, or Restore UI is enabled.
+
+
+## Current code revision verification — c89d532a — 2026-11-08
+
+- Root CI 42497620421 passed Ubuntu and Windows; Ubuntu race detector passed. The new Windows relative-source-open regression test ran as part of the Windows Go package suite.
+- SQLite driver evaluation 42497620420 passed 4/4.
+- Wails platform proof 42497620429 passed 2/2, including Linux WebView-to-Go/database reopen and Windows native executable verification.
+- Linux distribution matrix 42497620422 was in progress with 4/8 jobs passed at this update. Do not claim full matrix green for c89d532a yet.
+- Code commit: c89d532a3ba04d43c7d2ccbed1675319c6f90ee8. Current branch also includes docs-only follow-up commits.
+- Remaining Windows path boundary: destination directory path is opened by CreateFile; OPEN_REPARSE_POINT protects its final component only. Next implement component-by-component directory opening from a trusted volume root and verify private ACL/permissions before the executor.

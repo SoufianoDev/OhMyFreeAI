@@ -103,3 +103,16 @@ The corrected handle-bound no-replace implementation is covered by:
 - Linux distribution matrix [42496659764](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42496659764): all eight configured distro lanes passed.
 
 These results verify the current foundation, journal/planner tests, and the no-replace move primitive. They do **not** verify the missing filesystem executor, startup recovery coordinator, complete restore transaction, every Windows filesystem provider, or power-loss durability. Restore remains disabled.
+
+
+## Current Windows source-open revision — 2026-11-08
+
+The Windows source is now opened relative to the retained destination directory handle using NtCreateFile and OBJECT_ATTRIBUTES.RootDirectory. The source-open regression test changes the directory's path after opening the handle and verifies that the operation still targets the original directory.
+
+For code commit c89d532a:
+- Root CI 42497620421 passed Ubuntu and Windows; Ubuntu race detector passed.
+- SQLite driver evaluation 42497620420 passed 4/4.
+- Wails platform proof 42497620429 passed 2/2.
+- Linux distribution matrix 42497620422 was still running with 4/8 lanes passed at the time of this update.
+
+The remaining Windows boundary is the initial open of the destination directory by full path: only the final component is checked for reparse-point status. Before executor work, open each directory component relative to a trusted parent handle, reject reparse points at every level, and verify the state directory's private ACL. Restore remains disabled.

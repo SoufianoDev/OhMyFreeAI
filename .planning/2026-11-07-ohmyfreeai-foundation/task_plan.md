@@ -260,3 +260,13 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Wails run 42497620429 was still in progress and Linux distribution matrix 42497620422 was queued at this update.
 - Remaining boundary: the destination directory itself is still opened by a full path with CreateFile. OPEN_REPARSE_POINT protects its final component, not every ancestor. Next, open the canonical state path component-by-component from a trusted volume root, reject reparse points at each step, and verify private directory permissions/ACL. The executor must still hash and revalidate identity from the opened source handle before mutation.
 - Restore remains disabled.
+
+
+## Current code revision verification — c89d532a — 2026-11-08
+
+- Root CI 42497620421 passed Ubuntu and Windows; Ubuntu race detector passed. The new Windows relative-source-open regression test ran as part of the Windows Go package suite.
+- SQLite driver evaluation 42497620420 passed 4/4.
+- Wails platform proof 42497620429 passed 2/2, including Linux WebView-to-Go/database reopen and Windows native executable verification.
+- Linux distribution matrix 42497620422 was in progress with 4/8 jobs passed at this update. Do not claim full matrix green for c89d532a yet.
+- Code commit: c89d532a3ba04d43c7d2ccbed1675319c6f90ee8. Current branch also includes docs-only follow-up commits.
+- Remaining Windows path boundary: destination directory path is opened by CreateFile; OPEN_REPARSE_POINT protects its final component only. Next implement component-by-component directory opening from a trusted volume root and verify private ACL/permissions before the executor.
