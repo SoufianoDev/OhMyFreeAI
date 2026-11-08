@@ -43,6 +43,7 @@ func TestPlanRestoreRecoveryConservativeDecisions(t *testing.T) {
 		wantRemoveStaging bool
 		wantPreserveStaging bool
 		wantPreserveTarget bool
+		wantPreserveStaging bool
 		wantRestoreRollback bool
 		wantVerifyTarget bool
 	}{
@@ -332,6 +333,12 @@ func TestPlanRestoreRecoveryIntentPhaseTruthTables(t *testing.T) {
 			wantPreserveTarget: true, wantRestoreRollback: true,
 		},
 		{
+			name: "restoring previous preserves staged candidate before quarantine",
+			phase: RestorePhaseRestoringPrevious, hadPrevious: true,
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFilePrevious, RestoreFileMissing),
+			wantPreserveStaging: true, wantRestoreRollback: true,
+		},
+		{
 			name: "restoring previous after candidate quarantine",
 			phase: RestorePhaseRestoringPrevious, hadPrevious: true,
 			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFilePrevious, RestoreFileCandidate),
@@ -353,6 +360,7 @@ func TestPlanRestoreRecoveryIntentPhaseTruthTables(t *testing.T) {
 				plan.PreservePrevious != test.wantPreservePrevious ||
 				plan.PublishCandidate != test.wantPublishCandidate ||
 				plan.PreserveTarget != test.wantPreserveTarget ||
+				plan.PreserveStaging != test.wantPreserveStaging ||
 				plan.RestoreRollback != test.wantRestoreRollback {
 				t.Fatalf("PlanRestoreRecovery() = %#v", plan)
 			}
