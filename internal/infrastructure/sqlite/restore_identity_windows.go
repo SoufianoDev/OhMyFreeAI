@@ -160,7 +160,7 @@ func openRestoreArtifactRoot(path string) (windows.Handle, error) {
 		windows.FILE_ATTRIBUTE_NORMAL,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		windows.FILE_OPEN,
-		windows.FILE_DIRECTORY_FILE|windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT,
+		windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT,
 		0,
 		0,
 	)
@@ -210,7 +210,10 @@ func openRestoreArtifactDirectoryRelative(parent windows.Handle, leaf string) (w
 		leaf,
 		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
-		windows.FILE_DIRECTORY_FILE|windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT,
+		// FILE_DIRECTORY_FILE is intentionally omitted: Microsoft documents it
+		// as incompatible with FILE_OPEN_REPARSE_POINT. Validate the opened
+		// handle's attributes before it can become a RootDirectory.
+		windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT,
 	)
 	if err != nil {
 		return windows.InvalidHandle, err
