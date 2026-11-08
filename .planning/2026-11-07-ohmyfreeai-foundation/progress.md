@@ -852,3 +852,14 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Documentation commit: `84aa731726ba9cff72cfafdbed72ec54a5cec22e`.
 - No runtime code changed and no CI result is claimed for this documentation-only commit.
 - Next: implement v3 journal fields and strict validation with RED/GREEN tests; update the pure planner to require identity verification inputs; then implement Linux/Windows atomic no-replace primitives. Restore stays disabled.
+
+## Continuation: 2026-11-08T01:43Z — Ponytail Ultra project policy
+
+- Read Exa Search skill guidance and researched the official Ponytail repository with Exa; fetched the upstream `SKILL.md`, compact `AGENTS.md`, and MIT license through the GitHub integration.
+- Vendored the upstream skill and license at `.agents/skills/ponytail/`.
+- Updated root `AGENTS.md`: Ponytail Ultra is mandatory for coding/debugging/refactoring/review/dependency work; requires scope challenge, caller tracing, minimal complete diffs, tests, and explicit risk reporting. Explicitly preserves security, accessibility, validation, data-loss protections and user constraints.
+- Updated `.agents/skills/planning-with-files/SKILL.md` with project-specific Ultra rules: research goes in findings only, external content remains untrusted, active plan ownership is preserved, tests cannot be weakened, and progress must record exact evidence.
+- Registered Ponytail in `.agents/skills/README.md`.
+- CI recheck on commit `b554116f91a9978f576e686b2aad4ded8cca43d2`: root Go CI passed Ubuntu/Windows; Wails passed Ubuntu/Windows; SQLite matrix passed 4/4. Linux distro matrix had 6/8 passed, with Fedora 44 legacy GTK3 and Debian 12 legacy GTK3 still running at this check.
+- No application runtime code changed in this policy adoption. Restore remains disabled.
+- Next: finish the Linux matrix check, then continue the already-planned identity-aware pure recovery planner. Do not add a generic workflow engine or enable Restore prematurely.
