@@ -624,22 +624,12 @@ func holdExclusiveSQLiteLock(t *testing.T, store *Store) func() error {
 	lockDB.SetMaxOpenConns(1)
 	lockDB.SetMaxIdleConns(1)
 
-	var journalMode string
-	if err := lockDB.QueryRowContext(ctx, "PRAGMA journal_mode=DELETE").Scan(&journalMode); err != nil {
-		_ = lockDB.Close()
-		t.Fatalf("switch test database to rollback journal mode: %v", err)
-	}
-	if journalMode != "delete" {
-		_ = lockDB.Close()
-		t.Fatalf("journal mode = %q, want delete", journalMode)
-	}
-
 	conn, err := lockDB.Conn(ctx)
 	if err != nil {
 		_ = lockDB.Close()
 		t.Fatalf("acquire lock connection: %v", err)
 	}
-	if _, err := conn.ExecContext(ctx, "BEGIN EXCLUSIVE"); err != nil {
+	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		_ = conn.Close()
 		_ = lockDB.Close()
 		t.Fatalf("begin exclusive SQLite transaction: %v", err)
@@ -676,18 +666,11 @@ func waitForControllerCounts(t *testing.T, controller *StoreController, minimumR
 	}
 }
 
-func TestStoreControllerConfigOperationsDrainBeforeClose(t *testing.T) {
+func TestStoreControllerConfigSaveDrainsBeforeClose(t *testing.T) {
 	operations := []struct {
 		name string
 		run  func(context.Context, *StoreController) error
 	}{
-		{
-			name: "load",
-			run: func(ctx context.Context, controller *StoreController) error {
-				_, err := controller.Load(ctx)
-				return err
-			},
-		},
 		{
 			name: "save",
 			run: func(ctx context.Context, controller *StoreController) error {

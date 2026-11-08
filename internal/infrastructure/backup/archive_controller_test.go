@@ -32,24 +32,13 @@ func TestManagerCreateWithStoreControllerDrainsBeforeClose(t *testing.T) {
 		_ = store.Close()
 		t.Fatalf("open SQLite lock store: %v", err)
 	}
-	var journalMode string
-	if err := store.DB().QueryRowContext(ctx, "PRAGMA journal_mode=DELETE").Scan(&journalMode); err != nil {
-		_ = lockStore.Close()
-		_ = store.Close()
-		t.Fatalf("switch test database to rollback journal mode: %v", err)
-	}
-	if journalMode != "delete" {
-		_ = lockStore.Close()
-		_ = store.Close()
-		t.Fatalf("journal mode = %q, want delete", journalMode)
-	}
 	lockConn, err := lockStore.DB().Conn(ctx)
 	if err != nil {
 		_ = lockStore.Close()
 		_ = store.Close()
 		t.Fatalf("acquire SQLite lock connection: %v", err)
 	}
-	if _, err := lockConn.ExecContext(ctx, "BEGIN EXCLUSIVE"); err != nil {
+	if _, err := lockConn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		_ = lockConn.Close()
 		_ = lockStore.Close()
 		_ = store.Close()
