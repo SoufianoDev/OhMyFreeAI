@@ -78,6 +78,7 @@ jobs:
         if: inputs.source_mode == 'official-asset'
         shell: bash
         env:
+          SOURCE_REF: ${{ inputs.source_ref }}
           ARTIFACT_URL: ${{ inputs.artifact_url }}
         run: |
           set -euo pipefail
