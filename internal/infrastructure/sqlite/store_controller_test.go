@@ -610,7 +610,70 @@ func TestStoreControllerConfigRepositoryRoundTrip(t *testing.T) {
 }
 
 
-func holdExclusiveSQLiteLock(t *testing.T, store *Store) func() error {
+func TestStoreControllerConfigLoadDrainsBeforeClose(t *testing.T) {
+	store := newLifecycleTestStore(t, "state.db")
+	if err := store.Migrate(context.Background(), migrations.Files, "."); err != nil {
+		t.Fatalf("migrate test store: %v", err)
+	}
+	store.DB().SetMaxOpenConns(1)
+	store.DB().SetMaxIdleConns(1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	heldConnection, err := store.DB().Conn(ctx)
+	if err != nil {
+		t.Fatalf("reserve the only SQLite connection: %v", err)
+	}
+
+	controller := NewStoreController(store)
+	t.Cleanup(func() {
+		_ = heldConnection.Close()
+		closeContext, closeCancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer closeCancel()
+		if err := controller.Close(closeContext); err != nil && !errors.Is(err, ErrStoreUnavailable) {
+			t.Errorf("close controller during cleanup: %v", err)
+		}
+	})
+
+	loadDone := make(chan error, 1)
+	go func() {
+		_, err := controller.Load(ctx)
+		loadDone <- err
+	}()
+	waitForControllerCounts(t, controller, 1, 0)
+	select {
+	case err := <-loadDone:
+		t.Fatalf("configuration Load returned while its only SQLite connection was reserved: %v", err)
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	closeContext, closeCancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	closeErr := controller.Close(closeContext)
+	closeCancel()
+	if !errors.Is(closeErr, context.DeadlineExceeded) {
+		t.Fatalf("controller close while configuration Load was active = %v, want context deadline exceeded", closeErr)
+	}
+
+	if err := heldConnection.Close(); err != nil {
+		t.Fatalf("release reserved SQLite connection: %v", err)
+	}
+	if err := <-loadDone; err != nil {
+		t.Fatalf("configuration Load after releasing the connection: %v", err)
+	}
+	if err := controller.WithShared(context.Background(), func(current *Store) error {
+		if current != store {
+			t.Fatal("controller did not retain the active Store after a canceled close")
+		}
+		return nil
+	}); err != nil {
+		t.Fatalf("shared operation after canceled close: %v", err)
+	}
+	if err := controller.Close(context.Background()); err != nil {
+		t.Fatalf("controller close after configuration Load: %v", err)
+	}
+}
+
+func holdSQLiteWriteLock(t *testing.T, store *Store) func() error {
 	t.Helper()
 	ctx := context.Background()
 	dsn, err := dataSourceName(store.Path())
@@ -632,7 +695,7 @@ func holdExclusiveSQLiteLock(t *testing.T, store *Store) func() error {
 	if _, err := conn.ExecContext(ctx, "BEGIN IMMEDIATE"); err != nil {
 		_ = conn.Close()
 		_ = lockDB.Close()
-		t.Fatalf("begin exclusive SQLite transaction: %v", err)
+		t.Fatalf("begin SQLite write transaction: %v", err)
 	}
 	t.Cleanup(func() {
 		_ = conn.Close()
@@ -686,7 +749,7 @@ func TestStoreControllerConfigSaveDrainsBeforeClose(t *testing.T) {
 			if err := store.Migrate(context.Background(), migrations.Files, "."); err != nil {
 				t.Fatalf("migrate test store: %v", err)
 			}
-			releaseLock := holdExclusiveSQLiteLock(t, store)
+			releaseLock := holdSQLiteWriteLock(t, store)
 			controller := NewStoreController(store)
 			t.Cleanup(func() {
 				if err := releaseLock(); err != nil {
