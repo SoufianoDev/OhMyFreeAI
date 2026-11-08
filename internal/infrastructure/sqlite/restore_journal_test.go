@@ -5,10 +5,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
 )
+
+func boolPointer(value bool) *bool { return &value }
 
 func validTestRestoreJournal(root string) RestoreJournal {
 	return RestoreJournal{
@@ -48,7 +51,7 @@ func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 	want.TargetPath = canonicalTestRestorePath(t, journal.TargetPath)
 	want.StagingPath = canonicalTestRestorePath(t, journal.StagingPath)
 	want.RollbackPath = canonicalTestRestorePath(t, journal.RollbackPath)
-	if got != want {
+	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("read journal = %#v, want %#v", got, want)
 	}
 	info, err := os.Stat(filepath.Join(root, restoreJournalFileName))
@@ -112,6 +115,12 @@ func TestWriteRestoreJournalRejectsInvalidPhaseAndArchiveIdentity(t *testing.T) 
 	journal.Phase = RestorePhase("unknown")
 	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
 		t.Fatalf("write with unknown phase error = %v, want ErrRestoreJournalInvalid", err)
+	}
+
+	journal = validTestRestoreJournal(root)
+	journal.PreviousDatabaseExisted = nil
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("write without previous-database state error = %v, want ErrRestoreJournalInvalid", err)
 	}
 
 	journal = validTestRestoreJournal(root)
