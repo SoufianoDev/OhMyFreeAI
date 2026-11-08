@@ -83,6 +83,15 @@ func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 	if got.Phase != RestorePhasePreviousPreserved || !got.UpdatedAt.Equal(journal.UpdatedAt) {
 		t.Fatalf("updated journal = %#v, want phase %q and timestamp %s", got, journal.Phase, journal.UpdatedAt)
 	}
+	if runtime.GOOS == "windows" {
+		if err := RemoveRestoreJournal(root); !errors.Is(err, errRestoreJournalRemovalUnsupported) {
+			t.Fatalf("remove restore journal error = %v, want unsupported", err)
+		}
+		if _, err := ReadRestoreJournal(root); err != nil {
+			t.Fatalf("journal disappeared after unsupported removal: %v", err)
+		}
+		return
+	}
 	if err := RemoveRestoreJournal(root); err != nil {
 		t.Fatalf("remove restore journal: %v", err)
 	}
