@@ -317,6 +317,11 @@ def main() -> int:
         raise RuntimeError("tar is missing from this Colab runtime.")
 
     ROOT.mkdir(parents=True, exist_ok=True)
+
+    # aria2 must be installed and available before any acceptance-test work.
+    say("Preparing aria2 before starting the acceptance test.")
+    aria2 = ensure_aria2()
+
     say("Validating the actual Colab GPU and CUDA runtime.")
     env, gpu = configure_cuda_runtime()
     for key, value in gpu.items():
@@ -328,7 +333,6 @@ def main() -> int:
     if free_disk < 9.0:
         raise RuntimeError(f"Only {free_disk:.2f} GiB disk space is free; at least 9 GiB is required.")
 
-    aria2 = ensure_aria2()
     download_verified(ENGINE_URL, ENGINE_ARCHIVE, ENGINE_SHA256, aria2)
     model_url = (
         f"https://huggingface.co/{HF_REPO}/resolve/{HF_REVISION}/"
