@@ -31,7 +31,11 @@ func TestRenameRestoreHandleNoReplaceUsesOpenedSourceHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer windows.CloseHandle(sourceHandle)
+	defer func() {
+		if sourceHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(sourceHandle)
+		}
+	}()
 
 	directoryHandle, err := windows.CreateFile(
 		windows.StringToUTF16Ptr(directory),
@@ -45,7 +49,11 @@ func TestRenameRestoreHandleNoReplaceUsesOpenedSourceHandle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer windows.CloseHandle(directoryHandle)
+	defer func() {
+		if directoryHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(directoryHandle)
+		}
+	}()
 
 	if err := os.Rename(source, parked); err != nil {
 		t.Fatalf("move opened source name aside: %v", err)
@@ -57,6 +65,14 @@ func TestRenameRestoreHandleNoReplaceUsesOpenedSourceHandle(t *testing.T) {
 	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination)); err != nil {
 		t.Fatalf("rename opened source handle: %v", err)
 	}
+	if err := windows.CloseHandle(sourceHandle); err != nil {
+		t.Fatal(err)
+	}
+	sourceHandle = windows.InvalidHandle
+	if err := windows.CloseHandle(directoryHandle); err != nil {
+		t.Fatal(err)
+	}
+	directoryHandle = windows.InvalidHandle
 
 	got, err := os.ReadFile(destination)
 	if err != nil {
@@ -100,7 +116,11 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer windows.CloseHandle(sourceHandle)
+	defer func() {
+		if sourceHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(sourceHandle)
+		}
+	}()
 
 	directoryHandle, err := windows.CreateFile(
 		windows.StringToUTF16Ptr(directory),
@@ -114,11 +134,23 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer windows.CloseHandle(directoryHandle)
+	defer func() {
+		if directoryHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(directoryHandle)
+		}
+	}()
 
 	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination)); err == nil {
 		t.Fatal("handle-bound rename replaced an existing destination")
 	}
+	if err := windows.CloseHandle(sourceHandle); err != nil {
+		t.Fatal(err)
+	}
+	sourceHandle = windows.InvalidHandle
+	if err := windows.CloseHandle(directoryHandle); err != nil {
+		t.Fatal(err)
+	}
+	directoryHandle = windows.InvalidHandle
 	for path, want := range map[string]string{
 		source:      "candidate",
 		destination: "existing",
