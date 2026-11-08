@@ -832,3 +832,13 @@ The first Ubuntu 22.04 attempt timed out waiting for the frontend-to-Go WebView 
 ### Next engineering step
 
 Proceed with the collision-safe filesystem recovery executor only after designing its ownership and no-overwrite semantics. It must revalidate paths immediately before each mutation, preserve unexpected candidates at collision-free transaction-owned locations, sync directory metadata where supported, and fail closed on any race or contradictory state. Add process-death tests at every journal phase before startup recovery is wired into Store opening.
+
+
+### Recovery executor design gate — 2026-11-08T01:06Z
+
+- Added `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md` before implementation.
+- The design identifies an important gap in the current completed-transition journal: a process can die after a filesystem move but before the following journal phase is persisted. The current planner correctly fails closed on some such states, but cannot automatically reconcile them.
+- The executor therefore requires explicit durable intent phases (`preserving-previous`, `publishing`, `restoring-previous`) and exhaustive truth tables for the filesystem states observable after each interrupted move.
+- Prohibited a check-then-`os.Rename` implementation. The planned adapter must provide atomic no-replace moves (Linux `renameat2(RENAME_NOREPLACE)`, Windows destination-exists-safe move with write-through); unsupported filesystems fail closed.
+- Candidate quarantine path and database content identities must be journaled before mutation. Unknown or partial staging artifacts are preserved rather than deleted without ownership proof.
+- No runtime code changed in this design step. Restore remains disabled. Next implementation begins with journal schema/state-machine TDD and platform no-replace primitives, followed by executor crash-injection tests.
