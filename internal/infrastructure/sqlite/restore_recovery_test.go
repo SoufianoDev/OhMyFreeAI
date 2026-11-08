@@ -14,14 +14,23 @@ func recoveryTestJournal(phase RestorePhase, hadPrevious bool) RestoreJournal {
 		Phase: phase,
 		TargetPath: filepath.Join(root, "state.db"),
 		StagingPath: filepath.Join(root, ".stage.db"),
+		CandidateQuarantinePath: filepath.Join(root, ".candidate-quarantine.db"),
 		PreviousDatabaseExisted: boolPointer(hadPrevious),
+		CandidateSHA256: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+		CandidateSize: 200,
 		ArchiveSHA256: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 		ArchiveSize: 100,
 	}
 	if hadPrevious {
 		journal.RollbackPath = filepath.Join(root, ".rollback.db")
+		journal.PreviousSHA256 = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+		journal.PreviousSize = 300
 	}
 	return journal
+}
+
+func recoveryFiles(target, staging, rollback, quarantine RestoreFileIdentity) RestoreRecoveryFiles {
+	return RestoreRecoveryFiles{Target: target, Staging: staging, Rollback: rollback, Quarantine: quarantine}
 }
 
 func TestPlanRestoreRecoveryConservativeDecisions(t *testing.T) {
@@ -32,69 +41,76 @@ func TestPlanRestoreRecoveryConservativeDecisions(t *testing.T) {
 		files RestoreRecoveryFiles
 		wantAction RestoreRecoveryAction
 		wantRemoveStaging bool
+		wantPreserveStaging bool
 		wantPreserveTarget bool
 		wantRestoreRollback bool
 		wantVerifyTarget bool
 	}{
 		{
-			name: "prepared preserves existing database and cleans stage",
+			name: "prepared preserves previous database and removes verified stage",
 			phase: RestorePhasePrepared, hadPrevious: true,
-			files: RestoreRecoveryFiles{TargetExists: true, StagingExists: true},
+			files: recoveryFiles(RestoreFilePrevious, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
 			wantAction: RestoreRecoveryCleanupStaging, wantRemoveStaging: true,
 		},
 		{
-			name: "staging without prior database keeps target absent",
+			name: "staging first database keeps target absent",
 			phase: RestorePhaseStaging, hadPrevious: false,
-			files: RestoreRecoveryFiles{StagingExists: true},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
 			wantAction: RestoreRecoveryCleanupStaging, wantRemoveStaging: true,
 		},
 		{
-			name: "previous preserved restores rollback",
+			name: "previous preserved retains stage before restoring rollback",
 			phase: RestorePhasePreviousPreserved, hadPrevious: true,
-			files: RestoreRecoveryFiles{StagingExists: true, RollbackExists: true},
-			wantAction: RestoreRecoveryRestorePrevious, wantRemoveStaging: true, wantRestoreRollback: true,
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFilePrevious, RestoreFileMissing),
+			wantAction: RestoreRecoveryRestorePrevious, wantPreserveStaging: true, wantRestoreRollback: true,
 		},
 		{
-			name: "published with prior target preserves candidate then rolls back",
+			name: "published with prior database quarantines candidate then rolls back",
 			phase: RestorePhasePublished, hadPrevious: true,
-			files: RestoreRecoveryFiles{TargetExists: true, RollbackExists: true},
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFilePrevious, RestoreFileMissing),
 			wantAction: RestoreRecoveryRestorePrevious, wantPreserveTarget: true, wantRestoreRollback: true,
 		},
 		{
-			name: "reopening with missing candidate still restores rollback",
+			name: "reopening after candidate quarantine restores rollback",
 			phase: RestorePhaseReopening, hadPrevious: true,
-			files: RestoreRecoveryFiles{RollbackExists: true},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFilePrevious, RestoreFileCandidate),
 			wantAction: RestoreRecoveryRestorePrevious, wantRestoreRollback: true,
 		},
 		{
 			name: "published without prior database preserves candidate for manual review",
 			phase: RestorePhasePublished, hadPrevious: false,
-			files: RestoreRecoveryFiles{TargetExists: true},
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 			wantAction: RestoreRecoveryPreserveForManualReview,
 		},
 		{
-			name: "committed with prior database requires verification and retains rollback",
+			name: "committed with prior database verifies candidate and retains rollback",
 			phase: RestorePhaseCommitted, hadPrevious: true,
-			files: RestoreRecoveryFiles{TargetExists: true, RollbackExists: true},
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFilePrevious, RestoreFileMissing),
 			wantAction: RestoreRecoveryVerifyCommitted, wantVerifyTarget: true,
 		},
 		{
-			name: "committed first database requires verification",
+			name: "committed first database verifies candidate",
 			phase: RestorePhaseCommitted, hadPrevious: false,
-			files: RestoreRecoveryFiles{TargetExists: true},
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 			wantAction: RestoreRecoveryVerifyCommitted, wantVerifyTarget: true,
+		},
+		{
+			name: "rolled back verifies previous target and retains candidate quarantine",
+			phase: RestorePhaseRolledBack, hadPrevious: true,
+			files: recoveryFiles(RestoreFilePrevious, RestoreFileMissing, RestoreFileMissing, RestoreFileCandidate),
+			wantAction: RestoreRecoveryVerifyRolledBack, wantVerifyTarget: true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			journal := recoveryTestJournal(test.phase, test.hadPrevious)
-			plan, err := PlanRestoreRecovery(journal, test.files)
+			plan, err := PlanRestoreRecovery(recoveryTestJournal(test.phase, test.hadPrevious), test.files)
 			if err != nil {
 				t.Fatalf("PlanRestoreRecovery() error = %v", err)
 			}
 			if plan.Action != test.wantAction ||
 				plan.RemoveStaging != test.wantRemoveStaging ||
+				plan.PreserveStaging != test.wantPreserveStaging ||
 				plan.PreserveTarget != test.wantPreserveTarget ||
 				plan.RestoreRollback != test.wantRestoreRollback ||
 				plan.VerifyTarget != test.wantVerifyTarget {
@@ -113,32 +129,32 @@ func TestPlanRestoreRecoveryFailsClosedOnAmbiguousStates(t *testing.T) {
 		{
 			name: "missing previous database during pre-publication",
 			journal: recoveryTestJournal(RestorePhaseStaging, true),
-			files: RestoreRecoveryFiles{StagingExists: true, RollbackExists: true},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
 			name: "rollback missing after publication",
 			journal: recoveryTestJournal(RestorePhasePublished, true),
-			files: RestoreRecoveryFiles{TargetExists: true},
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
 			name: "target unexpectedly present after previous-preserved",
 			journal: recoveryTestJournal(RestorePhasePreviousPreserved, true),
-			files: RestoreRecoveryFiles{TargetExists: true, RollbackExists: true},
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileCandidate, RestoreFilePrevious, RestoreFileMissing),
 		},
 		{
-			name: "first publication missing target",
+			name: "first publication missing candidate",
 			journal: recoveryTestJournal(RestorePhasePublished, false),
-			files: RestoreRecoveryFiles{},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
-			name: "committed database missing",
+			name: "committed candidate missing",
 			journal: recoveryTestJournal(RestorePhaseCommitted, false),
-			files: RestoreRecoveryFiles{StagingExists: true},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
 			name: "unknown phase",
 			journal: recoveryTestJournal(RestorePhase("unknown"), false),
-			files: RestoreRecoveryFiles{},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
 			name: "unsupported journal version",
@@ -147,7 +163,7 @@ func TestPlanRestoreRecoveryFailsClosedOnAmbiguousStates(t *testing.T) {
 				j.Version++
 				return j
 			}(),
-			files: RestoreRecoveryFiles{},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
 			name: "empty target path",
@@ -156,16 +172,16 @@ func TestPlanRestoreRecoveryFailsClosedOnAmbiguousStates(t *testing.T) {
 				j.TargetPath = ""
 				return j
 			}(),
-			files: RestoreRecoveryFiles{},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
-			name: "missing prior database metadata",
+			name: "missing previous metadata",
 			journal: func() RestoreJournal {
 				j := recoveryTestJournal(RestorePhasePrepared, false)
 				j.PreviousDatabaseExisted = nil
 				return j
 			}(),
-			files: RestoreRecoveryFiles{},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
 			name: "unexpected rollback path for first database",
@@ -174,7 +190,32 @@ func TestPlanRestoreRecoveryFailsClosedOnAmbiguousStates(t *testing.T) {
 				j.RollbackPath = filepath.Join("state", ".unexpected-rollback.db")
 				return j
 			}(),
-			files: RestoreRecoveryFiles{TargetExists: false},
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
+		},
+		{
+			name: "unverified partial staging artifact is never deleted",
+			journal: recoveryTestJournal(RestorePhaseStaging, true),
+			files: recoveryFiles(RestoreFilePrevious, RestoreFileUnverified, RestoreFileMissing, RestoreFileMissing),
+		},
+		{
+			name: "candidate content mismatch",
+			journal: recoveryTestJournal(RestorePhasePublished, true),
+			files: recoveryFiles(RestoreFileMismatch, RestoreFilePrevious, RestoreFileMissing, RestoreFileMissing),
+		},
+		{
+			name: "previous content mismatch",
+			journal: recoveryTestJournal(RestorePhasePublished, true),
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMismatch, RestoreFileMissing, RestoreFileMissing),
+		},
+		{
+			name: "unreadable candidate",
+			journal: recoveryTestJournal(RestorePhasePublished, true),
+			files: recoveryFiles(RestoreFileUnreadable, RestoreFilePrevious, RestoreFileMissing, RestoreFileMissing),
+		},
+		{
+			name: "intent phase is not auto-recovered before executor exists",
+			journal: recoveryTestJournal(RestorePhasePublishing, false),
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
 		},
 	}
 
@@ -190,7 +231,6 @@ func TestPlanRestoreRecoveryFailsClosedOnAmbiguousStates(t *testing.T) {
 		})
 	}
 }
-
 
 func TestPlanRestoreRecoveryRejectsCollidingPaths(t *testing.T) {
 	tests := []struct {
@@ -221,103 +261,25 @@ func TestPlanRestoreRecoveryRejectsCollidingPaths(t *testing.T) {
 				return j
 			}(),
 		},
+		{
+			name: "quarantine equals target",
+			journal: func() RestoreJournal {
+				j := recoveryTestJournal(RestorePhasePrepared, false)
+				j.CandidateQuarantinePath = j.TargetPath
+				return j
+			}(),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			plan, err := PlanRestoreRecovery(test.journal, RestoreRecoveryFiles{TargetExists: true, RollbackExists: true})
+			plan, err := PlanRestoreRecovery(test.journal, recoveryFiles(
+				RestoreFilePrevious, RestoreFileMissing, RestoreFilePrevious, RestoreFileMissing,
+			))
 			if !errors.Is(err, ErrRestoreRecoveryAmbiguous) {
 				t.Fatalf("PlanRestoreRecovery() = %#v, %v; want ErrRestoreRecoveryAmbiguous", plan, err)
 			}
 			if plan != (RestoreRecoveryPlan{}) {
 				t.Fatalf("colliding paths returned actionable plan: %#v", plan)
-			}
-		})
-	}
-}
-
-func TestPlanRestoreRecoveryRequiresVerifiedFileIdentities(t *testing.T) {
-	journal := recoveryTestJournal(RestorePhasePublished, true)
-	journal.CandidateSHA256 = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-	journal.CandidateSize = 200
-	journal.PreviousSHA256 = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
-	journal.PreviousSize = 300
-
-	tests := []struct {
-		name  string
-		files RestoreRecoveryFiles
-		want  RestoreRecoveryAction
-		wantErr bool
-	}{
-		{
-			name: "verified candidate and previous permit rollback plan",
-			files: RestoreRecoveryFiles{
-				Target: RestoreFileCandidate,
-				Rollback: RestoreFilePrevious,
-				Staging: RestoreFileMissing,
-				Quarantine: RestoreFileMissing,
-			},
-			want: RestoreRecoveryRestorePrevious,
-		},
-		{
-			name: "candidate digest mismatch is ambiguous",
-			files: RestoreRecoveryFiles{
-				Target: RestoreFileMismatch,
-				Rollback: RestoreFilePrevious,
-				Staging: RestoreFileMissing,
-				Quarantine: RestoreFileMissing,
-			},
-			wantErr: true,
-		},
-		{
-			name: "previous digest mismatch is ambiguous",
-			files: RestoreRecoveryFiles{
-				Target: RestoreFileCandidate,
-				Rollback: RestoreFileMismatch,
-				Staging: RestoreFileMissing,
-				Quarantine: RestoreFileMissing,
-			},
-			wantErr: true,
-		},
-		{
-			name: "unreadable candidate is ambiguous",
-			files: RestoreRecoveryFiles{
-				Target: RestoreFileUnreadable,
-				Rollback: RestoreFilePrevious,
-				Staging: RestoreFileMissing,
-				Quarantine: RestoreFileMissing,
-			},
-			wantErr: true,
-		},
-		{
-			name: "unverified staging artifact cannot be deleted",
-			files: RestoreRecoveryFiles{
-				Target: RestoreFilePrevious,
-				Staging: RestoreFileUnverified,
-				Rollback: RestoreFileMissing,
-				Quarantine: RestoreFileMissing,
-			},
-			wantErr: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			phaseJournal := journal
-			if test.name == "unverified staging artifact cannot be deleted" {
-				phaseJournal = recoveryTestJournal(RestorePhaseStaging, true)
-			}
-			plan, err := PlanRestoreRecovery(phaseJournal, test.files)
-			if test.wantErr {
-				if !errors.Is(err, ErrRestoreRecoveryAmbiguous) {
-					t.Fatalf("PlanRestoreRecovery() = %#v, %v; want ambiguity", plan, err)
-				}
-				return
-			}
-			if err != nil {
-				t.Fatalf("PlanRestoreRecovery() error = %v", err)
-			}
-			if plan.Action != test.want {
-				t.Fatalf("PlanRestoreRecovery() action = %q; want %q", plan.Action, test.want)
 			}
 		})
 	}
