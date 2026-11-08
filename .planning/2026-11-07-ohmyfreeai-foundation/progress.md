@@ -748,3 +748,38 @@
 - Current journal tests are awaiting CI on the newest revision; run `42428160345` started for the earlier journal-test commit `485b2c6...` and has not yet returned jobs. Subsequent commits superseded that run. Do not claim journal CI green yet.
 - Architecture documentation now records the implemented journal primitive and explicitly distinguishes it from integrated durable restore. Restore remains disabled.
 - Next: get clean CI on current tip; add recovery-state validation/decision logic that operates only on validated journal paths; then implement startup recovery before opening the canonical Store. Keep the application-level exclusive lease and rollback/verification protocol as the only route to restore.
+
+
+## Continuation: cross-platform journal correction and pure recovery planner — 2026-11-08
+
+### CI failure diagnosis
+- Inspected the completed jobs from the journal validation runs instead of relying on their queued status.
+- Root CI run `42428193863`: Ubuntu passed all steps including `go test -race ./...`; Windows failed `TestRestoreJournalRoundTripAndAtomicPhaseUpdate`.
+- Exact Windows failure: journal read-back returned the long temporary directory spelling while the expected struct retained the 8.3 short-path spelling. This was a path canonicalization mismatch, not a database or journal-content corruption.
+- Linux distro run `42428193878`: 7/8 jobs passed. Ubuntu 22.04 failed the WebView smoke because the helper used fixed X display `:97`; the desktop process then reported `cannot open display: :97`. Native build and CLI smoke had passed.
+- Wails run `42428193865`: Windows passed; Ubuntu native build and CLI passed, but the live WebView smoke was cancelled. SQLite driver evaluation `42428193862` passed 4/4.
+
+### Fixes committed
+- `18260e34ce1bf9f3c961690008b30d8bb985aded`: normalize restore journal state and transaction paths to resolved absolute paths consistently, avoiding mixed 8.3/long-path spellings on Windows.
+- `f79a554555bd4e8d514478024bef4df7020fe21c` and `6a1a19523c08f65e74daabe2dc37d0fc1587fefd`: compare the journal round-trip against canonicalized expected paths and populate the newly required previous-database metadata in the fixture.
+- `cbd549dad5714603f33cf74ba0cc04a20b455743`: replace fixed Xvfb display `:97` with Xvfb `-displayfd` allocation, preventing stale display/socket collisions in containerized distro lanes.
+
+### Recovery design implemented (planner only)
+- Journal schema advanced to version 2 and now requires explicit `previous_database_existed` metadata. A pointer is used so a missing field is distinguishable from an explicit `false`; old/incomplete journal records fail validation rather than silently guessing.
+- `85df4cd7c09601b9c4101b2bdc35f6900149230c`: add required prior-database metadata and schema version.
+- `4620e08253897cc770dc68a13ccdbde61563d08f`: add pure `PlanRestoreRecovery` with no filesystem mutations.
+- `e617a8a31510f3deb9a7e5cf7bddbc3498724dec`: add phase/file-state decision tests and fail-closed ambiguity tests.
+- Planner policy: pre-publication phases preserve the original target; previous-preserved restores the rollback; published/reopening with a prior DB preserve the candidate and restore rollback; first-ever publication is retained for manual review; committed state requires target verification and retains rollback. Conflicting file/phase combinations return `ErrRestoreRecoveryAmbiguous`.
+- This is not a recovery executor, is not wired into startup, and does not enable Restore.
+
+### Current verification status
+- The above fixes and planner commits are on `foundation/bootstrap`.
+- A complete CI run for the newest commits has not yet been observed. The earlier Windows and Ubuntu 22.04 failures remain open until the corrected revision passes.
+- No local Go tests are claimed. Do not treat source acceptance or commit creation as test success.
+- Restore remains disabled. No changes were made to `main`, live Colab, paid services, or the user's local machine.
+
+### Next
+1. Obtain a fresh root CI result for Windows + Ubuntu and verify the Linux race step.
+2. Obtain fresh Wails and all-eight-distro results; inspect any remaining WebView failures.
+3. Review and test the version-2 journal schema and pure planner, then implement a conservative filesystem recovery executor with collision-safe candidate preservation and crash-injection tests.
+4. Wire recovery before canonical Store open only after the executor is verified.
