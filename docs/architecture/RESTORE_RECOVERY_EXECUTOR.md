@@ -134,3 +134,41 @@ The pure planner now receives explicit per-path identity outcomes for target, st
 Completed-phase decisions require the expected content identity at each relevant path. Candidate publication rollback requires a verified previous database at rollback and a verified candidate either at target or already in quarantine. Committed verification requires the candidate at target and retains the previous rollback. Rolled-back verification requires the previous database at target and the candidate retained in quarantine.
 
 The planner intentionally rejects `preserving-previous`, `publishing`, and `restoring-previous` intent phases until the executor's move-by-move truth tables and no-replace operations are implemented. This is a deliberate fail-closed boundary, not a claim of automatic crash recovery.
+
+
+## Intent-phase planner truth tables and no-replace move primitive — 2026-11-08
+
+The pure planner now has explicit decisions for all three durable intent phases. These are planner decisions only; the filesystem executor is still absent.
+
+| Intent phase | Verified filesystem state | Plan |
+|---|---|---|
+| preserving-previous | Previous DB at target, rollback missing, quarantine missing; staging missing or verified candidate | Resume with PreservePrevious=true |
+| preserving-previous | Target missing, previous DB at rollback, quarantine missing; staging missing or verified candidate | Resume without repeating the move |
+| publishing | Candidate at staging, target missing, rollback matches prior-DB expectation, quarantine missing | PublishCandidate=true |
+| publishing | Candidate already at target, staging missing, rollback matches expectation, quarantine missing | Resume without repeating the move |
+| restoring-previous | Candidate at target, previous DB at rollback, quarantine missing, staging missing | Preserve target candidate, then restore rollback |
+| restoring-previous | Candidate at quarantine, previous DB at rollback, target and staging missing | Restore rollback |
+| restoring-previous | Candidate at quarantine, previous DB already at target, rollback and staging missing | Resume without repeating the move |
+
+Any other state—including identity mismatch, unreadable/unverified files, unexpected quarantine presence, contradictory prior-DB metadata, or ambiguous multiple copies—returns ErrRestoreRecoveryAmbiguous with an empty plan. The planner never authorizes cleanup from file presence alone.
+
+### Platform no-replace move primitive
+
+Implemented as an isolated primitive, not yet called by a restore executor:
+
+- Linux: golang.org/x/sys/unix.Renameat2 with unix.RENAME_NOREPLACE. Unsupported-kernel/filesystem errors are returned unchanged; there is no replacement-capable fallback.
+- Windows: golang.org/x/sys/windows.MoveFileEx with MOVEFILE_WRITE_THROUGH, deliberately omitting MOVEFILE_REPLACE_EXISTING and MOVEFILE_COPY_ALLOWED. Same-directory validation keeps the operation on one volume; existing destinations fail and are mapped to os.ErrExist.
+- Shared preflight rejects empty/equal paths, cross-directory moves, and sources that are symlinks or non-regular files. The OS operation remains the authoritative atomic destination-collision check.
+
+The primitive does not sync the containing directory, persist journal phases, verify database content identities, or coordinate StoreController leases. The executor must perform those operations in the prescribed order. The Lstat preflight is not a standalone defense against a hostile writer racing inside the state directory; callers must supply the canonical private state directory and revalidate transaction paths immediately before mutation. No executor/startup integration is claimed.
+
+### Research sources
+
+- Linux renameat2(RENAME_NOREPLACE): https://www.man7.org/linux/man-pages/man2/rename.2.html
+- Microsoft MoveFileExW flags and write-through contract: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw
+- Go x/sys/unix: https://pkg.go.dev/golang.org/x/sys@v0.49.0/unix#Renameat2
+- Go x/sys/windows: https://pkg.go.dev/golang.org/x/sys@v0.49.0/windows#MoveFileEx
+
+### Verification boundary
+
+Test-first commit 61a19ea5932bbda9ef722e8789c5af42cabe4c45 produced expected RED in Root Go CI run 42438137306: go vet failed because moveRestoreFileNoReplace did not yet exist. The implementation and platform-specific tests were then added. On code commit d717eac7096d98c3b59b1b9ebd39aa1cff6e2d93, Root Go CI run 42438368020 passed on Ubuntu and Windows, including Linux race tests; SQLite driver matrix run 42438368022 passed 4/4. Wails run 42438368038 and Linux distribution run 42438368003 were still running at the time of this update. A separate retry of the failed Ubuntu 22.04 GTK3 WebView smoke from run 42437541325 was also in progress. Do not infer those pending results.
