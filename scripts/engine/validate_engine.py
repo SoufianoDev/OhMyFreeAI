@@ -74,7 +74,8 @@ def main() -> int:
     report = {
         "status": "passed",
         "server": str(server.relative_to(root)),
-        "version_output": version.stdout.strip(),\n        "device_enumeration_output": devices.stdout.strip(),
+        "version_output": version.stdout.strip(),
+        "device_enumeration_output": devices.stdout.strip(),
         "dependency_targets_checked": len(dependency_checks),
         "dependency_checks": dependency_checks,
         "gpu_readiness": "NOT_TESTED — requires a compatible real Colab GPU",
