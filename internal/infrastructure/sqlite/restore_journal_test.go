@@ -183,3 +183,20 @@ func TestWriteRestoreJournalRejectsSymlinkedTransactionPath(t *testing.T) {
 		t.Fatalf("write with symlinked staging path error = %v, want ErrRestoreJournalInvalid", err)
 	}
 }
+
+
+func TestRestoreJournalPreservesExplicitNoPreviousDatabase(t *testing.T) {
+	root := t.TempDir()
+	journal := validTestRestoreJournal(root)
+	journal.PreviousDatabaseExisted = boolPointer(false)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("write journal with no previous database: %v", err)
+	}
+	got, err := ReadRestoreJournal(root)
+	if err != nil {
+		t.Fatalf("read journal with no previous database: %v", err)
+	}
+	if got.PreviousDatabaseExisted == nil || *got.PreviousDatabaseExisted {
+		t.Fatalf("previous-database metadata = %#v, want explicit false", got.PreviousDatabaseExisted)
+	}
+}
