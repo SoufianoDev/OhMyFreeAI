@@ -129,7 +129,12 @@ def build(output_directory: Path, build_tags: str = "") -> Path:
         run(["go", "mod", "edit", f"-replace={ROOT_MODULE}={relative_root}"], cwd=project)
         run(["go", "mod", "tidy"], cwd=project)
 
-        run(["wails3", "generate", "bindings"], cwd=project)
+        generate_command = ["wails3", "generate", "bindings"]
+        if build_tags:
+            # Binding discovery uses go/packages too; keep its package graph on
+            # the same GTK/WebKit stack as the subsequent native build.
+            generate_command.extend(["-f", f"-tags={build_tags}"])
+        run(generate_command, cwd=project)
         attach_generated_binding(project)
         build_command = ["wails3", "build"]
         if build_tags:
