@@ -169,9 +169,23 @@ def configure_cuda_runtime() -> tuple[dict, object]:
     paths = list(dict.fromkeys(paths))
     if not any(any(Path(p).glob("libcudart.so*")) for p in paths):
         raise RuntimeError("Could not locate libcudart in PyTorch/NVIDIA runtime libraries.")
+
+    # CUDA's driver library is supplied by the Colab host, not the PyTorch wheel.
+    driver_dirs = [
+        Path("/usr/lib/x86_64-linux-gnu"),
+        Path("/usr/local/nvidia/lib64"),
+        Path("/usr/local/nvidia/lib"),
+        Path("/usr/local/cuda/compat"),
+        Path("/usr/local/cuda-13.0/compat"),
+        Path("/usr/lib/wsl/lib"),
+    ]
+    for directory in driver_dirs:
+        if directory.is_dir() and any(directory.glob("libcuda.so*")):
+            paths.append(str(directory))
+
     env = os.environ.copy()
     env["LD_LIBRARY_PATH"] = os.pathsep.join(
-        paths + [env.get("LD_LIBRARY_PATH", "")]
+        list(dict.fromkeys(paths)) + [env.get("LD_LIBRARY_PATH", "")]
     ).rstrip(os.pathsep)
     facts = {
         "gpu_name": name,
