@@ -7,6 +7,7 @@
 | [0003 — Backup artifact naming](../adr/0003-omfaibackup-format.md) | Use `.omfaibackup`; preserve legacy import compatibility | Accepted |
 | [0004 — SQLite driver evaluation](../adr/0004-sqlite-driver-evaluation.md) | Select modernc.org/sqlite v1.62.0; production Store/migrations/config repository are implemented, while crash recovery and backup API remain open | Accepted |
 | [0005 — Go toolchain baseline](../adr/0005-go-toolchain-baseline.md) | Target latest stable patch, Go 1.27.3 as of 2026-11-07 | Accepted |
+| [0006 — Wails v3.1.0 compatibility review](../adr/0006-wails-v3.1-review.md) | Keep Wails v3.0.0 pinned until the GTK3/WebKit2GTK 4.1 distro lanes have a proven migration path | Accepted |
 
 
 ## Build and implementation guides
