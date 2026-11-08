@@ -127,12 +127,12 @@ func openRestoreArtifactRoot(path string) (windows.Handle, error) {
 		return windows.InvalidHandle, fmt.Errorf("resolve restore drive device: %w", err)
 	}
 	devicePath := windows.UTF16ToString(deviceBuffer[:deviceLength])
-	if !strings.HasPrefix(devicePath, `\\Device\\`) ||
-		strings.Contains(strings.TrimPrefix(devicePath, `\\Device\\`), `\\`) {
+	if !strings.HasPrefix(devicePath, "\\Device\\") ||
+		strings.Contains(strings.TrimPrefix(devicePath, "\\Device\\"), "\\") {
 		return windows.InvalidHandle, fmt.Errorf("restore drive is not mapped directly to a local volume device")
 	}
 
-	volumePath, err := windows.NewNTUnicodeString(strings.TrimRight(devicePath, `\\`) + `\\`)
+	volumePath, err := windows.NewNTUnicodeString(strings.TrimRight(devicePath, "\\") + "\\")
 	if err != nil {
 		return windows.InvalidHandle, fmt.Errorf("encode restore NT volume path: %w", err)
 	}
