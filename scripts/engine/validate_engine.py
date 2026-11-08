@@ -38,6 +38,10 @@ def main() -> int:
             [ldd, str(server)], cwd=root, text=True,
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=30,
         )
+        if args.require_ldd_clean and ldd_result.returncode != 0:
+            raise RuntimeError(
+                f"ldd failed with exit code {ldd_result.returncode}:\\n{ldd_result.stdout}"
+            )
         missing = [line.strip() for line in ldd_result.stdout.splitlines()
                    if "not found" in line]
         if missing and args.require_ldd_clean:
