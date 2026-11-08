@@ -52,9 +52,17 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 	if journal.PreviousDatabaseExisted == nil {
 		return ambiguous("journal does not record whether a previous database existed")
 	}
+	if samePath(journal.TargetPath, journal.StagingPath) {
+		return ambiguous("target and staging paths are identical")
+	}
 	hadPrevious := *journal.PreviousDatabaseExisted
-	if hadPrevious && journal.RollbackPath == "" {
-		return ambiguous("previous database existed but no rollback path is recorded")
+	if hadPrevious {
+		if strings.TrimSpace(journal.RollbackPath) == "" {
+			return ambiguous("previous database existed but no rollback path is recorded")
+		}
+		if samePath(journal.RollbackPath, journal.TargetPath) || samePath(journal.RollbackPath, journal.StagingPath) {
+			return ambiguous("rollback path collides with another transaction path")
+		}
 	}
 	if !hadPrevious && (files.RollbackExists || journal.RollbackPath != "") {
 		return ambiguous("journal or filesystem contains an unexpected rollback path")
