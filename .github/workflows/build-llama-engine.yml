@@ -93,7 +93,7 @@ jobs:
           cp -a "$(dirname "$SERVER")/." stage/llama-engine/bin/
           TAG_REF="refs/tags/$SOURCE_REF"
           TAG_REFS="$(git ls-remote https://github.com/ggml-org/llama.cpp.git "$TAG_REF" "$TAG_REF^{}")"
-          SOURCE_COMMIT="$(printf '%s\\n' "$TAG_REFS" | awk -v peeled="$TAG_REF^{}" -v direct="$TAG_REF" '$2 == peeled { p=$1 } $2 == direct { d=$1 } END { print p ? p : d }')"
+          SOURCE_COMMIT="$(awk -v peeled="$TAG_REF^{}" -v direct="$TAG_REF" '$2 == peeled { p=$1 } $2 == direct { d=$1 } END { print p ? p : d }' <<< "$TAG_REFS")"
           test -n "$SOURCE_COMMIT" || { echo "::error::Could not resolve the supplied upstream release tag."; exit 1; }
           echo "SOURCE_COMMIT=$SOURCE_COMMIT" >> "$GITHUB_ENV"
           if [[ -f /tmp/llama-official/LICENSE ]]; then
@@ -131,6 +131,8 @@ jobs:
             -DGGML_CPU_ALL_VARIANTS=ON \
             -DCMAKE_C_COMPILER_LAUNCHER=ccache \
             -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            '-DCMAKE_INSTALL_RPATH=$ORIGIN/../lib;$ORIGIN' \
+            -DCMAKE_BUILD_WITH_INSTALL_RPATH=ON \
             -DGGML_CUDA=OFF \
             -DLLAMA_BUILD_SERVER=ON \
             -DLLAMA_BUILD_TESTS=OFF \
