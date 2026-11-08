@@ -79,3 +79,49 @@ Implemented: durable journal v2, canonical path confinement, non-regular path re
 Not implemented: intent phases, candidate quarantine metadata, database content identities, platform-specific no-replace move adapter, filesystem executor, startup coordinator, process-death executor tests, or application-level restore orchestration.
 
 This design deliberately blocks a quick implementation based on os.Rename or check-then-rename. Safety takes priority over automatic cleanup: ambiguous artifacts are preserved and Restore remains disabled.
+
+
+## Version-3 journal contract (implementation gate)
+
+The next journal revision is intentionally incompatible with v2. Restore is not enabled and there is no supported live transaction to migrate, so the reader must reject v2 rather than guess missing ownership or content metadata.
+
+The v3 record must contain these fields in addition to the existing transaction metadata:
+
+| Field | Required invariant |
+|---|---|
+| `candidate_quarantine_path` | Always present, confined to the canonical state directory, distinct from target, staging and rollback. The path is selected once and persisted before any candidate-preservation move. |
+| `candidate_sha256`, `candidate_size_bytes` | Both absent/zero only while the candidate is not yet complete. Both required before the first publication intent and retained through published, reopening, restoring-previous, committed and rolled-back. |
+| `previous_sha256`, `previous_size_bytes` | Required if and only if `previous_database_existed=true). Capture and verify before moving the previous database. Must be absent/zero for a first-ever database. |
+
+The implementation should represent optional content identities explicitly (digest plus size) and validate them as a pair. SHA-256 must be exactly 32 decoded bytes in lowercase hexadecimal; size must be non-zero. A digest without a size, size without a digest, or identity for a non-existent previous database is invalid.
+
+### v3 phase transitions
+
+```text
+prepared
+  -> staging
+  -> preserving-previous (only when a previous DB exists)
+  -> previous-preserved
+  -> publishing
+  -> published
+  -> reopening
+  -> committed
+
+published/reopening
+  -> restoring-previous
+  -> rolled-back
+```
+
+For a first-ever database, `staging -> publishing` is allowed and rollback phases are not. A failed first-ever publication cannot be called rolled-back because no previous database exists; preserve the candidate and require manual review. The executor must not manufacture a prior state.
+
+Intent phases are durable *before* their corresponding filesystem mutation. Completion phases are durable only after the move and required directory sync have succeeded. If sync fails after a move, leave the intent phase intact; recovery inspects the actual file identities and reconciles without replacement.
+
+### Validation and planner implications
+
+- All four transaction paths (target, staging, rollback when present, quarantine) must be pairwise distinct using platform-aware path comparison.
+- The candidate identity must match the bytes at whichever candidate-bearing path is observed; previous identity must match rollback before restoration and target after rollback.
+- File presence alone is insufficient. An unexpected file with the right name but wrong digest is ambiguous and must be preserved.
+- A quarantine destination collision is never resolved by generating a new path during recovery. It is a manual-review condition because the chosen path is already part of the durable transaction record.
+- `rolled-back` requires the verified previous database at target, no candidate at target, and retained rollback/quarantine artifacts consistent with the last durable intent. It does not authorize deleting rollback.
+- The pure planner must model candidate/quarantine presence and identity verification results explicitly; it must never emit a destructive action from booleans that omit content identity.
+- Tests must reject v2, missing paired identity fields, malformed digests, zero sizes, inconsistent previous-database identity, and every path collision before any executor operation can run.
