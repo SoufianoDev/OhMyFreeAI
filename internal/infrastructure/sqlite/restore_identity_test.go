@@ -1,3 +1,4 @@
+// Test-first checkpoint: safely inspect restore artifact identity from an opened file handle.
 package sqlite
 
 import (
