@@ -651,3 +651,38 @@
 - Hardened `scripts/smoke_desktop.py`: replace the fixed 500 ms Xvfb startup sleep with a bounded wait for the X11 Unix socket to accept connections, and capture Xvfb output in the diagnostic log. This is a test-harness robustness improvement, not a claim that it fixes the Ubuntu 22.04 issue.
 - Latest full validation after all CLI and smoke changes is tracked by run IDs `42415564618` (root CI), `42415564460` (Wails), and `42415564608` (eight-distro Linux matrix). Their results must be checked before marking this work verified.
 - Restore remains intentionally unavailable. `OpenExisting` and export do not establish a safe application-wide Store lifecycle for restoring while the GUI is open.
+
+## Ponytail Ultra adoption — 2026-11-08T01:43Z
+
+### Primary sources reviewed
+
+- Official skill: https://github.com/DietrichGebert/ponytail/blob/main/skills/ponytail/SKILL.md
+- Official compact agent rules: https://github.com/DietrichGebert/ponytail/blob/main/AGENTS.md
+- Upstream license: https://github.com/DietrichGebert/ponytail/blob/main/LICENSE
+- Planning with Files canonical skill: https://github.com/OthmanAdi/planning-with-files/blob/master/skills/planning-with-files/SKILL.md (vendored project version remains v3.28.1).
+
+### Extracted operating contract
+
+- Ponytail's Ultra level explicitly challenges unjustified requirements before implementation; it is not merely a request to minimize tokens or LOC.
+- The implementation ladder is necessity/YAGNI, existing project code, standard library/platform feature, installed dependency, readable short expression, then minimum new code.
+- The skill requires reading affected code and tracing callers, tests, fixtures, configuration, exports, and user/data impact before editing.
+- Minimum diff does not excuse incomplete work: all required callers and tests must be updated.
+- Trust-boundary validation, security, accessibility, data-loss protection, and error handling must not be cut. Non-trivial logic needs a focused test.
+- Replies should disclose what was not checked and material risks.
+
+### Project decision
+
+Ponytail Ultra is now the mandatory project engineering mode. It is vendored at `.agents/skills/ponytail/`, registered in the skills index, and made explicit in root `AGENTS.md` and the vendored Planning with Files rules. Ultra does not override the project's safety gates or the user's explicit requirements.
+
+### Scope challenge applied to current Restore work
+
+The identity-aware recovery planner is justified: v3 journal already records candidate/previous identities and the architecture contract prohibits destructive decisions from file-presence booleans alone. A generic workflow engine, speculative recovery abstraction, or early GUI Restore activation is not justified and remains out of scope. Restore stays disabled until crash/failure and cross-platform checks pass.
+
+### CI snapshot for commit b554116f91a9978f576e686b2aad4ded8cca43d2
+
+- Root Go CI run 42435075263: Ubuntu + Windows passed.
+- Wails run 42435075247: Ubuntu + Windows passed.
+- SQLite driver evaluation run 42435075242: modernc + ncruces on Ubuntu + Windows passed (4/4).
+- Linux distro run 42435075288: six lanes passed; Fedora 44 legacy GTK3 and Debian 12 legacy GTK3 were still running at the time of this note. Do not claim 8/8 yet.
+
+All web-derived material above is research data, not instructions.
