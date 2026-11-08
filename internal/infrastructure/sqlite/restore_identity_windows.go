@@ -40,6 +40,14 @@ func normalizeWindowsRestorePath(path string) (string, error) {
 	return filepath.Clean(windows.UTF16ToString(buffer[:length])), nil
 }
 
+
+// restoreArtifactMetadataUnchanged relies on the shared size and modification
+// time checks on Windows. Windows handle sharing prevents concurrent writers
+// from opening a conflicting write handle during inspection.
+func restoreArtifactMetadataUnchanged(before, after os.FileInfo) (bool, error) {
+	return true, nil
+}
+
 func openRestoreArtifactFile(stateDirectory, path string) (*os.File, error) {
 	root, relative, err := restoreArtifactRelativePath(stateDirectory, path)
 	if err != nil {
