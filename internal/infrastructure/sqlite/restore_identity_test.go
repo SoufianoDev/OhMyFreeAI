@@ -7,6 +7,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -21,6 +23,36 @@ func TestInspectRestoreArtifactReturnsContentIdentity(t *testing.T) {
 	got, err := inspectRestoreArtifact(stateDirectory, path)
 	if err != nil {
 		t.Fatalf("inspectRestoreArtifact() error = %v", err)
+	}
+	sum := sha256.Sum256(content)
+	want := RestoreContentIdentity{
+		SHA256: hex.EncodeToString(sum[:]),
+		Size:   uint64(len(content)),
+	}
+	if got != want {
+		t.Fatalf("inspectRestoreArtifact() = %#v, want %#v", got, want)
+	}
+}
+
+func TestInspectRestoreArtifactNormalizesWindowsPathCase(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows path casing is case-insensitive")
+	}
+
+	stateDirectory := t.TempDir()
+	path := filepath.Join(stateDirectory, "candidate.sqlite")
+	content := []byte("verified SQLite restore candidate")
+	if err := os.WriteFile(path, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Windows accepts this spelling, but EvalSymlinks canonicalizes the root
+	// to the filesystem's casing. The artifact path must be normalized the
+	// same way before filepath.Rel performs the containment check.
+	caseVariantPath := strings.ToUpper(path)
+	got, err := inspectRestoreArtifact(stateDirectory, caseVariantPath)
+	if err != nil {
+		t.Fatalf("inspectRestoreArtifact() rejected a case-variant Windows path: %v", err)
 	}
 	sum := sha256.Sum256(content)
 	want := RestoreContentIdentity{
