@@ -48,3 +48,7 @@ func openRestoreArtifactFile(stateDirectory, path string) (*os.File, error) {
 	}
 	return file, nil
 }
+
+// normalizeWindowsRestorePath is unreachable on Linux; it keeps the shared
+// path-validation file buildable without importing Windows APIs.
+func normalizeWindowsRestorePath(path string) (string, error) { return path, nil }

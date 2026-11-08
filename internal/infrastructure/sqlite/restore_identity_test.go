@@ -46,9 +46,8 @@ func TestInspectRestoreArtifactNormalizesWindowsPathCase(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Windows accepts this spelling, but EvalSymlinks canonicalizes the root
-	// to the filesystem's casing. The artifact path must be normalized the
-	// same way before filepath.Rel performs the containment check.
+	// Windows accepts this spelling. Normalize both paths to their on-disk
+	// long form before performing the lexical containment check.
 	caseVariantPath := strings.ToUpper(path)
 	got, err := inspectRestoreArtifact(stateDirectory, caseVariantPath)
 	if err != nil {

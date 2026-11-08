@@ -13,6 +13,33 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// normalizeWindowsRestorePath expands DOS 8.3 aliases and normalizes on-disk
+// component spelling without resolving reparse points. The actual open remains
+// relative to pinned directory handles and rejects reparse points component by
+// component.
+func normalizeWindowsRestorePath(path string) (string, error) {
+	pathPtr, err := windows.UTF16PtrFromString(path)
+	if err != nil {
+		return "", fmt.Errorf("encode Windows restore path: %w", err)
+	}
+	required, err := windows.GetLongPathName(pathPtr, nil, 0)
+	if err != nil {
+		return "", fmt.Errorf("query Windows long restore path: %w", err)
+	}
+	if required == 0 {
+		return "", fmt.Errorf("Windows returned an empty long restore path")
+	}
+	buffer := make([]uint16, required)
+	length, err := windows.GetLongPathName(pathPtr, &buffer[0], uint32(len(buffer)))
+	if err != nil {
+		return "", fmt.Errorf("normalize Windows restore path: %w", err)
+	}
+	if length == 0 || length >= uint32(len(buffer)) {
+		return "", fmt.Errorf("Windows returned an invalid long restore path length")
+	}
+	return filepath.Clean(windows.UTF16ToString(buffer[:length])), nil
+}
+
 func openRestoreArtifactFile(stateDirectory, path string) (*os.File, error) {
 	root, relative, err := restoreArtifactRelativePath(stateDirectory, path)
 	if err != nil {

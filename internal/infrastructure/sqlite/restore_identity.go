@@ -92,6 +92,15 @@ func restoreArtifactRelativePath(stateDirectory, path string) (string, string, e
 // parent: the platform opener must reject every reparse/symlink component
 // relative to the pinned state-directory handle.
 func windowsRestoreArtifactRelativePath(root, candidate string) (string, bool) {
+	var err error
+	root, err = normalizeWindowsRestorePath(root)
+	if err != nil {
+		return "", false
+	}
+	candidate, err = normalizeWindowsRestorePath(candidate)
+	if err != nil {
+		return "", false
+	}
 	root = filepath.Clean(root)
 	candidate = filepath.Clean(candidate)
 
