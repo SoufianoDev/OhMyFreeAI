@@ -1004,3 +1004,14 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Linux distribution matrix 42497620422 was in progress with 4/8 jobs passed at this update. Do not claim full matrix green for c89d532a yet.
 - Code commit: c89d532a3ba04d43c7d2ccbed1675319c6f90ee8. Current branch also includes docs-only follow-up commits.
 - Remaining Windows path boundary: destination directory path is opened by CreateFile; OPEN_REPARSE_POINT protects its final component only. Next implement component-by-component directory opening from a trusted volume root and verify private ACL/permissions before the executor.
+
+
+## Continuation — historical prototype provenance and Colab MCP policy review — 2026-11-08
+
+- Reconfirmed that the uploaded Python patch/monitor scripts and archived Wails monitor applications are historical proof-of-concept artifacts, not production source files in OhMyFreeAI.
+- Recorded the user's confirmation that the initial experiment successfully started the model on free hosting, connected it to OpenCode, and completed a real conversation from inside OpenCode after approximately four hours of work. This is historical technical evidence only; it does not establish policy approval or production readiness. Additional scripts were not uploaded and remain unknown.
+- Reviewed Google's official Colab FAQ and official Colab MCP `create_runtime` reference. The MCP API documents runtime creation and authenticated Jupyter access, but does not expressly authorize a general-purpose inference server or OpenCode-consumed inference endpoint on a free managed runtime.
+- Updated `docs/legal/COLAB_RISK_DISCLOSURE.md`, `docs/adr/0002-colab-free-policy-gate.md`, and `docs/architecture/PROTOTYPE_AUDIT.md`; recorded research in `findings.md` and added the open policy reassessment item to `task_plan.md`.
+- Documentation commit: `45b6a9b998eef1e5657b359f971e99dc8313001b` on `foundation/bootstrap`.
+- No application code, live runtime, launcher, or user process was modified. No automated tests were run because this change is documentation-only. The Colab adapter remains policy-gated and disabled.
+- Exa's follow-up search endpoint returned HTTP 500 twice; conclusions above rely on the successfully retrieved official Google documentation, not third-party tutorials.
