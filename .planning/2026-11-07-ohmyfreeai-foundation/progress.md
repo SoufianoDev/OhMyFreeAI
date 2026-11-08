@@ -881,3 +881,16 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 
 - Re-ran only the failed Ubuntu 22.04 job from workflow run `42435761590` (job `128597325747`), leaving the seven successful distro jobs untouched.
 - At the latest check, Ubuntu 22.04 was still in progress; no retry result is claimed. The original attempt's failure was the frontend-to-Go `GetSnapshot` WebView smoke timeout after native build and CLI smoke passed.
+
+
+## Continuation: atomic no-replace Restore move primitive — 2026-11-08
+
+- Researched Linux renameat2(RENAME_NOREPLACE) and Windows MoveFileExW from the Linux man-pages and Microsoft Learn using Exa. Reused the existing golang.org/x/sys v0.49.0 dependency; no new dependency version.
+- Test-first commit 61a19ea5932bbda9ef722e8789c5af42cabe4c45 produced expected RED in Root Go CI run 42438137306: Ubuntu job 128601331157 failed at go vet with undefined: moveRestoreFileNoReplace.
+- Added common path/source validation, Linux Renameat2(RENAME_NOREPLACE), Windows MoveFileEx(MOVEFILE_WRITE_THROUGH) without replacement/copy flags, and an unsupported-platform implementation that fails closed.
+- Added tests for successful move, preserving source and destination on collision, symbolic-link and non-regular source rejection, cross-directory rejection, and a concurrent two-source/one-destination collision.
+- Hush/Deslop review: no explanatory comments were added; required build constraints remain. No unrelated files were changed.
+- The first implementation CI run exposed only a go mod tidy grouping mismatch in go.mod; corrected the direct dependency grouping in commit d717eac7096d98c3b59b1b9ebd39aa1cff6e2d93. No dependency version or go.sum change.
+- Verified on d717eac: Root Go CI run 42438368020 passed Ubuntu + Windows (including Linux go test -race ./...); SQLite driver matrix run 42438368022 passed 4/4. Wails run 42438368038 and eight-distro matrix run 42438368003 were still in progress at the time of writing.
+- The preceding distro run 42437541325 finished with 7/8; Ubuntu 22.04 built and passed CLI smoke but timed out waiting for the WebView-to-Go call. A targeted retry of that lane is in progress. This remains an environment-sensitive failure until a successful retry is observed.
+- Restore remains disabled. The primitive is not called by an executor. Not yet implemented: journaled move orchestration, content identity revalidation around each move, directory sync and restart reconciliation, crash-injection tests, startup recovery and shared application Restore service.
