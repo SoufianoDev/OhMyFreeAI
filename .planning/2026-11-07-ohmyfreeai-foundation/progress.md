@@ -797,3 +797,15 @@
 - `32f21f59481e5e2eee880a96cce942250c6f6b72`: added a journal round-trip test proving explicit `previous_database_existed=false` remains distinguishable from missing metadata.
 - `e46da7305213bba156098987671336d37d6a4870`: removed an unused import from the dynamic Xvfb smoke helper.
 - These source changes also require a fresh CI run. The available Actions connector only exposes pull-request workflow runs for commit lookup, and no push-run IDs/check results were returned for the new commits. Verification is therefore still pending.
+
+
+## Continuation: restore journal rollback invariants — 2026-11-08T00:36Z
+
+- Reviewed the durable journal and recovery planner against the required rollback protocol.
+- Found a validation gap: the journal parser accepted previous_database_existed=true with no rollback path, and accepted false with an unexpected rollback path. The planner rejected some of these combinations later, but the durable journal boundary itself should reject inconsistent metadata before any executor can consume it.
+- Updated canonicalizeRestoreJournal to require a rollback path if and only if a previous database existed. Path-collision checks now use the platform-aware samePath helper for target/staging/rollback comparisons.
+- Updated the test fixture to include the required rollback path and adjusted the explicit-false case to omit it.
+- Added write-time and read-time tests for both inconsistent combinations.
+- Commits: 62068a8d7c17a8988d571aab37ee379e392f2401 (journal validation), 1548e9d62cd1a6e10a51337ed304f8c61940691f (tests), followed by this documentation correction.
+- CI status for the latest commits is not available from the current GitHub status lookup; no test success is claimed.
+- Restore remains disabled. Next: obtain full CI evidence, then implement the recovery executor only with collision-safe no-overwrite semantics and process-death tests.
