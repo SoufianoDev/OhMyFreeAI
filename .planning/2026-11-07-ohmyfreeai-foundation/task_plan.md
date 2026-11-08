@@ -8,7 +8,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 StoreController integration is complete and verified. The Wails composition root and AppService retain the controller; configuration Load/Save and GUI/CLI backup export hold shared leases for their full operations; shutdown drains through the controller. The controller tests cover writer preference, cancellation, panic/failure fail-closed behavior, replacement, close draining, configuration Load/Save and backup export. On commit 3a814ff960e57da2e60bb7fc7dd697461af8bda1, Root CI 42475338115 passed Ubuntu and Windows (Linux race detector passed), SQLite driver evaluation 42475338112 passed 4/4, Wails proof 42475338129 passed 2/2, and the Linux distribution matrix 42475338092 passed 8/8.
 
-The planner's staged-candidate rollback gap is closed by commits 5a183916, dd771f6e and 47bbe3e. The Windows no-replace rename boundary is now implemented with NtSetInformationFile(FileRenameInformationEx class 65), rooted at a retained directory handle and operating on an opened source handle. On code/test commit c85c3350, Root CI 42496659593 passed Ubuntu and Windows (including Linux race detector), SQLite driver evaluation 42496659645 passed 4/4, and Wails platform proof 42496659732 passed 2/2. Linux distro matrix 42496659764 has 4/8 jobs passed and 4 still running at this update. Restore remains disabled. The next security task is to open the source leaf relative to the already-pinned Windows directory handle with NtCreateFile, then enforce the private canonical state-directory boundary before implementing the durable executor. Process-death recovery and startup integration remain future work.
+The planner's staged-candidate rollback gap is closed by commits 5a183916, dd771f6e and 47bbe3e. The Windows no-replace rename boundary is now implemented with NtSetInformationFile(FileRenameInformationEx class 65), rooted at a retained directory handle and operating on an opened source handle. On code/test commit c85c3350, Root CI 42496659593 passed Ubuntu and Windows (including Linux race detector), SQLite driver evaluation 42496659645 passed 4/4, and Wails platform proof 42496659732 passed 2/2. Linux distro matrix 42496659764 passed 8/8. Restore remains disabled. The next security task is to open the source leaf relative to the already-pinned Windows directory handle with NtCreateFile, then enforce the private canonical state-directory boundary before implementing the durable executor. Process-death recovery and startup integration remain future work.
 
 ## Current Phase
 
@@ -236,3 +236,14 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Linux distribution matrix run 42496659764: Arch Linux, Fedora 44 GTK4, Ubuntu 24.04 GTK4 and Debian 13 GTK4 passed. openSUSE Tumbleweed, Ubuntu 22.04 GTK3, Fedora 44 legacy GTK3 and Debian 12 GTK3 were still running at this update. Do not claim 8/8 yet.
 - Current code/test commit: c85c3350d6dd9c0557805be62a6761f1a8110129. The Windows handle-bound implementation itself is in d6f6bb54c9f72cfcd118087e4468e7d425e83251.
 - Restore remains disabled. The move primitive still opens the destination directory by path and the source by pathname; next close the source-open race by using NtCreateFile with RootDirectory set to the already-opened directory handle. The future executor must also enforce a private canonical state directory and journal/recovery invariants.
+
+
+## Final CI closure — Windows handle-bound move — 2026-11-08
+
+- Linux distribution matrix 42496659764 completed SUCCESS, 8/8: Arch rolling, Fedora 44 GTK4, Ubuntu 24.04 GTK4, Debian 13 GTK4, openSUSE Tumbleweed, Ubuntu 22.04 GTK3, Fedora 44 legacy GTK3 and Debian 12 GTK3.
+- The full code/test revision c85c3350 is green across Root CI, Wails, SQLite driver evaluation and the eight-lane Linux matrix:
+  - Root CI 42496659593: Ubuntu + Windows SUCCESS; Linux race detector SUCCESS.
+  - Wails 42496659732: Ubuntu + Windows SUCCESS; Ubuntu WebView-to-Go and DB reopen passed.
+  - SQLite drivers 42496659645: 4/4 SUCCESS.
+  - Linux distributions 42496659764: 8/8 SUCCESS.
+- The current branch also contains the separately committed Wails v3.1 compatibility ADR index update and this Restore CI record. No production code changed after c85c3350.

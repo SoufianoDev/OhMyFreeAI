@@ -298,10 +298,21 @@ The adapter:
 - Root CI 42496659593 passed Ubuntu and Windows; Ubuntu race detector passed.
 - SQLite driver evaluation 42496659645 passed 4/4.
 - Wails platform proof 42496659732 passed 2/2, including Ubuntu WebView-to-Go and DB reopen plus Windows executable verification.
-- Linux distribution matrix 42496659764 had 4/8 jobs pass at this update; the other four were still running. No 8/8 claim.
+- Linux distribution matrix 42496659764 completed SUCCESS, 8/8: Arch, Fedora 44 GTK4, Ubuntu 24.04 GTK4, Debian 13 GTK4, openSUSE Tumbleweed, Ubuntu 22.04 GTK3, Fedora 44 legacy GTK3 and Debian 12 GTK3.
 
 ### Explicit limitations and next step
 
 The destination directory is still opened by path and the source file is still opened by pathname. The next Windows hardening step is to open the source leaf relative to the already-opened destination directory handle using NtCreateFile and OBJECT_ATTRIBUTES.RootDirectory, with FILE_OPEN_REPARSE_POINT and FILE_SYNCHRONOUS_IO_NONALERT plus SYNCHRONIZE access. The future executor must enforce the private canonical state-directory boundary, verify identities immediately before mutation, persist journal intent and recover ambiguous move results/process death.
 
 The native class is not assumed to work on every filesystem/provider. Unsupported providers fail closed. No full executor, startup recovery or app-level Restore service exists. Restore remains disabled.
+
+
+### Final CI closure — 2026-11-08
+
+The corrected handle-bound move implementation and Windows tests are covered by a fully green validation set on code/test commit c85c3350:
+- Root CI 42496659593 — Ubuntu and Windows passed; Ubuntu race detector passed.
+- SQLite driver evaluation 42496659645 — 4/4 passed.
+- Wails platform proof 42496659732 — 2/2 passed; Linux WebView-to-Go and database reopen passed.
+- Linux distribution compatibility 42496659764 — 8/8 passed across GTK4/WebKit6 and legacy GTK3/WebKit2GTK 4.1 lanes.
+
+These CI results do not certify every bare-metal distribution release, Windows filesystem provider, or power-loss behavior. Restore remains disabled.

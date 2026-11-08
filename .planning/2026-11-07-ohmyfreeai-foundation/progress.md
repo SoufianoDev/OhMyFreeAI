@@ -985,3 +985,12 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Wails platform proof 42496659732: SUCCESS 2/2. Ubuntu native app, CLI, WebView-to-Go bridge and DB reopen passed; Windows native app/executable passed.
 - Linux distro matrix 42496659764: 4/8 passed (Arch, Fedora 44 GTK4, Ubuntu 24.04 GTK4, Debian 13 GTK4); openSUSE and three GTK3 legacy lanes still running. No 8/8 claim.
 - Next security task: open the source leaf relative to the pinned Windows directory handle using NtCreateFile; preserve fail-closed behavior. Restore remains disabled.
+
+
+## Final validation closure — 2026-11-08
+
+- Root CI 42496659593 passed Ubuntu and Windows; Ubuntu race detector passed.
+- Wails v3 platform proof 42496659732 passed 2/2, including the live Linux WebView-to-Go bridge and database reopen.
+- SQLite driver evaluation 42496659645 passed 4/4.
+- Linux distribution compatibility 42496659764 passed 8/8 across modern GTK4/WebKit6 and legacy GTK3/WebKit2GTK 4.1 lanes.
+- Current Restore code remains low-level only. No durable executor, startup recovery, app-level Restore service, or Restore UI is enabled.
