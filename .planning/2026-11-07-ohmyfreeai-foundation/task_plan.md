@@ -157,3 +157,12 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Latest code commit: d717eac7096d98c3b59b1b9ebd39aa1cff6e2d93.
 - Root Go CI 42438368020: Ubuntu + Windows passed; Linux race detector passed. SQLite driver matrix 42438368022: 4/4 passed. Wails 42438368038 and distro matrix 42438368003 are pending; Ubuntu 22.04 from the previous matrix is being retried separately.
 - Next: close the pending Wails/distro checks, then implement the durable executor around these primitives with intent-before-mutation journaling, identity revalidation, directory sync, process-death tests and idempotent recovery. Do not wire startup recovery or enable Restore until all safety gates pass.
+
+
+### CI update after no-replace primitive
+
+- Root Go CI 42438368020 passed Ubuntu + Windows; Linux race detector passed.
+- SQLite driver evaluation 42438368022 passed 4/4.
+- Wails native platform proof 42438368038 passed 2/2, including Ubuntu WebView-to-Go and SQLite reopen.
+- Previous distro matrix 42437541325 reached 8/8 after rerunning only its failed Ubuntu 22.04 GTK3 lane; that targeted retry passed without a code change.
+- Current code-revision distro matrix 42438368003 remains pending and must be checked separately.
