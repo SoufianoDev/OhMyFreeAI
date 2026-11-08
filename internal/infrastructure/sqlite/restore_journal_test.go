@@ -1,7 +1,7 @@
 package sqlite
 
 import (
-	"errors"
+	"encoding/json"\n\t"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -198,5 +198,38 @@ func TestRestoreJournalPreservesExplicitNoPreviousDatabase(t *testing.T) {
 	}
 	if got.PreviousDatabaseExisted == nil || *got.PreviousDatabaseExisted {
 		t.Fatalf("previous-database metadata = %#v, want explicit false", got.PreviousDatabaseExisted)
+	}
+}
+
+
+func TestReadRestoreJournalRejectsMissingPreviousDatabaseMetadata(t *testing.T) {
+	root := t.TempDir()
+	journal := validTestRestoreJournal(root)
+	journal.PreviousDatabaseExisted = nil
+	data, err := json.Marshal(journal)
+	if err != nil {
+		t.Fatalf("marshal journal without previous-database metadata: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, restoreJournalFileName), data, 0o600); err != nil {
+		t.Fatalf("write journal without previous-database metadata: %v", err)
+	}
+	if _, err := ReadRestoreJournal(root); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("read journal without previous-database metadata error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
+func TestReadRestoreJournalRejectsLegacyVersionOne(t *testing.T) {
+	root := t.TempDir()
+	journal := validTestRestoreJournal(root)
+	journal.Version = 1
+	data, err := json.Marshal(journal)
+	if err != nil {
+		t.Fatalf("marshal legacy journal: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(root, restoreJournalFileName), data, 0o600); err != nil {
+		t.Fatalf("write legacy journal: %v", err)
+	}
+	if _, err := ReadRestoreJournal(root); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("read version-one journal error = %v, want ErrRestoreJournalInvalid", err)
 	}
 }
