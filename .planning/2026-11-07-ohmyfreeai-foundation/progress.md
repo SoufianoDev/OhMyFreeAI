@@ -842,3 +842,13 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Prohibited a check-then-`os.Rename` implementation. The planned adapter must provide atomic no-replace moves (Linux `renameat2(RENAME_NOREPLACE)`, Windows destination-exists-safe move with write-through); unsupported filesystems fail closed.
 - Candidate quarantine path and database content identities must be journaled before mutation. Unknown or partial staging artifacts are preserved rather than deleted without ownership proof.
 - No runtime code changed in this design step. Restore remains disabled. Next implementation begins with journal schema/state-machine TDD and platform no-replace primitives, followed by executor crash-injection tests.
+
+
+## Continuation: 2026-11-08T01:12Z — v3 journal contract
+
+- Re-read repository instructions, active task plan, findings/progress, and the restore recovery design before continuing.
+- Confirmed current branch head before edits: `7054668df048aa6ad931219f801c7a320e68aec4`; all writes remain on `foundation/bootstrap`.
+- Expanded `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md` with a concrete v3 journal contract: persisted quarantine path, paired candidate and previous-database SHA-256/size identities, incompatible-v2 policy, phase transitions, and validation/planner requirements.
+- Documentation commit: `84aa731726ba9cff72cfafdbed72ec54a5cec22e`.
+- No runtime code changed and no CI result is claimed for this documentation-only commit.
+- Next: implement v3 journal fields and strict validation with RED/GREEN tests; update the pure planner to require identity verification inputs; then implement Linux/Windows atomic no-replace primitives. Restore stays disabled.
