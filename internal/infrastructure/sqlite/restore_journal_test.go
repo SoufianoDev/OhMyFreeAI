@@ -1,7 +1,8 @@
 package sqlite
 
 import (
-	"encoding/json"\n\t"errors"
+	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -200,7 +201,6 @@ func TestRestoreJournalPreservesExplicitNoPreviousDatabase(t *testing.T) {
 		t.Fatalf("previous-database metadata = %#v, want explicit false", got.PreviousDatabaseExisted)
 	}
 }
-
 
 func TestReadRestoreJournalRejectsMissingPreviousDatabaseMetadata(t *testing.T) {
 	root := t.TempDir()
