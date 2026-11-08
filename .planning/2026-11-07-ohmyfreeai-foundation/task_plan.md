@@ -6,7 +6,9 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-GUI and CLI backup export/inspect are implemented. StoreController is wired into Wails configuration and GUI/CLI backup export. The durable journal primitive is currently schema v2 and the pure recovery planner is conservative but not crash-complete. The current gate is the collision-safe Restore recovery executor: add move-by-move truth tables for the three intent phases, atomic Linux/Windows no-replace moves, and process-death tests. Keep Restore disabled and Colab remote inference policy-gated. Hush and Deslop code-hygiene policies are now installed and mandatory for code changes.
+StoreController integration is complete and verified. The Wails composition root and AppService retain the controller; configuration Load/Save and GUI/CLI backup export hold shared leases for their full operations; shutdown drains through the controller. The controller tests cover writer preference, cancellation, panic/failure fail-closed behavior, replacement, close draining, configuration Load/Save and backup export. On commit 3a814ff960e57da2e60bb7fc7dd697461af8bda1, Root CI 42475338115 passed Ubuntu and Windows (Linux race detector passed), SQLite driver evaluation 42475338112 passed 4/4, Wails proof 42475338129 passed 2/2, and the Linux distribution matrix 42475338092 passed 8/8.
+
+The next task is a focused TDD correction in the pure Restore planner: the previous-preserved plan requires preserving a candidate still in staging before restoring rollback, but the restoring-previous intent phase currently rejects that staging state. Add the missing truth-table test and planner decision before implementing filesystem mutations. Keep Restore disabled and do not add startup recovery or Restore UI until the executor and crash/failure test matrix pass. Journal v3, the identity-aware planner and no-replace move primitives already exist as low-level code; they are not yet a recovery executor.
 
 ## Current Phase
 
@@ -69,10 +71,21 @@ Phase 4
 - [x] Wire backup export/inspect into the Wails service using native file dialogs and bilingual settings UI
 - [x] Add CLI backup export/inspect commands using the shared archive manager and existing-only SQLite open
 - [x] Specify crash-safe restore lifecycle, durable journal, startup recovery and failure-injection requirements in RESTORE_LIFECYCLE.md
-- [ ] Implement coordinated Store lifecycle, journal and rollback before enabling restore\n  - [ ] Complete StoreController TDD and green Ubuntu/Windows root CI\n  - [x] Route Wails configuration and backup export through controller leases; remove long-lived raw Store references\n  - [x] Route CLI backup export through controller leases\n  - [x] Add StoreController shutdown drain and closed-controller rejection tests\n  - [x] Publish a verified rollback Store after failed exclusive replacement, or fail closed\n  - [ ] Add concurrent config/backup drain tests that hold leases through complete operations\n  - [x] Add concurrent StoreController lease stress test and canceled-shutdown regression test
-  - [ ] Run Go race detector and add failure-injection coverage\n  - [x] Add durable restore journal storage primitive with bounded strict decoding, path confinement and atomic persistence (CI still pending on latest schema)
-  - [x] Record whether a previous database existed as required version-2 journal metadata
-  - [x] Add a pure phase/file-state recovery planner and fail-closed ambiguity tests (CI still pending)
+- [ ] Complete coordinated Store lifecycle and Restore safety gates before enabling Restore
+  - [x] Complete StoreController TDD and green Ubuntu/Windows root CI
+  - [x] Route Wails configuration and backup export through controller leases; remove long-lived raw Store references
+  - [x] Route CLI backup export through controller leases
+  - [x] Add StoreController shutdown drain and closed-controller rejection tests
+  - [x] Publish a verified rollback Store after failed exclusive replacement, or fail closed
+  - [x] Add concurrent configuration Load/Save and backup-export drain tests covering complete operations
+  - [x] Add concurrent StoreController lease stress test and canceled-shutdown regression test
+  - [x] Run the Go race detector in Linux CI; the Windows workflow skips the race step
+  - [ ] Add failure-injection coverage across Restore publication, reopen, journal commit and rollback
+  - [x] Add strict durable Restore journal v3 storage with bounded decoding, path confinement and paired content identities (low-level only)
+  - [x] Record explicit previous-database state and paired candidate/previous content identities in journal v3
+  - [x] Add an identity-aware pure recovery planner, intent-phase truth tables and fail-closed ambiguity tests
+  - [x] Add Linux/Windows no-replace move primitives; common behavioral tests now run on both platforms
+  - [ ] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)

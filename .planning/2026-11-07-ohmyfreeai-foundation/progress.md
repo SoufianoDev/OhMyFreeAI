@@ -927,3 +927,31 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Current eight-distro matrix run 42439943571 remained queued. This is pending, not a pass.
 - The new tests verify journal publication replacement and Windows fail-closed removal. Test-only workflows were cancelled before execution, so no RED evidence is claimed.
 - Restore remains disabled. Windows publication uses MoveFileExW write-through; full Windows power-loss guarantees and non-NTFS support remain unqualified. Windows journal deletion remains unsupported and preserves the journal.
+
+
+## StoreController integration gate and cross-platform move coverage — 2026-11-08
+
+### Required starting run
+
+- Requested run 42419106009 for commit f5396ee completed successfully on Ubuntu and Windows. This was the required baseline check, not the latest branch validation.
+
+### StoreController integration review
+
+- Reviewed `internal/infrastructure/sqlite/store_controller.go` and its tests. The controller uses shared/exclusive leases, writer preference, context cancellation, idempotent releases, and fail-closed handling when an exclusive callback panics or returns no safe Store.
+- The Wails composition root constructs the controller after startup migration, uses it as the configuration repository, passes it to AppService, and closes through the controller after the app exits.
+- AppService exposes backup export/inspect, dashboard snapshot and configuration save; it retains no raw Store. GUI and CLI export call `CreateWithStoreController`, which holds a shared lease through archive publication. CLI shutdown also closes through the controller.
+- Config Load/Save drain tests and the backup-export drain test hold the lease while the underlying SQLite operation is blocked. The controller suite also covers close draining, closed-controller rejection, replacement, cancellation, panic and concurrent lease stress.
+- No Restore method is exposed by AppService, the composition root does not run startup recovery, and the frontend has no Restore action. Existing low-level journal v3, planner and no-replace primitives remain disconnected; Restore stays disabled.
+
+### CI closure before the next phase
+
+- Branch commit `baca870a72dccf067fe3ec032e47425351ec71af`: Root CI run 42473729669 passed Ubuntu and Windows; Linux `go test -race ./...` passed. Wails run 42473729641 passed both platforms and logged two successful WebView-to-Go calls on each Linux launch plus `WEBVIEW_REOPEN_PASS`. SQLite driver evaluation 42473729677 passed 4/4.
+- Linux distribution run 42473729674 initially failed only Debian 12 GTK3/WebKit2GTK smoke with `Gtk-WARNING: cannot open display: :0`. The targeted retry (attempt 2, job 128713500788) passed; its bridge smoke succeeded twice and the reopen check passed. The completed run is 8/8. No code change was made for that transient failure.
+- Test-coverage commit `3a814ff960e57da2e60bb7fc7dd697461af8bda1` changes `restore_move_test.go` to `linux || windows` and moves the Linux-only symlinked-parent test into `restore_move_linux_test.go`. This is test coverage only; no production move behavior changed.
+- On `3a814ff`, Root CI run 42475338115 passed Ubuntu and Windows; the Linux race step passed and the Windows race step was skipped by workflow design. SQLite driver evaluation 42475338112 passed 4/4. Wails run 42475338129 passed 2/2; Linux logs show both WebView bridge launches succeeded and database reopen passed, while Windows executable verification passed. Linux distribution run 42475338092 passed 8/8.
+
+### Restore planner gap found during executor review
+
+- `PlanRestoreRecovery` returns `PreserveStaging=true` from the `previous-preserved` phase, because the staged candidate must be retained before restoring the old database.
+- The `restoring-previous` intent phase currently rejects every non-missing staging file and only accepts the candidate at target or quarantine. That leaves no recoverable state for a crash after the journal records the rollback intent but before it has moved the staged candidate to quarantine.
+- The next change is to add a focused truth-table test for candidate-at-staging under `restoring-previous`, then extend the planner without weakening its ambiguity checks. The filesystem executor remains unimplemented; no Restore UI/startup recovery was added.

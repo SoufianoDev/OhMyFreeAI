@@ -764,3 +764,12 @@ Sources:
 ### Decision
 
 Do not claim a single portable directory-sync abstraction. Use platform-specific namespace barriers and fail closed where a destructive transition lacks a supported persistence mechanism. Keep Restore disabled until executor and restart recovery tests prove all transitions.
+
+
+## Restore executor review — 2026-11-08
+
+StoreController integration and the full current CI gate are green on commit `3a814ff960e57da2e60bb7fc7dd697461af8bda1`: Ubuntu/Windows root CI, Linux race detector, SQLite driver matrix 4/4, Wails proof 2/2 and Linux distribution matrix 8/8.
+
+A planner-state gap must be closed before filesystem execution. The `previous-preserved` decision requests `PreserveStaging=true` and `RestoreRollback=true`, but `RestorePhaseRestoringPrevious` rejects any candidate still at staging. A crash after the journal records the rollback intent but before the staging-to-quarantine move therefore has no accepted recovery state. Add the explicit state (target missing, candidate at staging, previous DB at rollback, quarantine missing) to the intent truth table and test it. Keep all mismatched, unreadable, unverified and colliding states ambiguous.
+
+The cross-platform no-replace move tests were previously build-tagged Linux-only. Commit `3a814ff` makes the common move/collision/concurrency/symlink-source checks run on Linux and Windows, while retaining the symlinked-containing-directory test as Linux-only. Root CI passed on both platforms. Restore remains disabled; no executor, startup coordinator or UI was introduced.
