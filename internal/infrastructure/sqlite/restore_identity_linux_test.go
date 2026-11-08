@@ -5,6 +5,7 @@ package sqlite
 import (
 	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 )
 
