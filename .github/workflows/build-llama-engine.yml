@@ -124,14 +124,27 @@ jobs:
         if: (inputs.source_mode || 'source-build') == 'source-build'
         shell: bash
         env:
-          SOURCE_REF: ${{ inputs.source_ref }}
+          SOURCE_REF: ${{ inputs.source_ref || 'v0.9.0' }}
         run: |
           set -euo pipefail
           git clone --filter=blob:none https://github.com/ggml-org/llama.cpp.git /tmp/llama-src
-          git -C /tmp/llama-src fetch --depth 1 origin "$SOURCE_REF"
-          git -C /tmp/llama-src checkout --detach FETCH_HEAD
-          git -C /tmp/llama-src rev-parse HEAD | tee stage/source-commit.txt
-          echo "SOURCE_COMMIT=$(git -C /tmp/llama-src rev-parse HEAD)" >> "$GITHUB_ENV"
+          if [[ "$SOURCE_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            git -C /tmp/llama-src fetch --depth 1 origin "$SOURCE_REF"
+            git -C /tmp/llama-src checkout --detach FETCH_HEAD
+            EXPECTED_COMMIT="${SOURCE_REF,,}"
+          else
+            git -C /tmp/llama-src fetch --depth 1 origin \
+              "refs/tags/${SOURCE_REF}:refs/tags/${SOURCE_REF}"
+            git -C /tmp/llama-src checkout --detach "refs/tags/${SOURCE_REF}"
+            EXPECTED_COMMIT="$(git -C /tmp/llama-src rev-parse "refs/tags/${SOURCE_REF}^{commit}")"
+          fi
+          SOURCE_COMMIT="$(git -C /tmp/llama-src rev-parse HEAD)"
+          if [[ -z "$EXPECTED_COMMIT" || "$SOURCE_COMMIT" != "$EXPECTED_COMMIT" ]]; then
+            echo "::error::Pinned source mismatch: expected ${EXPECTED_COMMIT:-<unresolved>}, got ${SOURCE_COMMIT}. Refusing to build."
+            exit 1
+          fi
+          printf '%s\\n' "$SOURCE_COMMIT" | tee stage/source-commit.txt
+          echo "SOURCE_COMMIT=$SOURCE_COMMIT" >> "$GITHUB_ENV"
           cmake -S /tmp/llama-src -B /tmp/llama-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX=/tmp/llama-install \
@@ -152,6 +165,11 @@ jobs:
           cmake --build /tmp/llama-build --config Release --parallel 2 --target llama-server
           cmake --build /tmp/llama-build --config Release --parallel 2 --target install
           test -x /tmp/llama-install/bin/llama-server
+          /tmp/llama-install/bin/llama-server --version | tee /tmp/llama-server-version.txt
+          if [[ "$SOURCE_REF" == v* ]] && grep -q -- '-dev' /tmp/llama-server-version.txt; then
+            echo "::error::A stable release tag produced a development-version binary. Refusing to publish."
+            exit 1
+          fi
           cp -a /tmp/llama-install/bin/. stage/llama-engine/bin/
           cp /tmp/llama-src/LICENSE stage/llama-engine/LICENSE
 
