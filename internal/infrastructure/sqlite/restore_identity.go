@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -20,43 +21,75 @@ type RestoreContentIdentity struct {
 	Size   uint64
 }
 
+// verifiedRestoreArtifact owns the exact file handle whose bytes were hashed.
+// Callers that will later consume or move the artifact must retain this object
+// and use file; reopening a path would discard the identity guarantee.
+type verifiedRestoreArtifact struct {
+	file     *os.File
+	identity RestoreContentIdentity
+}
+
+func (artifact *verifiedRestoreArtifact) close() error {
+	if artifact == nil || artifact.file == nil {
+		return nil
+	}
+	return artifact.file.Close()
+}
+
 func inspectRestoreArtifact(stateDirectory, path string) (RestoreContentIdentity, error) {
-	var identity RestoreContentIdentity
+	artifact, err := openVerifiedRestoreArtifact(stateDirectory, path)
+	if err != nil {
+		return RestoreContentIdentity{}, err
+	}
+	defer artifact.close()
+	return artifact.identity, nil
+}
+
+func openVerifiedRestoreArtifact(stateDirectory, path string) (*verifiedRestoreArtifact, error) {
 	file, err := openRestoreArtifactFile(stateDirectory, path)
 	if err != nil {
-		return identity, fmt.Errorf("%w: open artifact: %v", ErrRestoreArtifactInvalid, err)
+		return nil, fmt.Errorf("%w: open artifact: %v", ErrRestoreArtifactInvalid, err)
 	}
-	defer file.Close()
+	fail := func(err error) (*verifiedRestoreArtifact, error) {
+		_ = file.Close()
+		return nil, err
+	}
 
 	before, err := file.Stat()
 	if err != nil {
-		return identity, fmt.Errorf("%w: stat opened artifact: %v", ErrRestoreArtifactInvalid, err)
+		return fail(fmt.Errorf("%w: stat opened artifact: %v", ErrRestoreArtifactInvalid, err))
 	}
 	if !before.Mode().IsRegular() || before.Size() <= 0 {
-		return identity, fmt.Errorf("%w: artifact must be a non-empty regular file", ErrRestoreArtifactInvalid)
+		return fail(fmt.Errorf("%w: artifact must be a non-empty regular file", ErrRestoreArtifactInvalid))
 	}
 
 	hash := sha256.New()
 	size, err := io.Copy(hash, file)
 	if err != nil {
-		return identity, fmt.Errorf("%w: hash opened artifact: %v", ErrRestoreArtifactInvalid, err)
+		return fail(fmt.Errorf("%w: hash opened artifact: %v", ErrRestoreArtifactInvalid, err))
 	}
 	after, err := file.Stat()
 	if err != nil {
-		return identity, fmt.Errorf("%w: restat opened artifact: %v", ErrRestoreArtifactInvalid, err)
+		return fail(fmt.Errorf("%w: restat opened artifact: %v", ErrRestoreArtifactInvalid, err))
 	}
 	metadataStable, metadataErr := restoreArtifactMetadataUnchanged(before, after)
 	if metadataErr != nil {
-		return identity, fmt.Errorf("%w: compare artifact metadata: %v", ErrRestoreArtifactInvalid, metadataErr)
+		return fail(fmt.Errorf("%w: compare artifact metadata: %v", ErrRestoreArtifactInvalid, metadataErr))
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		return fail(fmt.Errorf("%w: rewind verified artifact: %v", ErrRestoreArtifactInvalid, err))
 	}
 	if !after.Mode().IsRegular() || size <= 0 || uint64(size) != uint64(after.Size()) ||
 		before.Size() != after.Size() || !before.ModTime().Equal(after.ModTime()) || !metadataStable {
-		return identity, fmt.Errorf("%w: artifact changed while its identity was being read", ErrRestoreArtifactInvalid)
+		return fail(fmt.Errorf("%w: artifact changed while its identity was being read", ErrRestoreArtifactInvalid))
 	}
 
-	return RestoreContentIdentity{
-		SHA256: hex.EncodeToString(hash.Sum(nil)),
-		Size:   uint64(size),
+	return &verifiedRestoreArtifact{
+		file: file,
+		identity: RestoreContentIdentity{
+			SHA256: hex.EncodeToString(hash.Sum(nil)),
+			Size:   uint64(size),
+		},
 	}, nil
 }
 
