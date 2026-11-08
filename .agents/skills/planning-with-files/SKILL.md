@@ -39,6 +39,14 @@ Work like Manus: Use persistent markdown files as your "working memory on disk."
 
 For this repository, **Ponytail Ultra is mandatory for all engineering work**. Read `.agents/skills/ponytail/SKILL.md` and apply its Ultra level before changing code. Ultra means challenging unjustified scope before implementation, preferring deletion and reuse, and choosing the smallest complete solution. It does not authorize cutting validation, security, accessibility, data-loss protection, error handling, user requirements, or tests. If a requested feature or proposed architecture is not justified by the project goal, record the reason in `findings.md` and recommend the smaller alternative before proceeding. Preserve required safety work even when it increases the diff.
 
+## OhMyFreeAI code hygiene: Hush + Deslop
+
+For every code change, read and apply `.agents/skills/hush/SKILL.md`. Hush is the comment policy: default to no comments, add only comments that preserve information the code cannot express, and clean up only comments introduced or edited in the current task. Preserve directives, required documentation, license notices, TODOs with owners, and comments that explain security, data integrity, SQLite/Restore invariants, rollback, concurrency, platform workarounds, or Colab policy.
+
+After implementation, apply `.agents/skills/deslop-code/SKILL.md` to the current task's diff. Compare against nearby code and remove only proven redundancy or inconsistency introduced by this task. Do not remove trust-boundary validation, error handling, cancellation, type safety, security checks, data-loss protections, or tests. Do not perform repository-wide cleanup without explicit approval. Use only the configured formatter on touched files; do not invent formatting tools or reformat unrelated files.
+
+Hush and Deslop are subordinate to Ponytail Ultra and the project's architecture and safety requirements. If a cleanup decision is uncertain, preserve the code/comment and record the reason in `findings.md`. Record what was removed, retained, formatted, and tested in `progress.md`; never claim a formatter or test ran unless it did.
+
 Planning discipline under Ultra:
 
 - Keep the active plan as the source of truth; do not create competing plans or silently replace existing decisions.
