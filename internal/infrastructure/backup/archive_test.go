@@ -84,150 +84,29 @@ func TestManagerCreateWritesStrictOmfaibackupArchive(t *testing.T) {
 	}
 }
 
-func TestManagerRestoreRestoresSnapshotAndKeepsRollback(t *testing.T) {
-	ctx := context.Background()
+func TestManagerRestoreFailsClosedWithoutTouchingTarget(t *testing.T) {
 	directory := t.TempDir()
-	sourceStore, err := sqlite.Open(ctx, filepath.Join(directory, "source.db"))
-	if err != nil {
-		t.Fatalf("open source database: %v", err)
-	}
-	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
-		t.Fatalf("migrate source database: %v", err)
-	}
-	sourceConfig := appconfig.Defaults()
-	sourceConfig.Gateway.Port = 18086
-	if err := sourceStore.Save(ctx, sourceConfig); err != nil {
-		t.Fatalf("save source configuration: %v", err)
+	targetPath := filepath.Join(directory, "state.db")
+	original := []byte("existing application state must remain untouched")
+	if err := os.WriteFile(targetPath, original, 0o600); err != nil {
+		t.Fatalf("create existing target: %v", err)
 	}
 
-	manager := Manager{ApplicationVersion: "0.1.0", Migrations: migrations.Files, MigrationDir: "."}
-	archivePath := filepath.Join(directory, "source.omfaibackup")
-	if err := manager.Create(ctx, sourceStore, archivePath); err != nil {
-		t.Fatalf("create source backup archive: %v", err)
-	}
-	if err := sourceStore.Close(); err != nil {
-		t.Fatalf("close source database: %v", err)
+	manager := Manager{}
+	archivePath := filepath.Join(directory, "missing.omfaibackup")
+	if _, err := manager.Restore(context.Background(), archivePath, targetPath); !errors.Is(err, sqlite.ErrRestoreExecutorUnavailable) {
+		t.Fatalf("Manager.Restore() error = %v, want ErrRestoreExecutorUnavailable", err)
 	}
 
-	targetPath := filepath.Join(directory, "target.db")
-	targetStore, err := sqlite.Open(ctx, targetPath)
+	actual, err := os.ReadFile(targetPath)
 	if err != nil {
-		t.Fatalf("open target database: %v", err)
+		t.Fatalf("read existing target after disabled restore: %v", err)
 	}
-	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
-		t.Fatalf("migrate target database: %v", err)
+	if !reflect.DeepEqual(actual, original) {
+		t.Fatalf("target changed after disabled restore: got %q, want %q", actual, original)
 	}
-	targetConfig := appconfig.Defaults()
-	targetConfig.Gateway.Port = 18087
-	if err := targetStore.Save(ctx, targetConfig); err != nil {
-		t.Fatalf("save target configuration: %v", err)
-	}
-	if err := targetStore.Close(); err != nil {
-		t.Fatalf("close target database: %v", err)
-	}
-
-	rollbackPath, err := manager.Restore(ctx, archivePath, targetPath)
-	if err != nil {
-		t.Fatalf("restore backup archive: %v", err)
-	}
-	if rollbackPath == "" {
-		t.Fatal("restore did not preserve the previous database")
-	}
-
-	restoredStore, err := sqlite.Open(ctx, targetPath)
-	if err != nil {
-		t.Fatalf("open restored database: %v", err)
-	}
-	if err := restoredStore.Migrate(ctx, migrations.Files, "."); err != nil {
-		t.Fatalf("migrate restored database: %v", err)
-	}
-	restoredConfig, err := restoredStore.Load(ctx)
-	if err != nil {
-		t.Fatalf("load restored configuration: %v", err)
-	}
-	if !reflect.DeepEqual(restoredConfig, sourceConfig) {
-		t.Fatalf("restored configuration mismatch:\n got: %#v\nwant: %#v", restoredConfig, sourceConfig)
-	}
-	if err := restoredStore.Close(); err != nil {
-		t.Fatalf("close restored database: %v", err)
-	}
-
-	previousStore, err := sqlite.Open(ctx, rollbackPath)
-	if err != nil {
-		t.Fatalf("open rollback database: %v", err)
-	}
-	defer previousStore.Close()
-	if err := previousStore.Migrate(ctx, migrations.Files, "."); err != nil {
-		t.Fatalf("migrate rollback database: %v", err)
-	}
-	previousConfig, err := previousStore.Load(ctx)
-	if err != nil {
-		t.Fatalf("load rollback configuration: %v", err)
-	}
-	if !reflect.DeepEqual(previousConfig, targetConfig) {
-		t.Fatalf("rollback configuration mismatch:\n got: %#v\nwant: %#v", previousConfig, targetConfig)
-	}
-}
-
-func TestManagerRestoreRejectsChecksumMismatchWithoutTouchingTarget(t *testing.T) {
-	ctx := context.Background()
-	directory := t.TempDir()
-	sourceStore, err := sqlite.Open(ctx, filepath.Join(directory, "source.db"))
-	if err != nil {
-		t.Fatalf("open source database: %v", err)
-	}
-	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
-		t.Fatalf("migrate source database: %v", err)
-	}
-	manager := Manager{ApplicationVersion: "0.1.0", Migrations: migrations.Files, MigrationDir: "."}
-	archivePath := filepath.Join(directory, "source.omfaibackup")
-	if err := manager.Create(ctx, sourceStore, archivePath); err != nil {
-		t.Fatalf("create source archive: %v", err)
-	}
-	if err := sourceStore.Close(); err != nil {
-		t.Fatalf("close source database: %v", err)
-	}
-
-	targetPath := filepath.Join(directory, "target.db")
-	targetStore, err := sqlite.Open(ctx, targetPath)
-	if err != nil {
-		t.Fatalf("open target database: %v", err)
-	}
-	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
-		t.Fatalf("migrate target database: %v", err)
-	}
-	expected := appconfig.Defaults()
-	expected.Gateway.Port = 18088
-	if err := targetStore.Save(ctx, expected); err != nil {
-		t.Fatalf("save target configuration: %v", err)
-	}
-	if err := targetStore.Close(); err != nil {
-		t.Fatalf("close target database: %v", err)
-	}
-
-	corruptPath := filepath.Join(directory, "corrupt.omfaibackup")
-	rewriteArchive(t, archivePath, corruptPath, func(name string, data []byte) ([]byte, bool) {
-		if name == databaseName && len(data) > 32 {
-			data[32] ^= 0xff
-			return data, true
-		}
-		return data, false
-	})
-	if _, err := manager.Restore(ctx, corruptPath, targetPath); !errors.Is(err, ErrInvalidBackupArchive) {
-		t.Fatalf("expected checksum validation error, got %v", err)
-	}
-
-	verifiedStore, err := sqlite.Open(ctx, targetPath)
-	if err != nil {
-		t.Fatalf("reopen unchanged target database: %v", err)
-	}
-	defer verifiedStore.Close()
-	actual, err := verifiedStore.Load(ctx)
-	if err != nil {
-		t.Fatalf("load unchanged target configuration: %v", err)
-	}
-	if !reflect.DeepEqual(actual, expected) {
-		t.Fatalf("target changed after rejected archive:\n got: %#v\nwant: %#v", actual, expected)
+	if _, err := os.Stat(archivePath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("disabled restore unexpectedly accessed or created archive path: %v", err)
 	}
 }
 
@@ -268,50 +147,6 @@ func findZipEntry(t *testing.T, entries []*zip.File, name string) *zip.File {
 	}
 	t.Fatalf("archive entry %q not found", name)
 	return nil
-}
-
-func rewriteArchive(t *testing.T, sourcePath, destinationPath string, mutate func(string, []byte) ([]byte, bool)) {
-	t.Helper()
-	source, err := zip.OpenReader(sourcePath)
-	if err != nil {
-		t.Fatalf("open source archive for rewrite: %v", err)
-	}
-	defer source.Close()
-
-	output, err := os.Create(destinationPath)
-	if err != nil {
-		t.Fatalf("create rewritten archive: %v", err)
-	}
-	writer := zip.NewWriter(output)
-	for _, entry := range source.File {
-		reader, err := entry.Open()
-		if err != nil {
-			t.Fatalf("open source archive entry: %v", err)
-		}
-		data, err := io.ReadAll(reader)
-		_ = reader.Close()
-		if err != nil {
-			t.Fatalf("read source archive entry: %v", err)
-		}
-		if changed, ok := mutate(entry.Name, data); ok {
-			data = changed
-		}
-		header := &zip.FileHeader{Name: entry.Name, Method: zip.Deflate}
-		header.SetMode(0o600)
-		entryWriter, err := writer.CreateHeader(header)
-		if err != nil {
-			t.Fatalf("create rewritten archive entry: %v", err)
-		}
-		if _, err := entryWriter.Write(data); err != nil {
-			t.Fatalf("write rewritten archive entry: %v", err)
-		}
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatalf("close rewritten archive: %v", err)
-	}
-	if err := output.Close(); err != nil {
-		t.Fatalf("close rewritten archive file: %v", err)
-	}
 }
 
 
