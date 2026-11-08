@@ -108,6 +108,11 @@ func openRestoreArtifactRoot(path string) (windows.Handle, error) {
 	if err != nil {
 		return windows.InvalidHandle, fmt.Errorf("encode restore volume root: %w", err)
 	}
+	switch windows.GetDriveType(rootPtr) {
+	case windows.DRIVE_FIXED, windows.DRIVE_REMOVABLE, windows.DRIVE_RAMDISK:
+	default:
+		return windows.InvalidHandle, fmt.Errorf("restore state directory must be on a supported local drive")
+	}
 	current, err := windows.CreateFile(
 		rootPtr,
 		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
