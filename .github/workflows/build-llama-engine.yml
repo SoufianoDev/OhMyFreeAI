@@ -65,8 +65,8 @@ jobs:
               exit 1
             }
             case "$ARTIFACT_URL" in
-              https://github.com/ggml-org/llama.cpp/releases/download/*) ;;
-              *) echo "::error::Only official ggml-org/llama.cpp release asset URLs are accepted."; exit 1 ;;
+              "https://github.com/ggml-org/llama.cpp/releases/download/$SOURCE_REF/"*.tar.gz) ;;
+              *) echo "::error::URL must be a .tar.gz asset under the exact official release tag supplied as source_ref."; exit 1 ;;
             esac
           fi
           sudo apt-get update
@@ -90,12 +90,26 @@ jobs:
             exit 1
           }
           cp -a "$(dirname "$SERVER")/." stage/llama-engine/bin/
+          TAG_REF="refs/tags/$SOURCE_REF"
+          TAG_REFS="$(git ls-remote https://github.com/ggml-org/llama.cpp.git "$TAG_REF" "$TAG_REF^{}")"
+          SOURCE_COMMIT="$(printf '%s\\n' "$TAG_REFS" | awk -v peeled="$TAG_REF^{}" -v direct="$TAG_REF" '$2 == peeled { p=$1 } $2 == direct { d=$1 } END { print p ? p : d }')"
+          test -n "$SOURCE_COMMIT" || { echo "::error::Could not resolve the supplied upstream release tag."; exit 1; }
+          echo "SOURCE_COMMIT=$SOURCE_COMMIT" >> "$GITHUB_ENV"
           if [[ -f /tmp/llama-official/LICENSE ]]; then
             cp /tmp/llama-official/LICENSE stage/llama-engine/LICENSE
           else
             LICENSE_FILE="$(find /tmp/llama-official -type f -name LICENSE -print -quit || true)"
             if [[ -n "$LICENSE_FILE" ]]; then cp "$LICENSE_FILE" stage/llama-engine/LICENSE; fi
           fi
+
+      - name: Restore compiler cache
+        if: inputs.source_mode == 'source-build'
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ccache
+          key: llama-cpp-${{ runner.os }}-${{ inputs.source_ref }}
+          restore-keys: |
+            llama-cpp-${{ runner.os }}-
 
       - name: Checkout pinned llama.cpp source
         if: inputs.source_mode == 'source-build'
@@ -108,11 +122,14 @@ jobs:
           git -C /tmp/llama-src fetch --depth 1 origin "$SOURCE_REF"
           git -C /tmp/llama-src checkout --detach FETCH_HEAD
           git -C /tmp/llama-src rev-parse HEAD | tee stage/source-commit.txt
+          echo "SOURCE_COMMIT=$(git -C /tmp/llama-src rev-parse HEAD)" >> "$GITHUB_ENV"
           cmake -S /tmp/llama-src -B /tmp/llama-build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_INSTALL_PREFIX="$GITHUB_WORKSPACE/stage/llama-engine" \
             -DGGML_NATIVE=OFF \
             -DGGML_CPU_ALL_VARIANTS=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
             -DGGML_CUDA=OFF \
             -DLLAMA_BUILD_SERVER=ON \
             -DLLAMA_BUILD_TESTS=OFF \
@@ -133,8 +150,10 @@ jobs:
           python3 scripts/engine/generate_manifest.py \
             --output stage/llama-engine/manifest.json \
             --source-ref "$SOURCE_REF" \
+            --source-commit "$SOURCE_COMMIT" \
             --source-mode "$SOURCE_MODE" \
             --artifact-url "$ARTIFACT_URL" \
+            --build-flags "Release;GGML_NATIVE=OFF;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=OFF" \
             --backend "$BACKEND"
           python3 scripts/engine/validate_engine.py --root stage/llama-engine --require-ldd-clean
 
