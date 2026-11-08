@@ -10,23 +10,11 @@ on:
       - docs/adr/0001-llama-engine-build-distribution.md
   workflow_dispatch:
     inputs:
-      source_mode:
-        description: "Use an exact upstream release asset, or build from a pinned source ref"
-        type: choice
-        required: true
-        default: source-build
-        options:
-          - official-asset
-          - source-build
       source_ref:
         description: "Pinned upstream version tag or full 40-character commit SHA"
         type: string
         required: true
         default: v0.9.0
-      artifact_url:
-        description: "Exact official Linux x86_64 CPU asset URL; required for official-asset mode"
-        type: string
-        required: false
       backend:
         description: "CUDA engine target for the verified Colab Tesla T4 (compute capability 7.5)."
         type: choice
@@ -40,7 +28,7 @@ permissions:
 
 concurrency:
   group: llama-engine-build-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build-package:
@@ -57,25 +45,14 @@ jobs:
       - name: Validate inputs and install tools
         shell: bash
         env:
-          SOURCE_MODE: ${{ inputs.source_mode || 'source-build' }}
+          SOURCE_MODE: source-build
           SOURCE_REF: ${{ inputs.source_ref || 'v0.9.0' }}
-          ARTIFACT_URL: ${{ inputs.artifact_url || '' }}
         run: |
           set -euo pipefail
           test -n "$SOURCE_REF"
           if [[ ! "$SOURCE_REF" =~ ^(v[0-9]+\.[0-9]+\.[0-9]+|b[0-9]+|[0-9a-fA-F]{40})$ ]]; then
             echo "::error::source_ref must be a version tag (vX.Y.Z or bNNNN) or full 40-character commit SHA."
             exit 1
-          fi
-          if [[ "$SOURCE_MODE" == "official-asset" ]]; then
-            test -n "$ARTIFACT_URL" || {
-              echo "::error::artifact_url is required for official-asset mode."
-              exit 1
-            }
-            case "$ARTIFACT_URL" in
-              "https://github.com/ggml-org/llama.cpp/releases/download/$SOURCE_REF/"*.tar.gz) ;;
-              *) echo "::error::URL must be a .tar.gz asset under the exact official release tag supplied as source_ref."; exit 1 ;;
-            esac
           fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends cmake ninja-build ccache zstd curl tar
@@ -90,37 +67,7 @@ jobs:
           python3 -m py_compile scripts/engine/*.py
           mkdir -p stage/llama-engine/bin dist
 
-      - name: Fetch official release asset
-        if: (inputs.source_mode || 'source-build') == 'official-asset'
-        shell: bash
-        env:
-          SOURCE_REF: ${{ inputs.source_ref }}
-          ARTIFACT_URL: ${{ inputs.artifact_url }}
-        run: |
-          set -euo pipefail
-          mkdir -p /tmp/llama-official
-          curl --fail --location --retry 3 --retry-delay 2 "$ARTIFACT_URL" -o /tmp/llama-official/engine-asset
-          tar -xf /tmp/llama-official/engine-asset -C /tmp/llama-official
-          SERVER="$(find /tmp/llama-official -type f -name llama-server -perm -u+x -print -quit)"
-          test -n "$SERVER" || {
-            echo "::error::The supplied official asset does not contain an executable llama-server."
-            exit 1
-          }
-          cp -a "$(dirname "$SERVER")/." stage/llama-engine/bin/
-          TAG_REF="refs/tags/$SOURCE_REF"
-          TAG_REFS="$(git ls-remote https://github.com/ggml-org/llama.cpp.git "$TAG_REF" "$TAG_REF^{}")"
-          SOURCE_COMMIT="$(awk -v peeled="$TAG_REF^{}" -v direct="$TAG_REF" '$2 == peeled { p=$1 } $2 == direct { d=$1 } END { print p ? p : d }' <<< "$TAG_REFS")"
-          test -n "$SOURCE_COMMIT" || { echo "::error::Could not resolve the supplied upstream release tag."; exit 1; }
-          echo "SOURCE_COMMIT=$SOURCE_COMMIT" >> "$GITHUB_ENV"
-          if [[ -f /tmp/llama-official/LICENSE ]]; then
-            cp /tmp/llama-official/LICENSE stage/llama-engine/LICENSE
-          else
-            LICENSE_FILE="$(find /tmp/llama-official -type f -name LICENSE -print -quit || true)"
-            if [[ -n "$LICENSE_FILE" ]]; then cp "$LICENSE_FILE" stage/llama-engine/LICENSE; fi
-          fi
-
       - name: Restore compiler cache
-        if: (inputs.source_mode || 'source-build') == 'source-build'
         uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
@@ -129,7 +76,6 @@ jobs:
             llama-cpp-${{ runner.os }}-
 
       - name: Checkout pinned llama.cpp source
-        if: (inputs.source_mode || 'source-build') == 'source-build'
         shell: bash
         env:
           SOURCE_REF: ${{ inputs.source_ref || 'v0.9.0' }}
@@ -183,16 +129,15 @@ jobs:
           fi
           cp -a /tmp/llama-install/bin/. stage/llama-engine/bin/
           cp /tmp/llama-src/LICENSE stage/llama-engine/LICENSE
-          python3 scripts/engine/bundle_cuda_runtime.py \
+          python3 scripts/engine/audit_cuda_runtime.py \
             --root stage/llama-engine \
             --cuda-lib-dir /usr/local/cuda-13.0/targets/x86_64-linux/lib
 
       - name: Generate provenance and validate engine
         shell: bash
         env:
-          SOURCE_MODE: ${{ inputs.source_mode || 'source-build' }}
+          SOURCE_MODE: source-build
           SOURCE_REF: ${{ inputs.source_ref || 'v0.9.0' }}
-          ARTIFACT_URL: ${{ inputs.artifact_url }}
           BACKEND: ${{ inputs.backend || 'cuda-t4-sm75' }}
         run: |
           set -euo pipefail
@@ -201,7 +146,6 @@ jobs:
             --source-ref "$SOURCE_REF" \
             --source-commit "$SOURCE_COMMIT" \
             --source-mode "$SOURCE_MODE" \
-            --artifact-url "$ARTIFACT_URL" \
             --build-flags "Release;LLAMA_BUILD_IS_DEV=OFF;GGML_NATIVE=OFF;BUILD_SHARED_LIBS=ON;GGML_BACKEND_DL=ON;GGML_CPU_ALL_VARIANTS=ON;GGML_CUDA=ON;CMAKE_CUDA_ARCHITECTURES=75;CUDA_TOOLKIT=13.0" \
             --backend "$BACKEND"
           python3 scripts/engine/validate_engine.py --root stage/llama-engine --require-ldd-clean --require-cuda

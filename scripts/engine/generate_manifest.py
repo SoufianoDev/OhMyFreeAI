@@ -96,8 +96,9 @@ def main() -> None:
         "cuda_target": {
             "toolkit_version": "13.0" if args.backend.startswith("cuda") else None,
             "architectures": args.cuda_architectures if args.backend.startswith("cuda") else None,
-            "runtime_policy": "CUDA toolkit shared libraries bundled; libcuda.so.1 supplied by host NVIDIA driver" if args.backend.startswith("cuda") else None,
+            "runtime_policy": "CUDA 13 runtime/cuBLAS libraries resolved from the Colab PyTorch CUDA distribution; libcuda.so.1 supplied by the host NVIDIA driver" if args.backend.startswith("cuda") else None,
         },
+        "runtime_dependency_policy": "CI validates against CUDA Toolkit 13.0; Colab launcher must add torch/lib and site-packages/nvidia/*/lib to LD_LIBRARY_PATH" if args.backend.startswith("cuda") else "system dependencies",
         "build_flags": args.build_flags,
         "cuda": {
             "nvidia_smi": command_output(["nvidia-smi", "--query-gpu=name,driver_version",
