@@ -1,5 +1,14 @@
 # Historical prototype audit
 
+## User-confirmed historical outcome and source boundary
+
+The uploaded Python patch/monitor scripts and archived Wails monitor applications belong to the **initial proof-of-concept experiment**, not to the OhMyFreeAI repository's production source tree. They are historical experiment artifacts and audit references only; do not treat them as project implementation files, merge them into the product, or execute them automatically.
+
+The user confirms that, after approximately four hours of work in that initial experiment, the model was successfully started on a free hosted runtime, connected to OpenCode, and used through an actual conversation from inside OpenCode. This is important practical evidence that the tested technical path worked at that time. It is not evidence of provider-policy approval, repeatability, guaranteed availability, or production readiness.
+
+Some additional experiment scripts were not uploaded. Their contents and exact behavior remain unknown and must not be inferred.
+
+
 - Audit type: read-only static inspection
 - Date: 2026-11-07
 - Execution policy: none of the supplied patch/monitor scripts or archived applications were executed; no Colab command or local process was touched.

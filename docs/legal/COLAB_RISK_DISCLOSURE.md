@@ -28,3 +28,22 @@ The intended pattern of a local client calling a local Gateway that forwards inf
 ## User disclosure
 
 Colab Free is best-effort interactive compute. Sessions and resources can change or terminate without warning. Users must remain within Google's current terms. OhMyFreeAI does not guarantee availability or override provider restrictions.
+
+
+## Official Colab MCP API — scope and limits (reviewed 2026-11-08)
+
+Google now documents an official Colab MCP API. Its runtime-management reference describes creating managed runtimes, returning authenticated runtime connection information, and using the standard Jupyter REST API and/or a client library to interact with the runtime.
+
+This is an official runtime-management interface, but the API reference does **not** state that a managed runtime may be repurposed as a general-purpose model-serving host, nor does it grant an exception to the Colab FAQ's restrictions for free managed runtimes. In particular, an authenticated Jupyter connection is not evidence that a persistent `llama-server`, an externally consumed inference endpoint, or OpenCode-driven remote inference is an approved use.
+
+For OhMyFreeAI, keep these cases distinct:
+
+- **Runtime/session management through Google's documented MCP API:** an official API surface that may be evaluated for notebook-oriented lifecycle management.
+- **User-driven interactive notebook computation:** remains subject to the FAQ's interactive-compute priority and all applicable restrictions.
+- **Long-running model server or inference API consumed by OpenCode:** not cleared by the existence of the MCP API; keep remote-inference activation disabled until the exact workflow is explicitly confirmed as permitted.
+
+Do not use the MCP API, Jupyter REST API, or any other interface as a means to evade Colab's restrictions.
+
+Official references:
+- Colab FAQ: https://research.google.com/colaboratory/intl/en-GB/faq.html
+- Colab MCP `create_runtime` reference: https://developers.google.com/colab/api/reference/mcp/tools_list/create_runtime

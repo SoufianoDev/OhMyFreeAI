@@ -65,6 +65,7 @@ Phase 4
 - [ ] Run documentation/link validation and review all source changes
 - [x] Perform a read-only static audit of the supplied prototype archives and Python patch/monitor scripts; record hashes, preserved invariants and risks in docs/architecture/PROTOTYPE_AUDIT.md
 - [ ] Revalidate current Colab /props and /v1/models behavior, model-specific Q8_0/262144 compatibility and the live SSE path before enabling remote inference
+- [ ] Reassess the Colab Free policy gate against the official MCP runtime API; distinguish notebook/runtime management from authorization to serve model inference to OpenCode. Keep remote inference disabled until the exact flow is confirmed permitted.
 - [x] Add SQLite online backup/restore primitives with integrity, foreign-key, migration-history, cancellation, no-overwrite, target-safety and rollback tests on Ubuntu and Windows
 - [x] Implement strict .omfaibackup snapshot archive with manifest, SHA-256, fixed entries, size limits and path-traversal protections; round-trip, rollback, checksum, overwrite and cancellation tests pass on Linux/Windows
 - [x] Implement read-only Manager.Inspect with isolated temporary extraction, full manifest/checksum/schema validation and cleanup tests

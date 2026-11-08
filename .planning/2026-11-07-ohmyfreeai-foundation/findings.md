@@ -871,3 +871,16 @@ The destination directory is still initially opened by a full path through Creat
 - Linux distribution matrix 42497620422 was in progress with 4/8 jobs passed at this update. Do not claim full matrix green for c89d532a yet.
 - Code commit: c89d532a3ba04d43c7d2ccbed1675319c6f90ee8. Current branch also includes docs-only follow-up commits.
 - Remaining Windows path boundary: destination directory path is opened by CreateFile; OPEN_REPARSE_POINT protects its final component only. Next implement component-by-component directory opening from a trusted volume root and verify private ACL/permissions before the executor.
+
+
+## User clarification — historical experiment provenance (2026-11-08)
+
+The Python files `fix-soufianodev-free-ai.py`, `fix-soufianodev-sse-framing.py`, and `monitor-soufianodev-free-ai.py`, together with the archived monitor applications, are from the initial proof-of-concept experiment. They are not source files from the current OhMyFreeAI project. The user confirms that after approximately four hours of work the model was successfully started on free hosting, connected to OpenCode, and used in a real conversation from inside OpenCode. Treat this as historical feasibility evidence, not production implementation or provider-policy approval. Some additional experiment scripts were not uploaded; do not invent their contents.
+
+## Colab official MCP API research (2026-11-08)
+
+- Google's official Colab MCP `create_runtime` reference documents managed runtime creation, authenticated connection information (`url`, short-lived proxy token, expiry), and use of the standard Jupyter REST API and/or client library.
+- The official API documentation does not expressly authorize a general-purpose inference server, persistent `llama-server`, or OpenCode-consumed inference endpoint on a free managed runtime.
+- The Colab FAQ still states that free managed runtimes may be terminated without warning for remote control (including SSH shells/remote desktops) and for bypassing the notebook UI to interact primarily through a web UI. It also disallows unrelated web-service offerings on managed runtimes.
+- Conclusion: MCP is a documented runtime-management interface, not policy clearance for the proposed remote inference topology. Keep the adapter disabled until the exact user workflow is confirmed permitted.
+- Sources: https://developers.google.com/colab/api/reference/mcp/tools_list/create_runtime ; https://research.google.com/colaboratory/intl/en-GB/faq.html
