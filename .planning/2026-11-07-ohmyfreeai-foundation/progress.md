@@ -738,3 +738,13 @@
 - This was a test setup defect, not a StoreController implementation failure. Updated the fixture to apply the committed production migrations before exercising controller `Save`/`Load`.
 - Fix commit: `5405998c0dbee5b7c184925c49031bd7650b6738`. The corrected test still requires a fresh root CI run; no green claim yet.
 - Race detector did not run in the failed Ubuntu job because ordinary `go test ./...` failed first. Await the new revision's Ubuntu run for both normal and race tests.
+
+## Verified CI and first durable journal primitive — 2026-11-08T00:03Z
+
+- All four workflows passed on commit `5405998c0dbee5b7c184925c49031bd7650b6738`: Root Go CI (Ubuntu + Windows), Linux `go test -race ./...`, SQLite driver matrix (4/4), Wails v3 (2/2), and Linux distribution matrix (8/8). Run IDs: `42427211242`, `42427211222`, `42427211260`, `42427211256`.
+- Added `internal/infrastructure/sqlite/restore_journal.go` as a storage primitive, not yet integrated into restore execution or startup. It writes bounded strict JSON metadata with phase, transaction ID, target/staging/rollback paths and archive SHA-256/size; constrains transaction paths to the canonical state directory; rejects symlinked paths; writes a same-directory temp file, syncs it, atomically renames, and syncs the directory where supported (Windows skips directory sync through the standard library limitation).
+- Added journal tests for round-trip, atomic phase update, mode 0600, generated timestamp, path confinement, invalid phase/digest, unknown fields, trailing data, and symlink rejection.
+- Journal implementation commits: `2a54883d5c5b3b3639736d9a6c34f52be32c1a54`, `cacd03b3632d204fdd6a332c05467ab0e3c0c622`, `485b2c60cd110fbba45725de01b0915fb663f058`, `991ac99eecfa29039e6a400a7b8dfa3c0775b263`, `b62124c3f6d7699d0762b81f0c3b5affc65fb87f`.
+- Current journal tests are awaiting CI on the newest revision; run `42428160345` started for the earlier journal-test commit `485b2c6...` and has not yet returned jobs. Subsequent commits superseded that run. Do not claim journal CI green yet.
+- Architecture documentation now records the implemented journal primitive and explicitly distinguishes it from integrated durable restore. Restore remains disabled.
+- Next: get clean CI on current tip; add recovery-state validation/decision logic that operates only on validated journal paths; then implement startup recovery before opening the canonical Store. Keep the application-level exclusive lease and rollback/verification protocol as the only route to restore.
