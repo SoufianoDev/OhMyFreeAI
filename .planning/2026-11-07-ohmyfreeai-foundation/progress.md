@@ -791,3 +791,9 @@
 - `947124d4e0abeabcb280f0c0ae38ec5ec79c530a`: update RESTORE_LIFECYCLE.md to distinguish the version-2 journal and pure planner from a filesystem executor or integrated restore.
 - `e8769e665fb316714f89fcbbeba3b42e5c5ccf85`: update the active task plan and next-step ordering.
 - No fresh workflow run/status for these commits is currently exposed by the available GitHub Actions lookup. The fixes are implemented but unverified; do not mark them passed.
+
+
+### Final test coverage additions in this continuation
+- `32f21f59481e5e2eee880a96cce942250c6f6b72`: added a journal round-trip test proving explicit `previous_database_existed=false` remains distinguishable from missing metadata.
+- `e46da7305213bba156098987671336d37d6a4870`: removed an unused import from the dynamic Xvfb smoke helper.
+- These source changes also require a fresh CI run. The available Actions connector only exposes pull-request workflow runs for commit lookup, and no push-run IDs/check results were returned for the new commits. Verification is therefore still pending.
