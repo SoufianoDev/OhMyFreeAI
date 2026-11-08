@@ -260,9 +260,14 @@ func canonicalStatePath(root, path string) (string, error) {
 		return "", fmt.Errorf("%w: resolve transaction path parent: %v", ErrRestoreJournalInvalid, err)
 	}
 	resolvedCandidate := filepath.Join(parent, filepath.Base(absolute))
-	if info, statErr := os.Lstat(absolute); statErr == nil && info.Mode()&os.ModeSymlink != 0 {
-		return "", fmt.Errorf("%w: transaction path must not be a symbolic link", ErrRestoreJournalInvalid)
-	} else if statErr != nil && !errors.Is(statErr, os.ErrNotExist) {
+	if info, statErr := os.Lstat(absolute); statErr == nil {
+		if info.Mode()&os.ModeSymlink != 0 {
+			return "", fmt.Errorf("%w: transaction path must not be a symbolic link", ErrRestoreJournalInvalid)
+		}
+		if !info.Mode().IsRegular() {
+			return "", fmt.Errorf("%w: existing transaction path must be a regular file", ErrRestoreJournalInvalid)
+		}
+	} else if !errors.Is(statErr, os.ErrNotExist) {
 		return "", fmt.Errorf("%w: inspect transaction path: %v", ErrRestoreJournalInvalid, statErr)
 	}
 	relative, err := filepath.Rel(resolvedRoot, resolvedCandidate)
