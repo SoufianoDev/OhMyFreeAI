@@ -5,6 +5,8 @@ These skills are vendored so compatible coding agents can discover them after cl
 | Skill | Source | Version/scope | Application |
 |---|---|---|---|
 | planning-with-files | https://github.com/OthmanAdi/planning-with-files | v3.28.1 | Persistent plans, findings, progress, validation; applies project-specific Ponytail Ultra rules below |
+| hush | https://github.com/SoufianoDev/hush | `dev` snapshot; MIT | Mandatory code-comment discipline; scope cleanup to current changes and preserve meaningful/tooling comments |
+| deslop-code | https://github.com/brianlovin/agent-config/tree/main/skills/deslop | Upstream skill snapshot; adapted with project safety rules | Post-change code-slop review; remove only proven redundancy and inconsistent patterns |
 | ponytail | https://github.com/DietrichGebert/ponytail | Upstream main snapshot | Mandatory Ultra engineering mode: challenge scope, minimize complete diffs, preserve safety and tests |
 | material-3 | https://github.com/SoufianoDev/material-3-skill | v1.1.1 | Material Design 3 tokens, component semantics, layout, accessibility |
 | compose-component-design | https://github.com/SoufianoDev/KotlinComposeKit | Current source skill | Reusable component ownership and caller-controlled content/placement principles only |
