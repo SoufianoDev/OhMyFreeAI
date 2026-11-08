@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 )
@@ -54,12 +55,12 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	if err != nil {
 		return err
 	}
+	if journal.UpdatedAt.IsZero() {
+		journal.UpdatedAt = time.Now().UTC()
+	}
 	journal, err = canonicalizeRestoreJournal(root, journal)
 	if err != nil {
 		return err
-	}
-	if journal.UpdatedAt.IsZero() {
-		journal.UpdatedAt = time.Now().UTC()
 	}
 	data, err := json.Marshal(journal)
 	if err != nil {
@@ -261,6 +262,11 @@ func validRestorePhase(phase RestorePhase) bool {
 }
 
 func syncRestoreDirectory(path string) error {
+	// Windows does not expose directory handles that support File.Sync through
+	// the standard library; file contents are still synced before rename.
+	if runtime.GOOS == "windows" {
+		return nil
+	}
 	directory, err := os.Open(path)
 	if err != nil {
 		return fmt.Errorf("open SQLite restore state directory for sync: %w", err)
