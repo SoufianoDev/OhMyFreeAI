@@ -16,22 +16,9 @@ import (
 )
 
 func moveRestoreFileNoReplacePlatform(source, destination string) error {
-	directory := filepath.Dir(destination)
-	directoryPtr, err := windows.UTF16PtrFromString(directory)
+	directoryHandle, err := openRestoreDirectoryNoReparse(filepath.Dir(destination))
 	if err != nil {
-		return fmt.Errorf("encode SQLite restore destination directory: %w", err)
-	}
-	directoryHandle, err := windows.CreateFile(
-		directoryPtr,
-		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
-		0,
-	)
-	if err != nil {
-		return fmt.Errorf("open SQLite restore destination directory: %w", err)
+		return fmt.Errorf("open SQLite restore destination directory without reparse traversal: %w", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
 
@@ -42,6 +29,122 @@ func moveRestoreFileNoReplacePlatform(source, destination string) error {
 	defer windows.CloseHandle(sourceHandle)
 
 	return renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination))
+}
+
+func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
+	if strings.TrimSpace(path) == "" {
+		return windows.InvalidHandle, fmt.Errorf("SQLite restore directory path is empty")
+	}
+	absolute, err := filepath.Abs(filepath.Clean(path))
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("resolve SQLite restore directory: %w", err)
+	}
+	volume := filepath.VolumeName(absolute)
+	if len(volume) != 2 || volume[1] != ':' || len(absolute) < 3 || absolute[2] != filepath.Separator {
+		return windows.InvalidHandle, fmt.Errorf("SQLite restore directory must be an absolute local drive path")
+	}
+
+	rootPath := volume + string(filepath.Separator)
+	rootPointer, err := windows.UTF16PtrFromString(rootPath)
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("encode SQLite restore volume root: %w", err)
+	}
+	current, err := windows.CreateFile(
+		rootPointer,
+		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
+		0,
+	)
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("open SQLite restore volume root: %w", err)
+	}
+	if err := verifyRestoreDirectoryHandle(current); err != nil {
+		_ = windows.CloseHandle(current)
+		return windows.InvalidHandle, fmt.Errorf("validate SQLite restore volume root: %w", err)
+	}
+
+	remainder := strings.TrimLeft(absolute[len(volume):], string(filepath.Separator))
+	if remainder == "" {
+		return current, nil
+	}
+	for _, component := range strings.Split(remainder, string(filepath.Separator)) {
+		next, err := openRestoreDirectoryRelative(current, component)
+		if err != nil {
+			_ = windows.CloseHandle(current)
+			return windows.InvalidHandle, fmt.Errorf("open SQLite restore path component %q: %w", component, err)
+		}
+		if err := windows.CloseHandle(current); err != nil {
+			_ = windows.CloseHandle(next)
+			return windows.InvalidHandle, fmt.Errorf("close previous SQLite restore directory handle: %w", err)
+		}
+		current = next
+	}
+	return current, nil
+}
+
+func openRestoreDirectoryRelative(directory windows.Handle, leaf string) (windows.Handle, error) {
+	if directory == windows.InvalidHandle {
+		return windows.InvalidHandle, fmt.Errorf("SQLite restore parent directory handle is invalid")
+	}
+	if err := validateRestoreMoveLeaf(leaf); err != nil {
+		return windows.InvalidHandle, err
+	}
+	objectName, err := windows.NewNTUnicodeString(leaf)
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("encode SQLite restore directory component: %w", err)
+	}
+	objectAttributes := windows.OBJECT_ATTRIBUTES{
+		RootDirectory: directory,
+		ObjectName:    objectName,
+		Attributes:    windows.OBJ_CASE_INSENSITIVE,
+	}
+	objectAttributes.Length = uint32(unsafe.Sizeof(objectAttributes))
+
+	var ioStatus windows.IO_STATUS_BLOCK
+	var child windows.Handle
+	err = windows.NtCreateFile(
+		&child,
+		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
+		&objectAttributes,
+		&ioStatus,
+		nil,
+		windows.FILE_ATTRIBUTE_DIRECTORY,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		windows.FILE_OPEN,
+		windows.FILE_DIRECTORY_FILE|windows.FILE_OPEN_REPARSE_POINT|windows.FILE_SYNCHRONOUS_IO_NONALERT,
+		0,
+		0,
+	)
+	runtime.KeepAlive(directory)
+	runtime.KeepAlive(objectName)
+	runtime.KeepAlive(&objectAttributes)
+	runtime.KeepAlive(&ioStatus)
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("NtCreateFile relative to SQLite restore parent directory: %w", err)
+	}
+	if err := verifyRestoreDirectoryHandle(child); err != nil {
+		_ = windows.CloseHandle(child)
+		return windows.InvalidHandle, err
+	}
+	return child, nil
+}
+
+func verifyRestoreDirectoryHandle(directory windows.Handle) error {
+	if directory == windows.InvalidHandle {
+		return fmt.Errorf("SQLite restore directory handle is invalid")
+	}
+	var info windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(directory, &info); err != nil {
+		return fmt.Errorf("inspect opened SQLite restore directory: %w", err)
+	}
+	if info.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 ||
+		info.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DEVICE) != 0 {
+		return fmt.Errorf("opened SQLite restore path component is not a regular non-reparse directory")
+	}
+	return nil
 }
 
 func openRestoreSourceRelative(directory windows.Handle, sourceLeaf string) (windows.Handle, error) {
@@ -108,7 +211,7 @@ func renameRestoreHandleNoReplace(source, destinationDirectory windows.Handle, d
 		return fmt.Errorf("inspect opened SQLite restore destination directory: %w", err)
 	}
 	if directoryInfo.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 ||
-		directoryInfo.FileAttributes&windows.FILE_ATTRIBUTE_REPARSE_POINT != 0 {
+		directoryInfo.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DEVICE) != 0 {
 		return fmt.Errorf("opened SQLite restore destination is not a regular directory")
 	}
 
