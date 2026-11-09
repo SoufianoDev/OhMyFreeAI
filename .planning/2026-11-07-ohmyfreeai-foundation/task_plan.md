@@ -347,3 +347,15 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - [ ] Establish a documented Windows namespace durability barrier with equivalent no-replace and handle-binding guarantees, or keep Windows Restore unavailable.
 - Root CI's only materialized Ubuntu job passed all steps, but the run reports failure and no Windows job was created. SQLite driver evaluation's three materialized jobs passed, including two Windows jobs, but they do not exercise Restore filesystem code. All seven materialized Linux distro jobs passed. Wails workflow failed with zero jobs.
 - Restore remains disabled. Do not start the executor, startup recovery, GUI/CLI Restore, or merge to main.
+
+
+## CI verification — restored Linux regression and cross-platform Restore tests — 2026-11-09
+
+- [x] Run restored Linux symlink-parent regression and Linux directory-sync tests in Ubuntu Root CI; package passed in `go test ./...` and `go test -race ./...`.
+- [x] Run Root CI on both Ubuntu and Windows; both jobs completed successfully, including `go test ./...`. Windows SQLite package tests passed.
+- [x] Verify all four SQLite driver-evaluation jobs (modernc/ncruces on Ubuntu/Windows); all passed.
+- [ ] Complete Wails v3 native build proof on Ubuntu and Windows (run #42682591267 was still in progress at last check).
+- [ ] Complete Linux distribution compatibility matrix (run #42682591212 was still in progress at last check).
+- [ ] Establish a documented Windows namespace durability barrier with equivalent no-replace and handle-binding guarantees, or keep Windows Restore unavailable.
+- Root CI run: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42682590849. SQLite driver evaluation: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42682590841.
+- Windows Root tests validate the current Windows identity/verified-move code, not namespace crash durability. Restore remains disabled. Do not start the executor, startup recovery, GUI/CLI Restore, or merge to main.

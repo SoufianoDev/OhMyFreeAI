@@ -1204,3 +1204,13 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Restored `TestMoveRestoreFileNoReplaceRejectsSymlinkedContainingDirectory`, which had been accidentally dropped when the new Linux directory-sync tests replaced the file. Kept both directory-sync tests.
 - The restored test has been committed but has not yet been executed by CI. Do not claim this regression is green until a new Linux test job passes.
 - Windows namespace durability remains unresolved. Restore stays disabled; no executor, startup recovery, UI/CLI entry point, or main merge.
+
+
+## CI verification — restored Linux regression and cross-platform Restore tests — 2026-11-09
+
+- Root CI #42682590849 completed successfully for commit `f1eb8179a3a95e5cabfa19baebbade03e97b8bf5`: both `Validate (ubuntu-latest)` and `Validate (windows-latest)` succeeded. Logs show `go test ./...` passed on both operating systems; Ubuntu also passed `go test -race ./...`. The SQLite package passed on both platforms. On Linux this includes the restored symlinked-parent rejection test and both directory-sync tests.
+- SQLite driver evaluation #42682590841 completed successfully across all four materialized jobs: modernc Ubuntu, modernc Windows, ncruces Ubuntu, and ncruces Windows. This is driver-evaluation coverage, separate from the Restore package tests above.
+- Wails v3 platform proof #42682591267 is still running on Ubuntu and Windows; both jobs are at the native application build step. No conclusion recorded yet.
+- Linux distribution compatibility #42682591212 is still running. Arch, Fedora 44, Debian 13, and Ubuntu 24.04 were building; Ubuntu 22.04, openSUSE, Fedora legacy GTK3, and Debian 12 remained queued at last check. No workflow conclusion recorded yet.
+- This validates the current Linux directory-sync implementation and the existing Windows identity/verified-move tests under Root CI, but it does not resolve Windows namespace durability. Do not interpret Windows test success as proof of a durable parent-directory namespace flush.
+- Restore remains disabled. No filesystem executor, startup recovery, GUI/CLI Restore, or main merge.
