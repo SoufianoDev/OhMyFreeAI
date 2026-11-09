@@ -65,6 +65,10 @@ func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
 		_ = windows.CloseHandle(current)
 		return windows.InvalidHandle, fmt.Errorf("validate SQLite restore volume root: %w", err)
 	}
+	if err := verifyRestoreDirectoryACL(current); err != nil {
+		_ = windows.CloseHandle(current)
+		return windows.InvalidHandle, fmt.Errorf("validate SQLite restore volume-root ACL: %w", err)
+	}
 
 	remainder := strings.TrimLeft(absolute[len(volume):], string(filepath.Separator))
 	if remainder == "" {
@@ -137,6 +141,10 @@ func openRestoreDirectoryRelative(directory windows.Handle, leaf string) (window
 	if err := verifyRestoreDirectoryHandle(child); err != nil {
 		_ = windows.CloseHandle(child)
 		return windows.InvalidHandle, err
+	}
+	if err := verifyRestoreDirectoryACL(child); err != nil {
+		_ = windows.CloseHandle(child)
+		return windows.InvalidHandle, fmt.Errorf("validate SQLite restore ancestor ACL: %w", err)
 	}
 	return child, nil
 }
