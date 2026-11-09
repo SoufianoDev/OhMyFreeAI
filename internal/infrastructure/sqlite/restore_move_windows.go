@@ -51,7 +51,7 @@ func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
 	}
 	current, err := windows.CreateFile(
 		rootPointer,
-		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
+		windows.READ_CONTROL|windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		nil,
 		windows.OPEN_EXISTING,
@@ -81,6 +81,14 @@ func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
 			return windows.InvalidHandle, fmt.Errorf("close previous SQLite restore directory handle: %w", err)
 		}
 		current = next
+	}
+	if err := verifyRestoreDirectorySecurity(current); err != nil {
+		_ = windows.CloseHandle(current)
+		return windows.InvalidHandle, fmt.Errorf("validate private SQLite restore state directory: %w", err)
+	}
+	if err := verifyRestoreVolume(current, rootPath); err != nil {
+		_ = windows.CloseHandle(current)
+		return windows.InvalidHandle, fmt.Errorf("qualify SQLite restore state volume: %w", err)
 	}
 	return current, nil
 }
