@@ -164,7 +164,7 @@ func TestRestoreDirectoryACLAcceptsLocalVolumeRoot(t *testing.T) {
 	}
 	defer windows.CloseHandle(handle)
 
-	if err := verifyRestoreDirectoryACL(handle); err != nil {
+	if err := verifyRestoreDirectoryACLWithMask(handle, restoreVolumeRootNamespaceMask); err != nil {
 		t.Fatalf("verifyRestoreDirectoryACL() rejected local volume root: %v", err)
 	}
 }
