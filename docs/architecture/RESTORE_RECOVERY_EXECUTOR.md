@@ -31,7 +31,7 @@ Every intent phase must have an exhaustive truth table for target, staging, roll
 ## No-overwrite filesystem contract
 
 - Never use replacement-style rename for target, rollback or quarantine publication.
-- Use a platform adapter with atomic no-replace semantics. Linux should use renameat2 with RENAME_NOREPLACE; Windows should use a move operation that fails when the destination exists and requests write-through behavior. If the filesystem or OS cannot provide the required semantics, fail closed rather than falling back to overwrite-capable rename.
+- Use a platform adapter with atomic no-replace semantics. Linux uses `openat2` to pin the containing directory and `renameat2(RENAME_NOREPLACE)` with validated leaf names. Windows opens every directory component relative to a retained parent handle, opens the source leaf relative to the pinned state-directory handle, then uses native `NtSetInformationFile(FileRenameInformationEx=65)` with the replacement flag omitted. If the OS/filesystem rejects the required operation, fail closed; never fall back to `os.Rename`, `MoveFileExW`, or another overwrite-capable/path-only rename.
 - Source and destination must be on the same filesystem. Journal canonical state-directory confinement is a prerequisite, not a substitute for runtime validation.
 - Revalidate source and destination immediately before each mutation using no-follow filesystem operations. Reject symlinks, directories, devices, sockets, and other non-regular entries.
 - Destination collision is never resolved by deleting or replacing the destination. It is an ambiguity that must be preserved for manual review.
@@ -74,7 +74,7 @@ Every intent phase must have an exhaustive truth table for target, staging, roll
 
 ## Current implementation status
 
-Implemented: strict durable journal v3 with intent-phase names, canonical path confinement, candidate quarantine metadata, paired candidate/previous database identities, non-regular path rejection, and an identity-aware pure recovery planner for the completed phases. StoreController leases and the lower-level SQLite staging primitive are also implemented.
+Implemented: strict durable journal v3 with intent-phase names, canonical path confinement, candidate quarantine metadata, paired candidate/previous database identities, non-regular path rejection, and an identity-aware pure recovery planner for completed and intent phases. Linux/Windows no-replace move primitives and the Windows final-directory owner/DACL and fixed-local-NTFS gate are implemented. StoreController leases and the lower-level SQLite backup/staging primitives are also implemented. Root CI 42643886765 passed Ubuntu and Windows for the Windows TokenUser/TokenOwner owner-check correction.
 
 Not implemented: automatic planning for the three interrupted intent phases (they fail closed), platform-specific no-replace move adapter, filesystem executor, startup coordinator, process-death executor tests, and application-level restore orchestration.
 
@@ -311,3 +311,12 @@ The native rename class is not assumed to work on every filesystem/provider. Uns
 - Linux distribution matrix 42497620422 was in progress with 4/8 jobs passed at this update. Do not claim full matrix green for c89d532a yet.
 - Code commit: c89d532a3ba04d43c7d2ccbed1675319c6f90ee8. Current branch also includes docs-only follow-up commits.
 - Remaining Windows path boundary: destination directory path is opened by CreateFile; OPEN_REPARSE_POINT protects its final component only. Next implement component-by-component directory opening from a trusted volume root and verify private ACL/permissions before the executor.
+
+
+## Current verified boundary — 2026-11-09
+
+- Windows directory traversal opens each path component relative to a retained parent handle, rejects reparse/device/non-directory components, and validates the final directory owner/DACL and volume from handles.
+- The final directory owner must equal the process TokenUser or explicit TokenOwner SID. Broad write-capable ACEs are rejected. The accepted volume policy is fixed local NTFS with persistent ACLs; other providers are unsupported.
+- Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765) passed Ubuntu and Windows on `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`; Ubuntu race tests passed. Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) passed both platforms.
+- The exported legacy `RestoreDatabase` helper still performs its own standalone path-based publication and is not the transaction executor. Do not call it from the future journal executor or expose it through GUI/CLI. The executor must stage/verify a candidate separately, then publish only through the qualified no-replace adapter while holding the StoreController exclusive lease.
+- Restore remains disabled. No complete executor, startup coordinator, shared GUI/CLI Restore application service, or abrupt-process-restart verification is claimed.
