@@ -144,6 +144,15 @@ func isBroadWritableRestoreACE(aceType uint8, mask uint32, sid *windows.SID) boo
 			return true
 		}
 	}
+	// Domain Users, Domain Guests and Domain Computers are not fixed well-known
+	// SIDs: their domain identifier varies. Their final RID is stable.
+	if sid.IdentifierAuthority() == windows.SECURITY_NT_AUTHORITY && sid.SubAuthorityCount() >= 5 &&
+		sid.SubAuthority(0) == 21 {
+		switch sid.SubAuthority(uint32(sid.SubAuthorityCount() - 1)) {
+		case 513, 514, 515:
+			return true
+		}
+	}
 	return false
 }
 
