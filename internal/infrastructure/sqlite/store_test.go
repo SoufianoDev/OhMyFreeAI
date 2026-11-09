@@ -664,3 +664,103 @@ func TestRestoreDatabasePreservesExistingTargetDirectoryPermissions(t *testing.T
 		t.Fatalf("restore changed existing directory permissions to %04o, want 0750", got)
 	}
 }
+
+
+// These tests exercise SQLite's in-place online-backup restore primitive as
+// an architectural alternative to replacing the live database filename. They
+// do not enable the application Restore lifecycle or its recovery executor.
+func TestRestoreFromPathUpdatesExistingDatabaseInPlace(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+
+	sourceStore, err := Open(ctx, filepath.Join(directory, "source.db"))
+	if err != nil {
+		t.Fatalf("open source database: %v", err)
+	}
+	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate source database: %v", err)
+	}
+	sourceConfig := config.Defaults()
+	sourceConfig.Gateway.Port = 18082
+	if err := sourceStore.Save(ctx, sourceConfig); err != nil {
+		t.Fatalf("save source configuration: %v", err)
+	}
+	backupPath := filepath.Join(directory, "source-snapshot.sqlite")
+	if err := sourceStore.BackupTo(ctx, backupPath); err != nil {
+		t.Fatalf("create source snapshot: %v", err)
+	}
+	if err := sourceStore.Close(); err != nil {
+		t.Fatalf("close source database: %v", err)
+	}
+
+	targetPath := filepath.Join(directory, "target.db")
+	targetStore, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("open target database: %v", err)
+	}
+	defer targetStore.Close()
+	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate target database: %v", err)
+	}
+	targetConfig := config.Defaults()
+	targetConfig.Gateway.Port = 18083
+	if err := targetStore.Save(ctx, targetConfig); err != nil {
+		t.Fatalf("save target configuration: %v", err)
+	}
+
+	before, err := os.Stat(targetPath)
+	if err != nil {
+		t.Fatalf("stat target database before restore: %v", err)
+	}
+	if err := targetStore.restoreFromPath(ctx, backupPath); err != nil {
+		t.Fatalf("restore snapshot into existing database: %v", err)
+	}
+	after, err := os.Stat(targetPath)
+	if err != nil {
+		t.Fatalf("stat target database after restore: %v", err)
+	}
+	if !os.SameFile(before, after) {
+		t.Fatal("in-place SQLite restore unexpectedly replaced the target file identity")
+	}
+	actual, err := targetStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load restored target configuration: %v", err)
+	}
+	if !reflect.DeepEqual(actual, sourceConfig) {
+		t.Fatalf("in-place restore mismatch:\\n got: %#v\\nwant: %#v", actual, sourceConfig)
+	}
+}
+
+func TestRestoreFromPathFailedCopyPreservesExistingDatabase(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	targetPath := filepath.Join(directory, "target.db")
+	targetStore, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("open target database: %v", err)
+	}
+	defer targetStore.Close()
+	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate target database: %v", err)
+	}
+	expected := config.Defaults()
+	expected.Gateway.Port = 18083
+	if err := targetStore.Save(ctx, expected); err != nil {
+		t.Fatalf("save target configuration: %v", err)
+	}
+
+	invalidSource := filepath.Join(directory, "not-a-database.sqlite")
+	if err := os.WriteFile(invalidSource, []byte("not a SQLite database"), 0o600); err != nil {
+		t.Fatalf("write invalid source fixture: %v", err)
+	}
+	if err := targetStore.restoreFromPath(ctx, invalidSource); err == nil {
+		t.Fatal("expected invalid source restore to fail")
+	}
+	actual, err := targetStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load target after failed restore: %v", err)
+	}
+	if !reflect.DeepEqual(actual, expected) {
+		t.Fatalf("failed in-place restore changed target:\\n got: %#v\\nwant: %#v", actual, expected)
+	}
+}
