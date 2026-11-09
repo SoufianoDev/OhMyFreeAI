@@ -74,11 +74,24 @@ Every intent phase must have an exhaustive truth table for target, staging, roll
 
 ## Current implementation status
 
-Implemented: strict durable journal v3 with intent-phase names, canonical path confinement, candidate quarantine metadata, paired candidate/previous database identities, non-regular path rejection, and an identity-aware pure recovery planner for completed and intent phases. Linux/Windows no-replace move primitives and the Windows final-directory owner/DACL and fixed-local-NTFS gate are implemented. StoreController leases and the lower-level SQLite backup/staging primitives are also implemented. Root CI 42643886765 passed Ubuntu and Windows for the Windows TokenUser/TokenOwner owner-check correction.
+Implemented:
+- Strict durable journal v3 with intent-phase names, canonical path confinement, candidate-quarantine metadata, and paired candidate/previous content identities.
+- Identity-aware pure recovery planner for completed phases and all three intent phases: preserving-previous, publishing, and restoring-previous. Contradictory states return an empty plan and an ambiguity error.
+- Linux no-replace move primitive: openat2 pins the containing directory while rejecting symlink/magic-link traversal; renameat2(RENAME_NOREPLACE) performs the namespace move.
+- Windows no-replace move primitive: opens the state-directory path component-by-component from a volume-root handle, rejects reparse points, opens the source leaf relative to the pinned directory handle, and uses native NtSetInformationFile(FileRenameInformationEx=65) without the replace flag.
+- Windows final-directory owner/DACL and fixed-local-NTFS/persistent-ACL qualification gate.
+- StoreController leases and lower-level SQLite backup/staging primitives.
 
-Not implemented: automatic planning for the three interrupted intent phases (they fail closed), platform-specific no-replace move adapter, filesystem executor, startup coordinator, process-death executor tests, and application-level restore orchestration.
+Not implemented:
+- Filesystem transaction executor, startup recovery coordinator, process-death/failure-injection executor tests, and application-level restore orchestration.
+- A Linux source-leaf identity binding across the final name-based rename. The current Linux primitive pins the parent directory, but its source leaf is still selected by name after earlier path validation. The executor must verify the moved artifact's expected size and SHA-256 from a no-follow opened handle immediately after each move and before any database open; on mismatch it must preserve the artifact and stop. It must never use an overwrite-capable fallback.
+- Explicit power-loss qualification beyond the documented platform sync contracts.
 
-This design deliberately blocks a quick implementation based on os.Rename or check-then-rename. Safety takes priority over automatic cleanup: ambiguous artifacts are preserved and Restore remains disabled.
+The latest recovery-planner regression test exposed a lost-candidate state in preserving-previous. The planner now requires a verified candidate at staging for that phase. Root CI [42649675343](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42649675343) completed SUCCESS on commit 7b0ad259b5a741229e0d492b38c2a38b7a1dc3ec: Ubuntu and Windows passed; Linux race detection passed.
+
+Durability constraints: Linux fsync(2) does not by itself persist the containing directory entry; the parent directory must also be synced. On Windows, the journal publisher uses MOVEFILE_WRITE_THROUGH, while journal deletion remains unsupported rather than reporting false success. These are explicit platform boundaries, not a blanket cross-platform power-loss guarantee.
+
+Restore remains disabled. Ambiguous artifacts must remain untouched; no startup recovery, GUI/CLI Restore, or application-level Restore service may be enabled until the executor's identity, no-replace, sync, failure-injection, and restart tests pass on Linux and Windows.
 
 
 ## Version-3 journal contract (implementation gate)
