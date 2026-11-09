@@ -102,7 +102,7 @@ func verifyRestoreDirectorySecurity(directory windows.Handle) error {
 		return fmt.Errorf("restore state directory owner does not match the current process identity")
 	}
 
-	return verifyRestoreDirectoryDACL(dacl)
+	return verifyRestoreDirectoryDACL(dacl, restoreBroadWriteMask)
 }
 
 // verifyRestoreDirectoryACL rejects broad write access on a directory without
