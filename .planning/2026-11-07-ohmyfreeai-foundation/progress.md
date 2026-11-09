@@ -1159,3 +1159,15 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Updated task_plan.md: identity readers/post-move verification are implemented but still need CI verification; Linux parent-directory fsync and a documented Windows namespace durability barrier are explicit gates.
 - Do not start the filesystem executor yet. Resolve the Windows durability contract using primary documentation and a regression test, or keep Windows Restore unavailable. Do not add a path-only or overwrite-capable fallback. Implement Linux directory fsync as a separate, testable barrier.
 - Restore remains disabled. No startup recovery, application-level Restore service, GUI/CLI Restore entry point, or main merge was added.
+
+
+## CI observation — verified-move change — 2026-11-09 18:15Z
+
+- Code under validation: `38ffa21f8b2fef05bc98b80e4ed5c8c1836bd0ff` (includes `moveRestoreFileNoReplaceVerified` and its Linux/Windows regression tests).
+- Root CI run [42671657858](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671657858) reports FAILURE, but the GitHub jobs endpoint returned zero jobs, no job logs were available, and the Actions page displayed “Waiting for pending jobs”. No Go test failure or code-level error is evidenced. Treat this as an unresolved workflow/job scheduling result, not a proven code regression.
+- SQLite driver evaluation [42671658166](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671658166) reports FAILURE while its only created job, `modernc / windows-latest`, completed SUCCESS. Its logs show `go mod verify`, `TestProductionMigration`, and `TestSQLiteDriverEvaluation` passing. The other expected matrix cells were not created in the job list; the Actions page displayed “Waiting for pending jobs”. This workflow does not exercise the main Restore package tests.
+- Wails platform proof [42671658474](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671658474) reports FAILURE while its only created job, `Wails v3.0.0 / windows-latest`, completed SUCCESS, including native build, Windows CLI smoke test, and executable verification. The Ubuntu matrix lane was not created; no failing step is evidenced.
+- Linux distribution compatibility [42671658275](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671658275) remained IN_PROGRESS. At the last inspection, only `Debian 12 / legacy-gtk3-webkit41` was active and building the native application; no conclusion is claimed.
+- The earlier runs for intermediate commit `ee223221` were superseded/cancelled by the later test commit. No test result is claimed for those cancelled runs.
+- Do not add a code commit merely to force another workflow while the distro matrix remains active. Recheck GitHub Actions after the active lane completes; if root CI still has no jobs, use an actual workflow-level retry path if available or record the infrastructure limitation. Do not mark identity tests verified until Ubuntu and Windows Go test jobs actually execute.
+- Restore remains disabled. No executor, startup recovery, CLI/GUI Restore, or main merge.
