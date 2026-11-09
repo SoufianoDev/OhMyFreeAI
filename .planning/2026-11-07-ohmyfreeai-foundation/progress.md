@@ -1048,3 +1048,18 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - This change only hardens directory traversal for the low-level Windows move primitive. It does not verify directory owner/DACL privacy, distinguish a local fixed disk from a mapped network drive, or qualify the actual filesystem's support for the no-replace operation.
 - No filesystem recovery executor, startup recovery, app-level Restore service, CLI Restore command, or Restore UI was added. Restore remains disabled.
 - Next: verify the canonical state directory's private owner/DACL and qualify the volume/filesystem before implementing the collision-safe recovery executor. Then add publication/reopen/rollback failure injection and process-death recovery tests before any app-level Restore wiring.
+
+
+## Continuation — Windows Restore state-directory security gate — 2026-11-09
+
+- Confirmed the requested baseline workflow [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) is completed successfully on commit `f5396ee592b9b9756779f67aeabd6d7167520c40`. Both Ubuntu and Windows jobs passed Go vet/tests/build, Python compile/tests, frontend syntax and architecture-boundary checks.
+- Confirmed branch `foundation/bootstrap` and the last previously recorded planning commit `d61baffee574816bbfad3f31285d935f7c285ad1`. No writes were made to `main`.
+- Added Windows-only tests for volume qualification (fixed local NTFS with persistent ACLs only), broad-writable ACE detection, private directory owner/DACL verification, and actual handle-based volume inspection.
+- Added a Windows security adapter that reads owner/DACL from the opened directory handle via GetSecurityInfo, requires the current process user to own the canonical state directory, rejects NULL DACLs, rejects broad write/delete/metadata rights for Everyone, Authenticated Users, BUILTIN Users and other broad well-known principals, and fails closed on ACE layouts it does not parse.
+- Added volume qualification using GetVolumeInformationByHandleW, GetDriveTypeW, and FileRemoteProtocolInfo. The initial qualification policy is deliberately narrow: fixed local NTFS with persistent ACL support; remote, mapped, removable, unknown and unqualified filesystems are rejected. No ReFS/SMB/removable provider support is claimed.
+- Updated Windows directory traversal to retain READ_CONTROL on each opened component, enforce the final state-directory owner/DACL gate, enforce the volume gate, and reject a volume root as the state directory.
+- Relevant commits: test setup `fb747cff`, import correction `df441e69`, security/volume adapter `ff9b643e`, traversal integration `c551179b`, volume-root rejection `93bc1236`, READ_CONTROL retention `2e6ebe5d`, metadata-write ACL hardening `02504155`, additional test coverage `971a3294`.
+- Validation status: GitHub combined-status queries for the new commits returned empty status arrays. The available GitHub connector exposes job lookup only when a workflow run ID is known; its commit-run lookup is explicitly PR-trigger-only and returned no runs for these push commits. Therefore no current Root CI run ID or Ubuntu/Windows result is verified yet. Do not mark this gate green.
+- The new tests have not yet produced an observed CI RED/GREEN cycle. No RED evidence is claimed.
+- Restore remains disabled. No filesystem executor, startup recovery, app-level Restore service, CLI Restore command, or UI was added.
+- Next: obtain and inspect the Root CI run for the latest code commit, fix any Windows API/test failures, then verify Ubuntu/Windows and relevant Wails/SQLite/Linux matrix workflows. Only after this gate is green should the executor's failure-injection and process-death recovery work proceed.
