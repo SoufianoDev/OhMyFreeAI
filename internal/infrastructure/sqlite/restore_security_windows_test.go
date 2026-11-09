@@ -3,8 +3,8 @@
 package sqlite
 
 import (
-	"testing"
 	"path/filepath"
+	"testing"
 
 	"golang.org/x/sys/windows"
 )
@@ -82,7 +82,7 @@ func TestRestoreDirectorySecurityAcceptsPrivateTempDirectory(t *testing.T) {
 	}
 }
 
-func TestRestoreDirectoryTraversalRejectsNonNTFSOrRemoteVolume(t *testing.T) {
+func TestRestoreDirectoryTraversalAcceptsQualifiedLocalVolume(t *testing.T) {
 	directory := t.TempDir()
 	absolute, err := filepath.Abs(directory)
 	if err != nil {
