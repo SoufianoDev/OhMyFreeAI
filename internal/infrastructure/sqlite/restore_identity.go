@@ -1,6 +1,9 @@
 package sqlite
 
-import "strings"
+import (
+	"fmt"
+	"strings"
+)
 
 // RestoreContentIdentity is measured from an already-open, no-follow file
 // handle. It is independent of a pathname after the handle is opened.
