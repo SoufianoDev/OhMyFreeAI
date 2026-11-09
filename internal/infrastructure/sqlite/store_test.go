@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -762,5 +763,161 @@ func TestRestoreFromPathFailedCopyPreservesExistingDatabase(t *testing.T) {
 	}
 	if !reflect.DeepEqual(actual, expected) {
 		t.Fatalf("failed in-place restore changed target:\\n got: %#v\\nwant: %#v", actual, expected)
+	}
+}
+
+
+const restoreCrashTestModeEnv = "OHMYFREEAI_RESTORE_CRASH_TEST_MODE"
+
+// TestRestoreCrashSubprocessHelper is invoked only by the parent crash test.
+// os.Exit intentionally bypasses SQLite and Go cleanup to simulate process death.
+func TestRestoreCrashSubprocessHelper(t *testing.T) {
+	mode := os.Getenv(restoreCrashTestModeEnv)
+	if mode == "" {
+		return
+	}
+	targetPath := os.Getenv("OHMYFREEAI_RESTORE_CRASH_TARGET")
+	sourcePath := os.Getenv("OHMYFREEAI_RESTORE_CRASH_SOURCE")
+	if targetPath == "" || sourcePath == "" {
+		t.Fatal("crash helper requires target and source paths")
+	}
+	store, err := Open(context.Background(), targetPath)
+	if err != nil {
+		t.Fatalf("open target in crash helper: %v", err)
+	}
+
+	switch mode {
+	case "partial":
+		connection, err := store.db.Conn(context.Background())
+		if err != nil {
+			t.Fatalf("reserve target connection in crash helper: %v", err)
+		}
+		err = connection.Raw(func(raw any) error {
+			driverConnection, ok := raw.(onlineRestoreConnection)
+			if !ok {
+				return ErrBackupUnsupported
+			}
+			backup, err := driverConnection.NewRestore(readOnlyDataSourceName(sourcePath))
+			if err != nil {
+				return err
+			}
+			more, stepErr := backup.Step(1)
+			if stepErr != nil {
+				_ = backup.Finish()
+				return stepErr
+			}
+			if !more {
+				_ = backup.Finish()
+				return errors.New("crash fixture did not require more than one page")
+			}
+			os.Exit(0)
+			return nil
+		})
+		t.Fatalf("partial restore crash helper unexpectedly returned: %v", err)
+	case "committed":
+		if err := store.restoreFromPath(context.Background(), sourcePath); err != nil {
+			t.Fatalf("complete restore in crash helper: %v", err)
+		}
+		os.Exit(0)
+	default:
+		t.Fatalf("unknown restore crash helper mode %q", mode)
+	}
+}
+
+func TestRestoreFromPathRecoversAfterProcessDeath(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	sourceStore, err := Open(ctx, filepath.Join(directory, "source.db"))
+	if err != nil {
+		t.Fatalf("open source database: %v", err)
+	}
+	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate source database: %v", err)
+	}
+	sourceConfig := config.Defaults()
+	sourceConfig.Gateway.Port = 18082
+	if err := sourceStore.Save(ctx, sourceConfig); err != nil {
+		t.Fatalf("save source configuration: %v", err)
+	}
+	if _, err := sourceStore.DB().ExecContext(ctx, "CREATE TABLE restore_crash_payload (data BLOB NOT NULL)"); err != nil {
+		t.Fatalf("create large source payload table: %v", err)
+	}
+	if _, err := sourceStore.DB().ExecContext(ctx, "INSERT INTO restore_crash_payload(data) VALUES (zeroblob(1048576))"); err != nil {
+		t.Fatalf("insert large source payload: %v", err)
+	}
+	sourcePath := filepath.Join(directory, "source-snapshot.sqlite")
+	if err := sourceStore.BackupTo(ctx, sourcePath); err != nil {
+		t.Fatalf("create source snapshot: %v", err)
+	}
+	if err := sourceStore.Close(); err != nil {
+		t.Fatalf("close source database: %v", err)
+	}
+
+	targetPath := filepath.Join(directory, "target.db")
+	targetStore, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("open target database: %v", err)
+	}
+	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate target database: %v", err)
+	}
+	previousConfig := config.Defaults()
+	previousConfig.Gateway.Port = 18083
+	if err := targetStore.Save(ctx, previousConfig); err != nil {
+		t.Fatalf("save previous target configuration: %v", err)
+	}
+	if err := targetStore.Close(); err != nil {
+		t.Fatalf("close target before crash test: %v", err)
+	}
+
+	runCrashChild := func(mode string) {
+		t.Helper()
+		command := exec.Command(os.Args[0], "-test.run=^TestRestoreCrashSubprocessHelper$")
+		command.Env = append(os.Environ(),
+			restoreCrashTestModeEnv+"="+mode,
+			"OHMYFREEAI_RESTORE_CRASH_TARGET="+targetPath,
+			"OHMYFREEAI_RESTORE_CRASH_SOURCE="+sourcePath,
+		)
+		output, err := command.CombinedOutput()
+		if err != nil {
+			t.Fatalf("crash helper mode %q failed: %v\\n%s", mode, err, output)
+		}
+	}
+
+	// Kill the child after it has copied one page but before SQLITE_DONE and
+	// backup_finish. SQLite must recover the original target on next open.
+	runCrashChild("partial")
+	recoveredPrevious, err := OpenExisting(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("reopen target after partial-restore process death: %v", err)
+	}
+	actualPrevious, err := recoveredPrevious.Load(ctx)
+	if err != nil {
+		t.Fatalf("load target after partial-restore process death: %v", err)
+	}
+	if !reflect.DeepEqual(actualPrevious, previousConfig) {
+		t.Fatalf("partial restore changed target after process death:\\n got: %#v\\nwant: %#v", actualPrevious, previousConfig)
+	}
+	if err := recoveredPrevious.Close(); err != nil {
+		t.Fatalf("close target after partial-restore recovery: %v", err)
+	}
+
+	// Kill the child after the backup API has completed and returned, but
+	// before the owning Store is cleanly closed. The committed snapshot must
+	// be visible after SQLite performs WAL recovery on the next open.
+	runCrashChild("committed")
+	recoveredCandidate, err := OpenExisting(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("reopen target after committed-restore process death: %v", err)
+	}
+	actualCandidate, err := recoveredCandidate.Load(ctx)
+	if err != nil {
+		t.Fatalf("load target after committed-restore process death: %v", err)
+	}
+	if !reflect.DeepEqual(actualCandidate, sourceConfig) {
+		t.Fatalf("committed restore missing after process death:\\n got: %#v\\nwant: %#v", actualCandidate, sourceConfig)
+	}
+	if err := recoveredCandidate.Close(); err != nil {
+		t.Fatalf("close target after committed-restore recovery: %v", err)
 	}
 }
