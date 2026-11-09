@@ -93,7 +93,7 @@ Phase 4
   - [x] Replace Windows path-based MoveFileExW with native NtSetInformationFile(FileRenameInformationEx=65), rooted directory handle and opened source handle
   - [x] Add Windows source-handle substitution and no-replace collision tests; observe RED then GREEN on Windows CI
   - [x] Open Windows source leaf relative to the already-pinned directory handle with NtCreateFile; verify directory-path substitution test on Windows CI
-- [x] Open Windows destination directory component-by-component from the drive root; reject reparse/device/non-directory components and verify pinned-parent behavior on Windows CI
+  - [x] Open Windows destination directory component-by-component from the drive root; reject reparse/device/non-directory components and verify pinned-parent behavior on Windows CI
   - [ ] Verify canonical state-directory owner and private DACL; fail closed on broad write access
   - [ ] Qualify the actual volume type and filesystem for the no-replace move; reject unsupported remote/mapped or filesystem types
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
