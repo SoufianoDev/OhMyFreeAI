@@ -63,6 +63,41 @@ func TestIsBroadWritableRestoreACE(t *testing.T) {
 	}
 }
 
+func TestIsBroadRestoreAncestorNamespaceACE(t *testing.T) {
+	everyone, err := windows.StringToSid("S-1-1-0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	user, err := windows.StringToSid("S-1-5-21-1-2-3-1001")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name string
+		sid *windows.SID
+		mask uint32
+		aceType uint8
+		want bool
+	}{
+		{name: "Everyone delete child", sid: everyone, mask: 0x40, aceType: windows.ACCESS_ALLOWED_ACE_TYPE, want: true},
+		{name: "Everyone delete directory", sid: everyone, mask: 0x10000, aceType: windows.ACCESS_ALLOWED_ACE_TYPE, want: true},
+		{name: "Everyone change DACL", sid: everyone, mask: 0x40000, aceType: windows.ACCESS_ALLOWED_ACE_TYPE, want: true},
+		{name: "Everyone change owner", sid: everyone, mask: 0x80000, aceType: windows.ACCESS_ALLOWED_ACE_TYPE, want: true},
+		{name: "Everyone generic all", sid: everyone, mask: 0x10000000, aceType: windows.ACCESS_ALLOWED_ACE_TYPE, want: true},
+		{name: "Everyone add subdirectory only", sid: everyone, mask: 0x4, aceType: windows.ACCESS_ALLOWED_ACE_TYPE, want: false},
+		{name: "Everyone generic write only", sid: everyone, mask: 0x40000000, aceType: windows.ACCESS_ALLOWED_ACE_TYPE, want: false},
+		{name: "Everyone deny delete child", sid: everyone, mask: 0x40, aceType: windows.ACCESS_DENIED_ACE_TYPE, want: false},
+		{name: "ordinary user delete child", sid: user, mask: 0x40, aceType: windows.ACCESS_ALLOWED_ACE_TYPE, want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := isBroadRestoreACE(test.aceType, test.mask, test.sid, restoreAncestorNamespaceMask); got != test.want {
+				t.Fatalf("isBroadRestoreACE() = %v, want %v", got, test.want)
+			}
+		})
+	}
+}
+
 func TestRestoreDirectorySecurityAcceptsPrivateTempDirectory(t *testing.T) {
 	directory := t.TempDir()
 	handle, err := windows.CreateFile(
