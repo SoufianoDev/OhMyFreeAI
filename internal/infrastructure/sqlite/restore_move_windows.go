@@ -333,8 +333,8 @@ func renameRestoreHandle(source, destinationDirectory windows.Handle, destinatio
 
 	const fixedHeaderSize = 20
 	const minimumInformationSize = 24
-	const fileRenameInformationExClass = 65
-	bufferSize := fixedHeaderSize + nameBytes
+	const fileRenameInformationExClass = 22
+	bufferSize := fixedHeaderSize + nameBytes + 2
 	if bufferSize < minimumInformationSize {
 		bufferSize = minimumInformationSize
 	}
