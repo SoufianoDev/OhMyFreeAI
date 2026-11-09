@@ -116,7 +116,7 @@ func openRestoreDirectoryRelative(directory windows.Handle, leaf string) (window
 	var child windows.Handle
 	err = windows.NtCreateFile(
 		&child,
-		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
+		windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
 		&objectAttributes,
 		&ioStatus,
 		nil,
