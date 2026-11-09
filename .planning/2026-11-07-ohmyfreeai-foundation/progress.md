@@ -1222,3 +1222,11 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Linux distribution run #42682591212: Debian 13 completed successfully. Arch, Fedora 44, openSUSE, and Ubuntu 24.04 were still active; Ubuntu 22.04, Debian 12, and Fedora legacy GTK3 remained queued at last check.
 - Root CI remains green on Ubuntu and Windows, and SQLite driver evaluation remains green across its four jobs for commit `f1eb8179a3a95e5cabfa19baebbade03e97b8bf5`.
 - No additional code changes in this update. Windows namespace durability remains unresolved; Restore remains disabled.
+
+
+## Follow-up — Wails platform proof completed — 2026-11-09
+
+- Wails v3 platform proof run #42682591267 completed successfully on both Windows and Ubuntu. Windows: native application build, CLI dispatch smoke test, and executable verification passed. Ubuntu: native build, CLI dispatch smoke test, executable verification, and live WebView bridge/database reopen smoke test all passed.
+- Linux distribution run #42682591212: Arch Linux, Fedora 44 GTK4, and Debian 13 completed successfully. Ubuntu 22.04, openSUSE Tumbleweed, Fedora 44 legacy GTK3, and Ubuntu 24.04 were still active; Debian 12 remained queued at last check. Workflow still in progress.
+- Root CI #42682590849 and SQLite driver evaluation #42682590841 are both green. These runs tested code commit `f1eb8179a3a95e5cabfa19baebbade03e97b8bf5`; subsequent commits were documentation-only.
+- Windows namespace durability remains unresolved despite successful Windows compilation/tests and Wails build. Restore remains disabled.

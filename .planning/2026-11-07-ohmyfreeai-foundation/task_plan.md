@@ -368,3 +368,11 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - [ ] Complete the remaining Linux distribution matrix in run #42682591212.
 - Root CI and SQLite driver evaluation remain green for the tested code commit. Windows native build success does not resolve the separate Windows Restore namespace-durability gate.
 - Restore remains disabled. No executor, startup recovery, GUI/CLI Restore, or main merge.
+
+
+## Follow-up — Wails platform proof completed — 2026-11-09
+
+- [x] Complete Wails v3 native build proof on Ubuntu and Windows. Ubuntu live WebView bridge/database reopen smoke test passed; Windows native build, CLI dispatch, and executable verification passed.
+- [x] Complete Arch Linux, Fedora 44 GTK4, and Debian 13 desktop compatibility jobs.
+- [ ] Complete remaining Linux distribution jobs in run #42682591212 (Ubuntu 22.04, openSUSE Tumbleweed, Fedora legacy GTK3, Ubuntu 24.04, Debian 12; some still active/queued at last check).
+- Windows namespace durability remains an independent hard gate. Restore stays disabled; no executor, startup recovery, GUI/CLI Restore, or main merge.
