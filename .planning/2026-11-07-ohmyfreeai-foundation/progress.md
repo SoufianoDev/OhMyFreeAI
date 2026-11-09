@@ -1252,3 +1252,26 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 ### Scope and next work
 - No application code changed in this continuation. No Restore executor, journal integration, startup recovery, GUI/CLI Restore, or merge to main was started.
 - Continue evaluating only documented Windows APIs or an alternative storage design that can prove equivalent safety. Otherwise retain the explicit Windows gate and record the limitation.
+
+
+## Continuation — in-place SQLite restore feasibility probe — 2026-11-09
+
+### Work performed
+- Added test-only coverage in `internal/infrastructure/sqlite/store_test.go`; no production Restore path was enabled or changed.
+- Verified that `Store.restoreFromPath` can apply a verified snapshot into an existing database file without changing its OS file identity.
+- Verified that an invalid source does not change the existing target.
+- Added subprocess termination tests: termination after one copied page but before `SQLITE_DONE` recovers the previous database; termination after the backup API completes but before a clean Store close exposes the restored database after reopen.
+- Tested a 1024-byte-page source against a 4096-byte-page target. A WAL destination rejects the mismatch and retains its old data. With PERSIST rollback journaling, the in-place backup completes; after closing and reopening, the target has the source page size, passes database verification, and contains the expected configuration.
+- The connection that performed the backup may report its cached pre-restore `PRAGMA page_size`; verification must close and reopen the target before inspecting or using the restored database.
+
+### CI evidence for code commit `733623d438b81bcf4792098d5ebc330583cfdfd8`
+- Root CI #42695205394: Ubuntu and Windows succeeded; Go tests and Linux race tests passed.
+- SQLite driver evaluation #42695205322: modernc and ncruces succeeded on Ubuntu and Windows (4/4).
+- Wails platform proof #42695205294: Ubuntu and Windows succeeded.
+- Linux distribution compatibility #42695205101: all 8/8 distributions/GTK-WebKit combinations succeeded.
+
+### Safety scope and decision
+- This is a lower-level SQLite primitive probe, not a replacement Restore architecture. `RestoreDatabase` still uses its existing staged-file publication path.
+- PERSIST journal mode retains its rollback-journal file and commits by invalidating the journal header instead of deleting the filename. It is not persistent across database reopen, so a restore bootstrap must explicitly set it. The initial creation of the journal file still requires a durable file-creation guarantee; process-death tests do not establish power-loss durability.
+- The Windows JSON journal publisher remains a separate blocker: `restore_journal_publish_windows.go` still uses path-based `MoveFileExW(REPLACE_EXISTING|WRITE_THROUGH)`. The Microsoft contract reviewed earlier does not clearly guarantee same-volume rename namespace persistence.
+- No Restore executor, durable journal integration, startup recovery, UI/CLI Restore, or merge to main was started. Restore remains disabled pending complete Linux and Windows safety gates.

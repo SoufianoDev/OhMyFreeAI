@@ -393,3 +393,19 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - `FLUSH_FLAGS_FILE_DATA_SYNC_ONLY` is invalid for directory handles; `ReplaceFileW` says `REPLACEFILE_WRITE_THROUGH` is unsupported.
 - Microsoft Q&A clarification pages were treated as questions, not as authoritative engineering answers. The unresolved point is a missing documented API contract, not a claim about NTFS's internal capabilities.
 - No path-based fallback, overwrite-capable fallback, or undocumented directory flush is accepted. Restore remains disabled.
+
+
+## In-place SQLite restore research — 2026-11-09
+
+- [SQLite Online Backup API](https://www.sqlite.org/c3ref/backup_finish.html) holds a write transaction on the destination for the backup operation. If the operation is finished before `sqlite3_backup_step()` returns `SQLITE_DONE`, SQLite rolls back the incomplete destination transaction. The tests exercise both this rollback path and a completed backup followed by abrupt process termination.
+- [SQLite backup documentation](https://www.sqlite.org/backup.html) states that a destination in WAL mode cannot be backed up from a source with a different page size (`SQLITE_READONLY`). The implementation in [SQLite backup.c](https://github.com/sqlite/sqlite/blob/master/src/backup.c) attempts to align destination page size and contains logic to handle different source/destination page sizes when the destination is not WAL.
+- [SQLite PERSIST journal mode](https://sqlite.org/atomiccommit.html) retains the rollback journal and commits by overwriting its header with zeros rather than deleting the journal file. This avoids a directory-entry deletion at commit. The [journal_mode pragma documentation](https://www.sqlite.org/pragma.html#pragma_journal_mode) distinguishes PERSIST from WAL: WAL mode persists across reopen; PERSIST must be selected again on the restore connection.
+- The test result confirms the target file identity remains unchanged during in-place restore. A 4096-byte target accepts a 1024-byte source in PERSIST mode; after closing/reopening, the target reports 1024-byte pages and the expected data. The same mismatch is rejected in WAL mode without changing the previous target.
+- [SQLite Win32 VFS source](https://sqlite.org/src/file/src/os_win.c) shows `winSync` calling `FlushFileBuffers` on the file handle. Unlike the Unix VFS sync path, no parent-directory sync is visible in that Windows routine. PERSIST avoids journal filename deletion during commit, but the first journal-file creation and the durability of its directory entry still need explicit scrutiny. The process-termination tests are not power-loss tests.
+- Independent blocker: the current [Windows journal publisher](https://github.com/SoufianoDev/OhMyFreeAI/blob/foundation/bootstrap/internal/infrastructure/sqlite/restore_journal_publish_windows.go) publishes JSON journal updates using `MoveFileExW(MOVEFILE_REPLACE_EXISTING|MOVEFILE_WRITE_THROUGH)`. The Microsoft documentation reviewed in the previous finding does not establish same-volume rename namespace durability. In-place database restore alone does not resolve that journal-publication gap.
+
+### Candidate direction — not approved for implementation
+
+Investigate an in-place restore protocol using SQLite's backup API with a pre-existing PERSIST rollback journal, plus a durable transaction marker that can distinguish the old database from the candidate after restart. Candidate/rollback snapshot creation and transaction-state publication still need a proven no-loss protocol. A database-resident marker or preallocated fixed-slot journal may avoid per-phase path renames, but neither is approved yet.
+
+Do not treat this probe as proof of power-loss safety. Keep Restore disabled and do not start the Restore executor, journal integration, startup recovery, UI/CLI work, or merge until the complete platform gates are met.

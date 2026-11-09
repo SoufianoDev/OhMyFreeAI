@@ -901,3 +901,17 @@ The Python files `fix-soufianodev-free-ai.py`, `fix-soufianodev-sse-framing.py`,
 No documented Windows user-mode sequence has been established that simultaneously provides (1) retained-handle/relative-target no-replace rename semantics, (2) namespace durability before success, and (3) standard-user operation. This is a documentation/contract gap; it is not evidence that NTFS itself cannot persist directory metadata. Microsoft Q&A clarification threads reviewed during this pass are questions, not authoritative engineering answers, and are not treated as confirmation.
 
 Do not weaken the executor by using path-based `MoveFileExW`, overwrite-capable fallbacks, or undocumented directory-flush access combinations. Keep Windows Restore unavailable and Restore globally disabled until a documented equivalent is proven or the storage architecture is redesigned with equivalent guarantees.
+
+
+## In-place SQLite restore probe — 2026-11-09
+
+- [x] Add test for successful online restore into an existing target while preserving file identity.
+- [x] Add test that an invalid source leaves the target unchanged.
+- [x] Add process-death tests for interruption before backup completion and after backup completion, with recovery verified after reopening.
+- [x] Test page-size mismatch behavior: WAL rejects the mismatch without mutating the target; PERSIST rollback journaling accepts the source and the reopened database passes integrity/configuration checks.
+- [x] Verify Root CI, SQLite driver evaluation, Wails proof, and all eight Linux distribution matrix jobs for code commit `733623d438b81bcf4792098d5ebc330583cfdfd8`.
+- [ ] Prove power-loss durability of the Windows PERSIST-journal path, including initial rollback-journal file creation and directory-entry persistence.
+- [ ] Resolve Windows JSON journal publication, which still uses `MoveFileExW(REPLACE_EXISTING|WRITE_THROUGH)` without a clearly documented same-volume namespace durability guarantee.
+- [ ] Decide on and formally review a database-resident transaction marker or fixed-slot journal before any Restore executor/recovery integration.
+
+Restore remains disabled. No executor, durable journal integration, startup recovery, UI/CLI Restore, or merge to main before both platform safety gates are met.
