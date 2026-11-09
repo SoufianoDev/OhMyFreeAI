@@ -1063,3 +1063,14 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - The new tests have not yet produced an observed CI RED/GREEN cycle. No RED evidence is claimed.
 - Restore remains disabled. No filesystem executor, startup recovery, app-level Restore service, CLI Restore command, or UI was added.
 - Next: obtain and inspect the Root CI run for the latest code commit, fix any Windows API/test failures, then verify Ubuntu/Windows and relevant Wails/SQLite/Linux matrix workflows. Only after this gate is green should the executor's failure-injection and process-death recovery work proceed.
+
+
+## CI investigation — Windows restore directory owner — 2026-11-09
+
+- Root CI run [42642834055](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834055), commit `8ee245f32fac31ce9dfa1b058163ee90b4f52960`: Ubuntu passed all checks, including race tests and build. Windows passed vet but failed Go tests in `internal/infrastructure/sqlite`; later Windows validation steps were skipped.
+- The failing cases all reported `restore state directory owner does not match the current user`: regular no-replace move, destination collision, concurrent collision, pinned-parent traversal, and private temp-directory security test. The failure was in the new owner identity assumption, not compilation.
+- Wails run [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) passed both Ubuntu and Windows native builds, CLI smoke tests and executable verification; Ubuntu WebView bridge/database reopen also passed.
+- Microsoft TOKEN_OWNER documentation confirms that the token's default owner SID is the identity Windows assigns to newly created objects; this can differ from TokenUser (notably for elevated tokens). The previous exact TokenUser-only comparison rejected legitimate objects created under the process token's default owner.
+- Updated `restore_security_windows.go` to retrieve TokenOwner with `GetTokenInformation(TokenOwner)` and accept the directory owner only when it equals either TokenUser or the token's default owner. DACL broad-write checks remain unchanged and fail-closed; no arbitrary group membership is accepted.
+- Fix commit: `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5` on `foundation/bootstrap`. This is a targeted code correction; no new CI result exists yet. Re-run Root CI and inspect Windows test output before proceeding.
+- Restore remains disabled. No executor, journal, startup recovery or UI work started.
