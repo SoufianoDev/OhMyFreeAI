@@ -5,7 +5,6 @@ package sqlite
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"fmt"
 	"path/filepath"
 	"runtime"
@@ -80,19 +79,19 @@ func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, er
 	hash := sha256.New()
 	buffer := make([]byte, 128*1024)
 	var total uint64
-	for {
-		var read uint32
-		err := windows.ReadFile(handle, buffer, &read, nil)
-		if errors.Is(err, windows.ERROR_HANDLE_EOF) {
-			break
+	for total < size {
+		chunk := buffer
+		if remaining := size - total; remaining < uint64(len(chunk)) {
+			chunk = chunk[:int(remaining)]
 		}
-		if err != nil {
+		var read uint32
+		if err := windows.ReadFile(handle, chunk, &read, nil); err != nil {
 			return identity, fmt.Errorf("read opened SQLite restore identity: %w", err)
 		}
 		if read == 0 {
-			break
+			return identity, fmt.Errorf("SQLite restore identity ended before its recorded size")
 		}
-		_, _ = hash.Write(buffer[:read])
+		_, _ = hash.Write(chunk[:read])
 		total += uint64(read)
 	}
 	var after windows.ByHandleFileInformation
