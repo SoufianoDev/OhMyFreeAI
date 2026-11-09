@@ -258,11 +258,15 @@ func TestOpenRestoreDirectoryRelativeUsesPinnedParentHandle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open root directory without reparse traversal: %v", err)
 	}
-	defer windows.CloseHandle(rootHandle)
 
 	directoryHandle, err := openRestoreDirectoryRelative(rootHandle, "state")
 	if err != nil {
+		_ = windows.CloseHandle(rootHandle)
 		t.Fatalf("open state directory relative to pinned root: %v", err)
+	}
+	if err := windows.CloseHandle(rootHandle); err != nil {
+		_ = windows.CloseHandle(directoryHandle)
+		t.Fatalf("close root directory handle: %v", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
 
@@ -270,11 +274,14 @@ func TestOpenRestoreDirectoryRelativeUsesPinnedParentHandle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open original nested directory: %v", err)
 	}
-	defer windows.CloseHandle(expectedNestedHandle)
 
 	var expected windows.ByHandleFileInformation
 	if err := windows.GetFileInformationByHandle(expectedNestedHandle, &expected); err != nil {
+		_ = windows.CloseHandle(expectedNestedHandle)
 		t.Fatalf("inspect original nested directory: %v", err)
+	}
+	if err := windows.CloseHandle(expectedNestedHandle); err != nil {
+		t.Fatalf("close original nested directory handle: %v", err)
 	}
 
 	if err := os.Rename(directory, movedDirectory); err != nil {
