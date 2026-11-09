@@ -950,7 +950,7 @@ func preparePersistentRestoreJournalForTest(ctx context.Context, store *Store) e
 	return nil
 }
 
-func TestRestoreFromPathPERSISTModeSupportsPageSizeChange(t *testing.T) {
+func TestRestoreFromPathPERSISTModeSupportsDifferentSourcePageSize(t *testing.T) {
 	ctx := context.Background()
 	directory := t.TempDir()
 	sourcePath := filepath.Join(directory, "source-1024.db")
@@ -1010,7 +1010,12 @@ func TestRestoreFromPathPERSISTModeSupportsPageSizeChange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open target database: %v", err)
 	}
-	defer targetStore.Close()
+	targetStoreClosed := false
+	defer func() {
+		if !targetStoreClosed {
+			_ = targetStore.Close()
+		}
+	}()
 	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
 		t.Fatalf("migrate target database: %v", err)
 	}
@@ -1019,10 +1024,25 @@ func TestRestoreFromPathPERSISTModeSupportsPageSizeChange(t *testing.T) {
 	if err := targetStore.Save(ctx, previousConfig); err != nil {
 		t.Fatalf("save previous target configuration: %v", err)
 	}
+
+	// SQLite documents SQLITE_READONLY when a WAL destination and source
+	// have different page sizes. The failed attempt must leave the target intact.
+	if err := targetStore.restoreFromPath(ctx, snapshotPath); err == nil {
+		t.Fatal("WAL-mode restore unexpectedly accepted a different source page size")
+	}
+	actualPrevious, err := targetStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load target after rejected WAL restore: %v", err)
+	}
+	if !reflect.DeepEqual(actualPrevious, previousConfig) {
+		t.Fatalf("rejected WAL restore changed target:\\n got: %#v\\nwant: %#v", actualPrevious, previousConfig)
+	}
+
+	// PERSIST uses a rollback journal whose file is retained and invalidated
+	// by zeroing its header at commit, avoiding journal-name deletion.
 	if err := preparePersistentRestoreJournalForTest(ctx, targetStore); err != nil {
 		t.Fatalf("prepare persistent target journal: %v", err)
 	}
-
 	before, err := os.Stat(targetPath)
 	if err != nil {
 		t.Fatalf("stat target before in-place restore: %v", err)
@@ -1037,21 +1057,36 @@ func TestRestoreFromPathPERSISTModeSupportsPageSizeChange(t *testing.T) {
 	if !os.SameFile(before, after) {
 		t.Fatal("PERSIST-mode restore unexpectedly replaced the target file identity")
 	}
+	if _, err := os.Stat(targetPath + "-journal"); err != nil {
+		t.Fatalf("PERSIST rollback journal was not retained after restore: %v", err)
+	}
+
+	// Reopen before inspecting page_size: the connection that performed the
+	// backup may retain its pre-restore B-tree page-size cache.
+	if err := targetStore.Close(); err != nil {
+		t.Fatalf("close target after in-place restore: %v", err)
+	}
+	targetStoreClosed = true
+	if err := verifyBackupDatabase(ctx, targetPath); err != nil {
+		t.Fatalf("verify in-place restored target: %v", err)
+	}
+	restoredStore, err := OpenExisting(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("reopen in-place restored target: %v", err)
+	}
+	defer restoredStore.Close()
 	var restoredPageSize int
-	if err := targetStore.DB().QueryRowContext(ctx, "PRAGMA page_size").Scan(&restoredPageSize); err != nil {
-		t.Fatalf("read restored target page size: %v", err)
+	if err := restoredStore.DB().QueryRowContext(ctx, "PRAGMA page_size").Scan(&restoredPageSize); err != nil {
+		t.Fatalf("read restored target page size after reopen: %v", err)
 	}
 	if restoredPageSize != 1024 {
-		t.Fatalf("restored target page size = %d, want 1024", restoredPageSize)
+		t.Fatalf("restored target page size after reopen = %d, want 1024", restoredPageSize)
 	}
-	actual, err := targetStore.Load(ctx)
+	actual, err := restoredStore.Load(ctx)
 	if err != nil {
 		t.Fatalf("load restored target configuration: %v", err)
 	}
 	if !reflect.DeepEqual(actual, sourceConfig) {
 		t.Fatalf("PERSIST-mode restore mismatch:\\n got: %#v\\nwant: %#v", actual, sourceConfig)
-	}
-	if _, err := os.Stat(targetPath + "-journal"); err != nil {
-		t.Fatalf("PERSIST rollback journal was not retained after restore: %v", err)
 	}
 }
