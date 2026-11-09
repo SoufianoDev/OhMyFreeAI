@@ -116,3 +116,18 @@ For code commit c89d532a:
 - Linux distribution matrix 42497620422 was still running with 4/8 lanes passed at the time of this update.
 
 The remaining Windows boundary is the initial open of the destination directory by full path: only the final component is checked for reparse-point status. Before executor work, open each directory component relative to a trusted parent handle, reject reparse points at every level, and verify the state directory's private ACL. Restore remains disabled.
+
+
+## Windows Restore state-directory gate — implementation pending CI
+
+The Windows no-replace move path now performs these checks on the final opened state-directory handle before returning it to the caller:
+
+- The directory owner SID must equal the current process token user SID.
+- A NULL or missing DACL is rejected.
+- Basic allow ACEs are inspected for broad principals (Everyone, Authenticated Users, BUILTIN Users, Guests, Power Users, Pre-Windows 2000 Compatible Access, Interactive, Network and Anonymous). Broad write, add-file, add-subdirectory, delete-child, delete, WRITE_DAC, WRITE_OWNER, generic-write, generic-all, and directory metadata-write rights are rejected.
+- ACE layouts that the implementation does not parse (object/callback ACEs) are rejected rather than ignored.
+- The opened directory's volume must report a fixed drive, NTFS filesystem, and persistent ACL support. The handle-based remote-protocol query rejects remote-backed directories. UNC paths and mapped remote drive types remain rejected by path/drive validation.
+
+The qualification policy is intentionally NTFS-only. ReFS, SMB, removable media, RAM disks, and other providers are not qualified. This is an implementation policy, not a claim that those filesystems cannot support equivalent semantics.
+
+**Verification is pending.** The code and tests have been pushed to `foundation/bootstrap`, latest commit `971a3294fead03dc781eaf9634682ee95d58a992`. The GitHub connector returned no combined status checks and does not expose push-run listing without a workflow run ID. No Windows or Linux CI result is claimed for this gate. Restore remains disabled until the gate and the full executor/recovery test matrix pass.
