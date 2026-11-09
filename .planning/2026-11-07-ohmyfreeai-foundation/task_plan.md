@@ -278,3 +278,12 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Linux distribution matrix 42497620422 was in progress with 4/8 jobs passed at this update. Do not claim full matrix green for c89d532a yet.
 - Code commit: c89d532a3ba04d43c7d2ccbed1675319c6f90ee8. Current branch also includes docs-only follow-up commits.
 - Remaining Windows path boundary: destination directory path is opened by CreateFile; OPEN_REPARSE_POINT protects its final component only. Next implement component-by-component directory opening from a trusted volume root and verify private ACL/permissions before the executor.
+
+
+## 2026-11-09 CI gate update
+
+- Root CI `42642834055` failed only on Windows Go package tests; Ubuntu completed successfully. Windows failed because the restore-directory owner check compared the filesystem owner exclusively to TokenUser.
+- Wails `42642834036` passed on Ubuntu and Windows, including native build/CLI checks and Ubuntu WebView bridge/database reopen.
+- Corrected the Windows identity check to accept only TokenUser or the current token's explicit TokenOwner (the documented default owner for newly created objects). The broad-writable DACL rejection and fixed-local-NTFS gate remain unchanged.
+- Fix commit: `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`; planning update commit: `c1d9063b90283a40a5668b85f252f9bf37ac64b9`.
+- **Next mandatory gate:** rerun Root CI on this revision and inspect both platform results. Do not treat the fix as verified until Windows tests pass. Keep Restore disabled; do not start executor/journal/recovery/UI before the platform safety gate is green.
