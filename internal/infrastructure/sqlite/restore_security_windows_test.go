@@ -42,6 +42,7 @@ func TestIsBroadWritableRestoreACE(t *testing.T) {
 		want bool
 	}{
 		{name: "Everyone can add files", sid: "S-1-1-0", aceType: windows.ACCESS_ALLOWED_ACE_TYPE, mask: 0x2, want: true},
+		{name: "Everyone can modify directory metadata", sid: "S-1-1-0", aceType: windows.ACCESS_ALLOWED_ACE_TYPE, mask: 0x110, want: true},
 		{name: "Authenticated Users can delete children", sid: "S-1-5-11", aceType: windows.ACCESS_ALLOWED_ACE_TYPE, mask: 0x40, want: true},
 		{name: "Builtin Users generic write", sid: "S-1-5-32-545", aceType: windows.ACCESS_ALLOWED_ACE_TYPE, mask: 0x40000000, want: true},
 		{name: "Everyone read only", sid: "S-1-1-0", aceType: windows.ACCESS_ALLOWED_ACE_TYPE, mask: 0x1, want: false},
