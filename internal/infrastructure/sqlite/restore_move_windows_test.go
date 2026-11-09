@@ -243,3 +243,82 @@ func TestOpenRestoreSourceRelativeUsesPinnedDirectoryHandle(t *testing.T) {
 		t.Fatalf("replacement content = %q, want replacement at old directory path", got)
 	}
 }
+
+
+func TestOpenRestoreDirectoryRelativeUsesPinnedParentHandle(t *testing.T) {
+	root := t.TempDir()
+	directory := filepath.Join(root, "state")
+	movedDirectory := filepath.Join(root, "state-moved")
+	nested := filepath.Join(directory, "nested")
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	rootHandle, err := openRestoreDirectoryNoReparse(root)
+	if err != nil {
+		t.Fatalf("open root directory without reparse traversal: %v", err)
+	}
+	defer windows.CloseHandle(rootHandle)
+
+	directoryHandle, err := openRestoreDirectoryRelative(rootHandle, "state")
+	if err != nil {
+		t.Fatalf("open state directory relative to pinned root: %v", err)
+	}
+	defer windows.CloseHandle(directoryHandle)
+
+	expectedNestedHandle, err := openRestoreDirectoryRelative(directoryHandle, "nested")
+	if err != nil {
+		t.Fatalf("open original nested directory: %v", err)
+	}
+	defer windows.CloseHandle(expectedNestedHandle)
+
+	var expected windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(expectedNestedHandle, &expected); err != nil {
+		t.Fatalf("inspect original nested directory: %v", err)
+	}
+
+	if err := os.Rename(directory, movedDirectory); err != nil {
+		t.Fatalf("move opened parent directory aside: %v", err)
+	}
+	if err := os.MkdirAll(nested, 0o700); err != nil {
+		t.Fatalf("create replacement directory tree: %v", err)
+	}
+
+	pinnedNestedHandle, err := openRestoreDirectoryRelative(directoryHandle, "nested")
+	if err != nil {
+		t.Fatalf("open nested directory relative to pinned parent: %v", err)
+	}
+	defer windows.CloseHandle(pinnedNestedHandle)
+
+	var got windows.ByHandleFileInformation
+	if err := windows.GetFileInformationByHandle(pinnedNestedHandle, &got); err != nil {
+		t.Fatalf("inspect nested directory opened from pinned parent: %v", err)
+	}
+	if got.VolumeSerialNumber != expected.VolumeSerialNumber ||
+		got.FileIndexHigh != expected.FileIndexHigh ||
+		got.FileIndexLow != expected.FileIndexLow {
+		t.Fatal("relative directory open followed the replacement path instead of the pinned parent handle")
+	}
+}
+
+func TestOpenRestoreDirectoryNoReparseRejectsSymlinkComponent(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "target")
+	link := filepath.Join(root, "link")
+	if err := os.Mkdir(target, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, link); err != nil {
+		t.Skipf("cannot create a Windows directory symlink in this environment: %v", err)
+	}
+
+	if _, err := openRestoreDirectoryNoReparse(filepath.Join(link, "child")); err == nil {
+		t.Fatal("directory traversal accepted a reparse-point component")
+	}
+}
+
+func TestOpenRestoreDirectoryNoReparseRejectsUNCPath(t *testing.T) {
+	if _, err := openRestoreDirectoryNoReparse(`\\server\share\state`); err == nil {
+		t.Fatal("directory traversal accepted an unqualified UNC path")
+	}
+}
