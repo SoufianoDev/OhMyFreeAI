@@ -785,6 +785,9 @@ func TestRestoreCrashSubprocessHelper(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open target in crash helper: %v", err)
 	}
+	if err := preparePersistentRestoreJournalForTest(context.Background(), store); err != nil {
+		t.Fatalf("prepare persistent rollback journal in crash helper: %v", err)
+	}
 
 	switch mode {
 	case "partial":
@@ -919,5 +922,135 @@ func TestRestoreFromPathRecoversAfterProcessDeath(t *testing.T) {
 	}
 	if err := recoveredCandidate.Close(); err != nil {
 		t.Fatalf("close target after committed-restore recovery: %v", err)
+	}
+}
+
+
+func preparePersistentRestoreJournalForTest(ctx context.Context, store *Store) error {
+	store.db.SetMaxOpenConns(1)
+	store.db.SetMaxIdleConns(1)
+	var journalMode string
+	if err := store.db.QueryRowContext(ctx, "PRAGMA journal_mode=PERSIST").Scan(&journalMode); err != nil {
+		return fmt.Errorf("set SQLite PERSIST journal mode: %w", err)
+	}
+	if journalMode != "persist" {
+		return fmt.Errorf("SQLite refused PERSIST journal mode; active mode is %q", journalMode)
+	}
+	current, err := store.Load(ctx)
+	if err != nil {
+		return fmt.Errorf("load configuration before persistent-journal preparation: %w", err)
+	}
+	if err := store.Save(ctx, current); err != nil {
+		return fmt.Errorf("prepare persistent rollback journal: %w", err)
+	}
+	if _, err := os.Stat(store.path + "-journal"); err != nil {
+		return fmt.Errorf("persistent rollback journal was not retained: %w", err)
+	}
+	return nil
+}
+
+func TestRestoreFromPathPERSISTModeSupportsPageSizeChange(t *testing.T) {
+	ctx := context.Background()
+	directory := t.TempDir()
+	sourcePath := filepath.Join(directory, "source-1024.db")
+	rawSource, err := sql.Open(driverName, backupDataSourceName(sourcePath))
+	if err != nil {
+		t.Fatalf("open raw source database: %v", err)
+	}
+	rawSource.SetMaxOpenConns(1)
+	if _, err := rawSource.ExecContext(ctx, "PRAGMA page_size=1024"); err != nil {
+		t.Fatalf("set source page size: %v", err)
+	}
+	if _, err := rawSource.ExecContext(ctx, "CREATE TABLE page_size_seed (id INTEGER PRIMARY KEY)"); err != nil {
+		t.Fatalf("persist source page size: %v", err)
+	}
+	if err := rawSource.Close(); err != nil {
+		t.Fatalf("close raw source database: %v", err)
+	}
+
+	sourceStore, err := OpenExisting(ctx, sourcePath)
+	if err != nil {
+		t.Fatalf("open source database: %v", err)
+	}
+	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate source database: %v", err)
+	}
+	sourceConfig := config.Defaults()
+	sourceConfig.Gateway.Port = 18082
+	if err := sourceStore.Save(ctx, sourceConfig); err != nil {
+		t.Fatalf("save source configuration: %v", err)
+	}
+	snapshotPath := filepath.Join(directory, "source-1024-snapshot.sqlite")
+	if err := sourceStore.BackupTo(ctx, snapshotPath); err != nil {
+		t.Fatalf("create source snapshot: %v", err)
+	}
+	if err := sourceStore.Close(); err != nil {
+		t.Fatalf("close source database: %v", err)
+	}
+
+	snapshotDB, err := sql.Open(driverName, readOnlyDataSourceName(snapshotPath))
+	if err != nil {
+		t.Fatalf("open source snapshot for page-size check: %v", err)
+	}
+	var snapshotPageSize int
+	if err := snapshotDB.QueryRowContext(ctx, "PRAGMA page_size").Scan(&snapshotPageSize); err != nil {
+		_ = snapshotDB.Close()
+		t.Fatalf("read source snapshot page size: %v", err)
+	}
+	if err := snapshotDB.Close(); err != nil {
+		t.Fatalf("close source snapshot page-size check: %v", err)
+	}
+	if snapshotPageSize != 1024 {
+		t.Fatalf("source snapshot page size = %d, want 1024", snapshotPageSize)
+	}
+
+	targetPath := filepath.Join(directory, "target-4096.db")
+	targetStore, err := Open(ctx, targetPath)
+	if err != nil {
+		t.Fatalf("open target database: %v", err)
+	}
+	defer targetStore.Close()
+	if err := targetStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate target database: %v", err)
+	}
+	previousConfig := config.Defaults()
+	previousConfig.Gateway.Port = 18083
+	if err := targetStore.Save(ctx, previousConfig); err != nil {
+		t.Fatalf("save previous target configuration: %v", err)
+	}
+	if err := preparePersistentRestoreJournalForTest(ctx, targetStore); err != nil {
+		t.Fatalf("prepare persistent target journal: %v", err)
+	}
+
+	before, err := os.Stat(targetPath)
+	if err != nil {
+		t.Fatalf("stat target before in-place restore: %v", err)
+	}
+	if err := targetStore.restoreFromPath(ctx, snapshotPath); err != nil {
+		t.Fatalf("restore different-page-size snapshot in PERSIST mode: %v", err)
+	}
+	after, err := os.Stat(targetPath)
+	if err != nil {
+		t.Fatalf("stat target after in-place restore: %v", err)
+	}
+	if !os.SameFile(before, after) {
+		t.Fatal("PERSIST-mode restore unexpectedly replaced the target file identity")
+	}
+	var restoredPageSize int
+	if err := targetStore.DB().QueryRowContext(ctx, "PRAGMA page_size").Scan(&restoredPageSize); err != nil {
+		t.Fatalf("read restored target page size: %v", err)
+	}
+	if restoredPageSize != 1024 {
+		t.Fatalf("restored target page size = %d, want 1024", restoredPageSize)
+	}
+	actual, err := targetStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load restored target configuration: %v", err)
+	}
+	if !reflect.DeepEqual(actual, sourceConfig) {
+		t.Fatalf("PERSIST-mode restore mismatch:\\n got: %#v\\nwant: %#v", actual, sourceConfig)
+	}
+	if _, err := os.Stat(targetPath + "-journal"); err != nil {
+		t.Fatalf("PERSIST rollback journal was not retained after restore: %v", err)
 	}
 }
