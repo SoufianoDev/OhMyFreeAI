@@ -18,6 +18,31 @@ func moveRestoreFileNoReplace(source, destination string) error {
 	return nil
 }
 
+// moveRestoreFileNoReplaceVerified publishes one restore artifact without
+// replacement, then verifies the moved bytes through a no-follow handle.
+// A mismatch or verification error deliberately leaves the destination in
+// place for manual/recovery handling; callers must not open it as SQLite.
+func moveRestoreFileNoReplaceVerified(source, destination string, expected RestoreContentIdentity) error {
+	if err := validateRestoreContentIdentity(expected.SHA256, expected.Size, "restore move", true); err != nil {
+		return err
+	}
+	if err := moveRestoreFileNoReplace(source, destination); err != nil {
+		return err
+	}
+
+	actual, err := readRestoreContentIdentityPlatform(destination)
+	if err != nil {
+		return fmt.Errorf("verify moved SQLite restore artifact; destination preserved at %s: %w", destination, err)
+	}
+	if !actual.matches(expected.SHA256, expected.Size) {
+		return fmt.Errorf(
+			"verify moved SQLite restore artifact; destination preserved at %s: content identity mismatch (size=%d sha256=%s)",
+			destination, actual.Size, actual.SHA256,
+		)
+	}
+	return nil
+}
+
 func validateRestoreMovePaths(source, destination string) error {
 	if strings.TrimSpace(source) == "" || strings.TrimSpace(destination) == "" {
 		return fmt.Errorf("SQLite restore move paths must not be empty")
