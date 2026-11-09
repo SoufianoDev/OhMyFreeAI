@@ -10,7 +10,7 @@ The baseline workflow 42419106009 is verified green on Ubuntu and Windows for co
 
 Windows Restore path traversal now opens each component relative to a retained parent handle. A new owner/DACL and volume qualification gate has been implemented on `foundation/bootstrap`: current-user ownership, non-NULL DACL, rejection of broad writable ACEs, and fixed-local-NTFS/persistent-ACL qualification. Latest code/test commit: `8ee245f32fac31ce9dfa1b058163ee90b4f52960` (includes broad domain-group ACE coverage).
 
-**This new gate is not verified yet.** GitHub combined-status queries returned empty arrays, and the available connector does not expose listing push-triggered workflow runs without a run ID. No Ubuntu/Windows CI result is claimed for the new code. The new tests have not yet produced an observed RED/GREEN cycle.
+**This new gate is not verified yet.** Root CI [42642834055](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834055) is queued on Ubuntu and Windows. Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) is in progress on both platforms; Linux desktop dependency installation passed and both jobs are still installing Wails CLI. No Ubuntu/Windows test result is claimed. The new tests have not yet produced an observed RED/GREEN cycle.
 
 Next action: obtain the Root CI run for `971a3294`, inspect both platform jobs and failure logs, correct any failures, then verify the remaining required workflows. Keep Restore disabled. Do not implement or wire the filesystem executor until the security/volume gate passes CI and the remaining failure-injection/process-death requirements are completed.
 
