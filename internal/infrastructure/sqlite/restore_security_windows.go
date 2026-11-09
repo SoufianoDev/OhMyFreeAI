@@ -101,29 +101,62 @@ func verifyRestoreDirectorySecurity(directory windows.Handle) error {
 		return fmt.Errorf("restore state directory owner does not match the current process identity")
 	}
 
+	return verifyRestoreDirectoryDACL(dacl)
+}
+
+// verifyRestoreDirectoryACL rejects broad write access on a directory without
+// requiring that the directory be owned by the current user. Every ancestor
+// of the canonical state directory is checked because an attacker able to
+// rename/replace an ancestor could redirect a later startup to a different
+// state-directory object even while the current process retains a safe handle.
+func verifyRestoreDirectoryACL(directory windows.Handle) error {
+	if directory == windows.InvalidHandle {
+		return fmt.Errorf("restore directory handle is invalid")
+	}
+	var dacl *windows.ACL
+	var descriptor *windows.SECURITY_DESCRIPTOR
+	status, _, _ := restoreGetSecurityInfo.Call(
+		uintptr(directory),
+		uintptr(windows.SE_FILE_OBJECT),
+		uintptr(windows.DACL_SECURITY_INFORMATION),
+		0,
+		0,
+		uintptr(unsafe.Pointer(&dacl)),
+		0,
+		uintptr(unsafe.Pointer(&descriptor)),
+	)
+	if status != 0 {
+		return fmt.Errorf("GetSecurityInfo for restore directory DACL failed: %w", syscall.Errno(status))
+	}
+	if descriptor != nil {
+		defer windows.LocalFree(windows.Handle(unsafe.Pointer(descriptor)))
+	}
+	return verifyRestoreDirectoryDACL(dacl)
+}
+
+func verifyRestoreDirectoryDACL(dacl *windows.ACL) error {
+	if dacl == nil {
+		return fmt.Errorf("restore directory has a NULL DACL; access is not restricted")
+	}
 	for index := uint32(0); index < uint32(dacl.AceCount); index++ {
 		var ace *windows.ACCESS_ALLOWED_ACE
 		if err := windows.GetAce(dacl, index, &ace); err != nil {
-			return fmt.Errorf("read restore state directory DACL ACE %d: %w", index, err)
+			return fmt.Errorf("read restore directory DACL ACE %d: %w", index, err)
 		}
 		if ace == nil {
-			return fmt.Errorf("restore state directory DACL contains a null ACE")
+			return fmt.Errorf("restore directory DACL contains a null ACE")
 		}
 		switch ace.Header.AceType {
 		case windows.ACCESS_ALLOWED_ACE_TYPE, windows.ACCESS_DENIED_ACE_TYPE:
-			// These two basic ACE layouts share the same header/mask/SID offset.
 		default:
-			// Object and callback ACE layouts need additional GUID/condition
-			// parsing. Reject them rather than accidentally overlooking a broad
-			// allow rule.
-			return fmt.Errorf("restore state directory DACL contains unsupported ACE type %d", ace.Header.AceType)
+			return fmt.Errorf("restore directory DACL contains unsupported ACE type %d", ace.Header.AceType)
 		}
 		sid := (*windows.SID)(unsafe.Pointer(&ace.SidStart))
 		if !sid.IsValid() {
-			return fmt.Errorf("restore state directory DACL contains an invalid SID")
+			return fmt.Errorf("restore directory DACL contains an invalid SID")
 		}
 		if isBroadWritableRestoreACE(ace.Header.AceType, uint32(ace.Mask), sid) {
-			return fmt.Errorf("restore state directory grants broad write or delete access")
+			return fmt.Errorf("restore directory grants broad write or delete access")
 		}
 	}
 	return nil
