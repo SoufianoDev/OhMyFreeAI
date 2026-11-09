@@ -3,6 +3,7 @@
 package sqlite
 
 import (
+	"errors"
 	"crypto/sha256"
 	"encoding/hex"
 	"os"
