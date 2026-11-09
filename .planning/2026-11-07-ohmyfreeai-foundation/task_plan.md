@@ -313,3 +313,15 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - [ ] Resolve the workflow-level pending-job/scheduling state before another code push; avoid superseding the active Linux distribution run with a no-op commit.
 - [ ] Linux parent-directory fsync and the documented Windows namespace durability barrier remain blocking prerequisites for executor work.
 - Restore remains disabled; no executor, startup recovery, app-level Restore service, CLI/GUI Restore entry point, or merge to main.
+
+
+## CI closure — verified-move revision — 2026-11-09 18:16Z
+
+- [ ] Root CI [42671657858](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671657858) remains unverified: run failed before any jobs were returned; no Go tests ran.
+- [ ] Verified-move identity tests remain unverified on Linux and Windows.
+- [x] Partial platform evidence: Windows Wails native build/CLI smoke passed in run [42671658474](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671658474), but the Ubuntu matrix lane was not created and the workflow summary is FAILURE.
+- [x] Partial Linux evidence: Debian 12 legacy GTK3/WebKit2GTK 4.1 native build, CLI smoke, WebView bridge, and database reopen passed in run [42671658275](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671658275). Only 1/8 matrix lanes ran; overall workflow is FAILURE.
+- [x] Partial SQLite evidence: Windows modernc migration/driver tests passed in run [42671658166]; the other expected matrix cells were absent and the overall workflow is FAILURE. This is not evidence for the main Restore package.
+- [ ] Resolve the missing GitHub Actions matrix jobs and obtain a real Ubuntu + Windows Root CI run before marking the new tests verified.
+- [ ] Implement and test Linux parent-directory fsync; establish a documented Windows namespace durability barrier or keep Windows Restore unavailable.
+- Restore remains disabled. No executor, startup recovery, app-level Restore service, CLI/GUI Restore, or main merge.
