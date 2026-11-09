@@ -10,7 +10,7 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-func TestRenameRestoreHandleNoReplaceUsesOpenedSourceHandle(t *testing.T) {
+func TestRenameRestoreHandleNoReplaceUsesWriteThroughOpenedSourceHandle(t *testing.T) {
 	directory := t.TempDir()
 	source := filepath.Join(directory, "candidate.db")
 	parked := filepath.Join(directory, "parked.db")
@@ -19,39 +19,28 @@ func TestRenameRestoreHandleNoReplaceUsesOpenedSourceHandle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sourceHandle, err := windows.CreateFile(
-		windows.StringToUTF16Ptr(source),
-		windows.DELETE|windows.FILE_READ_ATTRIBUTES,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_OPEN_REPARSE_POINT,
-		0,
-	)
+	directoryHandle, err := openRestoreDirectoryNoReparse(directory)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("open qualified restore directory: %v", err)
+	}
+	defer windows.CloseHandle(directoryHandle)
+	guardHandle, directoryPath, err := openRestoreDirectoryWriteThroughGuard(directoryHandle)
+	if err != nil {
+		t.Fatalf("open write-through directory guard: %v", err)
+	}
+	defer func() {
+		if guardHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(guardHandle)
+		}
+	}()
+
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryPath, filepath.Base(source))
+	if err != nil {
+		t.Fatalf("open write-through source handle: %v", err)
 	}
 	defer func() {
 		if sourceHandle != windows.InvalidHandle {
 			_ = windows.CloseHandle(sourceHandle)
-		}
-	}()
-
-	directoryHandle, err := windows.CreateFile(
-		windows.StringToUTF16Ptr(directory),
-		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
-		0,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() {
-		if directoryHandle != windows.InvalidHandle {
-			_ = windows.CloseHandle(directoryHandle)
 		}
 	}()
 
@@ -62,17 +51,17 @@ func TestRenameRestoreHandleNoReplaceUsesOpenedSourceHandle(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination)); err != nil {
+	if err := renameRestoreHandleNoReplace(sourceHandle, guardHandle, filepath.Base(destination)); err != nil {
 		t.Fatalf("rename opened source handle: %v", err)
 	}
 	if err := windows.CloseHandle(sourceHandle); err != nil {
 		t.Fatal(err)
 	}
 	sourceHandle = windows.InvalidHandle
-	if err := windows.CloseHandle(directoryHandle); err != nil {
+	if err := windows.CloseHandle(guardHandle); err != nil {
 		t.Fatal(err)
 	}
-	directoryHandle = windows.InvalidHandle
+	guardHandle = windows.InvalidHandle
 
 	got, err := os.ReadFile(destination)
 	if err != nil {
@@ -104,53 +93,25 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sourceHandle, err := windows.CreateFile(
-		windows.StringToUTF16Ptr(source),
-		windows.DELETE|windows.FILE_READ_ATTRIBUTES,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_OPEN_REPARSE_POINT,
-		0,
-	)
+	directoryHandle, err := openRestoreDirectoryNoReparse(directory)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("open qualified restore directory: %v", err)
 	}
-	defer func() {
-		if sourceHandle != windows.InvalidHandle {
-			_ = windows.CloseHandle(sourceHandle)
-		}
-	}()
-
-	directoryHandle, err := windows.CreateFile(
-		windows.StringToUTF16Ptr(directory),
-		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
-		0,
-	)
+	defer windows.CloseHandle(directoryHandle)
+	guardHandle, directoryPath, err := openRestoreDirectoryWriteThroughGuard(directoryHandle)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("open write-through directory guard: %v", err)
 	}
-	defer func() {
-		if directoryHandle != windows.InvalidHandle {
-			_ = windows.CloseHandle(directoryHandle)
-		}
-	}()
+	defer windows.CloseHandle(guardHandle)
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryPath, filepath.Base(source))
+	if err != nil {
+		t.Fatalf("open write-through source handle: %v", err)
+	}
+	defer windows.CloseHandle(sourceHandle)
 
-	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination)); err == nil {
-		t.Fatal("handle-bound rename replaced an existing destination")
+	if err := renameRestoreHandleNoReplace(sourceHandle, guardHandle, filepath.Base(destination)); !errors.Is(err, os.ErrExist) {
+		t.Fatalf("handle-bound no-replace rename error = %v, want os.ErrExist", err)
 	}
-	if err := windows.CloseHandle(sourceHandle); err != nil {
-		t.Fatal(err)
-	}
-	sourceHandle = windows.InvalidHandle
-	if err := windows.CloseHandle(directoryHandle); err != nil {
-		t.Fatal(err)
-	}
-	directoryHandle = windows.InvalidHandle
 	for path, want := range map[string]string{
 		source:      "candidate",
 		destination: "existing",
@@ -165,82 +126,35 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 	}
 }
 
-
-func TestOpenRestoreSourceRelativeUsesPinnedDirectoryHandle(t *testing.T) {
+func TestOpenRestoreDirectoryWriteThroughGuardPreventsRename(t *testing.T) {
 	root := t.TempDir()
 	directory := filepath.Join(root, "state")
 	movedDirectory := filepath.Join(root, "state-moved")
 	if err := os.Mkdir(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	source := filepath.Join(directory, "candidate.db")
-	if err := os.WriteFile(source, []byte("original candidate"), 0o600); err != nil {
-		t.Fatal(err)
-	}
 
-	directoryHandle, err := windows.CreateFile(
-		windows.StringToUTF16Ptr(directory),
-		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
-		0,
-	)
+	directoryHandle, err := openRestoreDirectoryNoReparse(directory)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("open qualified restore directory: %v", err)
 	}
-	defer func() {
-		if directoryHandle != windows.InvalidHandle {
-			_ = windows.CloseHandle(directoryHandle)
-		}
-	}()
-
+	defer windows.CloseHandle(directoryHandle)
+	guardHandle, guardedPath, err := openRestoreDirectoryWriteThroughGuard(directoryHandle)
+	if err != nil {
+		t.Fatalf("open write-through directory guard: %v", err)
+	}
+	if guardedPath == "" {
+		t.Fatal("directory guard returned an empty path")
+	}
+	if err := os.Rename(directory, movedDirectory); err == nil {
+		_ = windows.CloseHandle(guardHandle)
+		t.Fatal("directory was renamed while its no-delete-share guard was held")
+	}
+	if err := windows.CloseHandle(guardHandle); err != nil {
+		t.Fatalf("close directory guard: %v", err)
+	}
 	if err := os.Rename(directory, movedDirectory); err != nil {
-		t.Fatalf("move opened directory path aside: %v", err)
-	}
-	if err := os.Mkdir(directory, 0o700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(directory, "candidate.db"), []byte("replacement at old directory path"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-
-	sourceHandle, err := openRestoreSourceRelative(directoryHandle, "candidate.db")
-	if err != nil {
-		t.Fatalf("open source relative to pinned directory handle: %v", err)
-	}
-	defer func() {
-		if sourceHandle != windows.InvalidHandle {
-			_ = windows.CloseHandle(sourceHandle)
-		}
-	}()
-
-	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, "published.db"); err != nil {
-		t.Fatalf("rename opened source handle: %v", err)
-	}
-	if err := windows.CloseHandle(sourceHandle); err != nil {
-		t.Fatal(err)
-	}
-	sourceHandle = windows.InvalidHandle
-	if err := windows.CloseHandle(directoryHandle); err != nil {
-		t.Fatal(err)
-	}
-	directoryHandle = windows.InvalidHandle
-
-	got, err := os.ReadFile(filepath.Join(movedDirectory, "published.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != "original candidate" {
-		t.Fatalf("published content = %q, want original candidate", got)
-	}
-	got, err = os.ReadFile(filepath.Join(directory, "candidate.db"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if string(got) != "replacement at old directory path" {
-		t.Fatalf("replacement content = %q, want replacement at old directory path", got)
+		t.Fatalf("rename directory after releasing guard: %v", err)
 	}
 }
 
