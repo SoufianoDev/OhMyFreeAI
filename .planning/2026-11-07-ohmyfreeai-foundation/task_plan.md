@@ -6,13 +6,13 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-The baseline workflow 42419106009 is verified green on Ubuntu and Windows for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`. StoreController integration and its config/backup leases, shutdown drain, and tests remain complete as recorded below.
+The baseline workflow 42419106009 passed Ubuntu and Windows on `f5396ee592b9b9756779f67aeabd6d7167520c40`. StoreController integration is already present and verified: Wails composition root, AppService, config repository, GUI/CLI backup leases, shutdown drain, stale-store rejection and failure-safe replacement tests.
 
-Windows Restore path traversal now opens each component relative to a retained parent handle. A new owner/DACL and volume qualification gate has been implemented on `foundation/bootstrap`: current-user ownership, non-NULL DACL, rejection of broad writable ACEs, and fixed-local-NTFS/persistent-ACL qualification. Latest code/test commit: `8ee245f32fac31ce9dfa1b058163ee90b4f52960` (includes broad domain-group ACE coverage).
+Windows Restore path traversal opens each component relative to retained parent handles. The owner/DACL and volume gate is implemented on `foundation/bootstrap`: directory ownership must match either the process TokenUser or its explicit TokenOwner; NULL DACLs and broad writable ACEs are rejected; only fixed local NTFS with persistent ACLs is qualified.
 
-**This new gate is not verified yet.** Root CI [42642834055](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834055) is queued on Ubuntu and Windows. Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) is in progress on both platforms; Linux desktop dependency installation passed and both jobs are still installing Wails CLI. No Ubuntu/Windows test result is claimed. The new tests have not yet produced an observed RED/GREEN cycle.
+**The gate is now CI-verified.** Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765), commit `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`, passed Ubuntu and Windows. Ubuntu passed vet, Go tests, race detector, build, Python compile/tests, frontend syntax and architecture checks. Windows passed vet, Go tests, build, Python compile/tests, frontend syntax and architecture checks; Linux-only race detection was skipped as expected. Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) also passed both platforms.
 
-Next action: obtain the Root CI run for `971a3294`, inspect both platform jobs and failure logs, correct any failures, then verify the remaining required workflows. Keep Restore disabled. Do not implement or wire the filesystem executor until the security/volume gate passes CI and the remaining failure-injection/process-death requirements are completed.
+Next: proceed test-first with the collision-safe Restore filesystem executor and startup recovery, using `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md` as the design gate. Do not expose Restore or add UI. The executor must preserve ambiguous artifacts, use only handle-/directory-pinned no-replace operations, persist intent/completion phases, and prove identity before mutation. Add failure-injection and abrupt-process-restart coverage on Linux and Windows.
 
 ## Current Phase
 
@@ -94,8 +94,8 @@ Phase 4
   - [x] Add Windows source-handle substitution and no-replace collision tests; observe RED then GREEN on Windows CI
   - [x] Open Windows source leaf relative to the already-pinned directory handle with NtCreateFile; verify directory-path substitution test on Windows CI
   - [x] Open Windows destination directory component-by-component from the drive root; reject reparse/device/non-directory components and verify pinned-parent behavior on Windows CI
-  - [ ] Verify canonical state-directory owner and private DACL; fail closed on broad write access
-  - [ ] Qualify the actual volume type and filesystem for the no-replace move; reject unsupported remote/mapped or filesystem types
+  - [x] Verify canonical state-directory owner and private DACL; fail closed on broad write access (Windows Root CI 42643886765)
+  - [x] Qualify the actual volume type and filesystem for the no-replace move; reject unsupported remote/mapped or filesystem types (fixed local NTFS only; Windows Root CI 42643886765)
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
@@ -287,3 +287,12 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - Corrected the Windows identity check to accept only TokenUser or the current token's explicit TokenOwner (the documented default owner for newly created objects). The broad-writable DACL rejection and fixed-local-NTFS gate remain unchanged.
 - Fix commit: `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`; planning update commit: `c1d9063b90283a40a5668b85f252f9bf37ac64b9`.
 - **Next mandatory gate:** rerun Root CI on this revision and inspect both platform results. Do not treat the fix as verified until Windows tests pass. Keep Restore disabled; do not start executor/journal/recovery/UI before the platform safety gate is green.
+
+
+### CI closure — Windows Restore directory security gate — 2026-11-09
+
+- Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765) passed on commit `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`: Ubuntu and Windows SUCCESS.
+- Ubuntu passed Go vet/tests, race detector, build, Python compile/tests, frontend syntax and architecture boundaries. Windows passed Go vet/tests/build, Python compile/tests, frontend syntax and architecture boundaries; the Linux-only race step was skipped as designed.
+- This verifies the Windows TokenUser/TokenOwner owner comparison correction, private DACL checks, broad-principal write rejection, and fixed-local-NTFS/persistent-ACL volume qualification on the Windows CI runner. It does not qualify other Windows filesystem providers or power-loss behavior.
+- Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) passed Ubuntu and Windows native build/smoke checks.
+- Code fix: `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`. No changes were made to `main`; Restore remains disabled.
