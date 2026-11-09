@@ -1124,3 +1124,38 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Identified a remaining Linux boundary: the parent directory is pinned with openat2, but the source leaf is still selected by name at rename time. The executor must hash/size-verify the moved file through a no-follow opened handle after each move and before opening SQLite; mismatch means preserve and stop.
 - Primary durability reference: Linux fsync(2) explicitly says syncing a file does not necessarily persist its containing directory entry; sync the parent directory as a separate step. Windows journal publication uses MOVEFILE_WRITE_THROUGH; durable journal removal intentionally remains unsupported.
 - Next: implement cross-platform no-follow handle-based content identity verification, then build the executor one journaled no-replace move at a time with injected failures and abrupt-process restart tests. Keep Restore disabled and do not add GUI/CLI/startup wiring.
+
+## Continuation — Restore identity verification and Windows durability gate — 2026-11-09
+
+### Repository and CI state
+
+- Re-read the active foundation plan, progress log, Restore executor design, journal, recovery planner, and platform move/identity implementations on foundation/bootstrap.
+- Reconfirmed Root CI 42643886765 on 8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5: Ubuntu and Windows both SUCCESS; Ubuntu race detector SUCCESS. Wails 42642834036 passed both platforms.
+- Checked Root CI 42645966152 after Windows ancestor ACL hardening: Ubuntu SUCCESS, Windows FAILURE in Go tests. The later planner revision 7b0ad259b5a741229e0d492b38c2a38b7a1dc3ec passed Root CI 42649675343 on Ubuntu and Windows; Ubuntu race detector passed. This closes the observed ACL/planner failure on that tested revision.
+- Current code head observed before documentation updates: 38ffa21f8b2fef05bc98b80e4ed5c8c1836bd0ff, commit message “test(sqlite): cover post-move restore identity verification”. Combined commit status returned an empty status list, and the PR-filtered workflow lookup returned no runs. Do not claim the later identity-reader and verified-move tests passed CI.
+- Documentation-only commits from this review: d0b9e77d3b1f7e68c2e10f37f1ec7ea8a0cb247e (executor durability gate) and b41255b4e00c5b637e8e4137729bef567e0da687 (task plan). The root CI workflow path filter does not include these Markdown-only changes.
+
+### Code review findings
+
+- Cross-platform no-follow content identity readers are now present:
+  - Linux pins the parent with openat2, opens the leaf with O_NOFOLLOW, hashes from the descriptor, and compares file identity/size/timestamps before and after reading.
+  - Windows opens the leaf relative to the retained, security-checked directory handle with NtCreateFile and FILE_OPEN_REPARSE_POINT, hashes from that handle, and compares volume/file ID/size/last-write metadata before and after reading.
+- moveRestoreFileNoReplaceVerified calls the platform no-replace move, then verifies the destination's size and SHA-256 through the no-follow identity reader. If verification fails or mismatches, it leaves the destination untouched and returns an error. It does not open SQLite.
+- The verified-move helper is not a complete executor and currently does not sync the changed directory namespace. The Linux no-replace primitive uses renameat2(RENAME_NOREPLACE) but does not yet call parent-directory fsync. The Windows handle-bound rename also has no integrated, documented namespace durability barrier.
+- The latest test commit adds success, mismatch-preservation, and invalid-expected-identity cases for the verified move. These tests are present in source but remain CI-unverified at this review point.
+
+### Exa research — primary API contracts
+
+- Linux fsync(2) explicitly states that syncing a file does not necessarily persist its directory entry; the containing directory must be synced separately: https://man7.org/linux/man-pages/man2/fsync.2.html
+- Linux rename(2) documents RENAME_NOREPLACE as failing when the destination exists and notes that filesystem support is required: https://man7.org/linux/man-pages/man2/rename.2.html
+- Microsoft MS-FSCC FileRenameInformationEx defines the no-replace behavior when FILE_RENAME_REPLACE_IF_EXISTS is unset. Its published flags do not include a write-through/durability flag: https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c
+- Microsoft NtSetInformationFile documents the operation/status contract, not a durable namespace barrier: https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntsetinformationfile
+- Microsoft FlushFileBuffers requires GENERIC_WRITE; its documented volume-wide form requires administrative privileges. The reviewed documentation did not establish a supported non-administrative user-mode sequence to flush the parent directory entry changed by the handle-bound rename: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers
+- Microsoft MoveFileExW describes MOVEFILE_WRITE_THROUGH, but the stated flush guarantee specifically covers a move performed as a copy-and-delete operation. It does not establish the required durability contract for the same-volume rename path, and replacing the retained-handle native rename with path-based MoveFileExW would reintroduce the source-substitution race: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw
+
+### Decision and next step
+
+- Updated docs/architecture/RESTORE_RECOVERY_EXECUTOR.md with the explicit Windows namespace durability blocker and the current identity-helper implementation status.
+- Updated task_plan.md: identity readers/post-move verification are implemented but still need CI verification; Linux parent-directory fsync and a documented Windows namespace durability barrier are explicit gates.
+- Do not start the filesystem executor yet. Resolve the Windows durability contract using primary documentation and a regression test, or keep Windows Restore unavailable. Do not add a path-only or overwrite-capable fallback. Implement Linux directory fsync as a separate, testable barrier.
+- Restore remains disabled. No startup recovery, application-level Restore service, GUI/CLI Restore entry point, or main merge was added.
