@@ -22,6 +22,7 @@ const (
 	restoreFileRemoteProtocolInfoClass = 13
 	restoreBroadWriteMask = uint32(0x00000002 | 0x00000004 | 0x00000010 | 0x00000040 | 0x00000100 | 0x00010000 | 0x00040000 | 0x00080000 | 0x10000000 | 0x40000000)
 	restoreAncestorNamespaceMask = uint32(0x00000040 | 0x00010000 | 0x00040000 | 0x00080000 | 0x10000000)
+	restoreVolumeRootNamespaceMask = uint32(restoreAncestorNamespaceMask &^ 0x00010000)
 	restoreSecurityOwnerAndDACL = 0x00000001 | 0x00000004
 )
 
@@ -111,6 +112,13 @@ func verifyRestoreDirectorySecurity(directory windows.Handle) error {
 // rename/replace an ancestor could redirect a later startup to a different
 // state-directory object even while the current process retains a safe handle.
 func verifyRestoreDirectoryACL(directory windows.Handle) error {
+	return verifyRestoreDirectoryACLWithMask(directory, restoreAncestorNamespaceMask)
+}
+
+// The volume root cannot itself be removed or renamed as a directory entry.
+// Ignore DELETE on that one object while still rejecting broad DELETE_CHILD,
+// WRITE_DAC, WRITE_OWNER and GENERIC_ALL grants that could replace descendants.
+func verifyRestoreDirectoryACLWithMask(directory windows.Handle, prohibitedMask uint32) error {
 	if directory == windows.InvalidHandle {
 		return fmt.Errorf("restore directory handle is invalid")
 	}
@@ -132,7 +140,7 @@ func verifyRestoreDirectoryACL(directory windows.Handle) error {
 	if descriptor != nil {
 		defer windows.LocalFree(windows.Handle(unsafe.Pointer(descriptor)))
 	}
-	return verifyRestoreDirectoryDACL(dacl, restoreAncestorNamespaceMask)
+	return verifyRestoreDirectoryDACL(dacl, prohibitedMask)
 }
 
 func verifyRestoreDirectoryDACL(dacl *windows.ACL, prohibitedMask uint32) error {
