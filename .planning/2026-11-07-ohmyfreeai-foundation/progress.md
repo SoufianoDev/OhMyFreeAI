@@ -1214,3 +1214,11 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Linux distribution compatibility #42682591212 is still running. Arch, Fedora 44, Debian 13, and Ubuntu 24.04 were building; Ubuntu 22.04, openSUSE, Fedora legacy GTK3, and Debian 12 remained queued at last check. No workflow conclusion recorded yet.
 - This validates the current Linux directory-sync implementation and the existing Windows identity/verified-move tests under Root CI, but it does not resolve Windows namespace durability. Do not interpret Windows test success as proof of a durable parent-directory namespace flush.
 - Restore remains disabled. No filesystem executor, startup recovery, GUI/CLI Restore, or main merge.
+
+
+## Follow-up — Wails Windows native build proof — 2026-11-09
+
+- Wails v3 platform proof run #42682591267: the Windows job completed successfully. Its native application build, Windows CLI dispatch smoke test, and executable verification all passed. The Ubuntu job was still running its native application build at last check; the workflow is not yet green.
+- Linux distribution run #42682591212: Debian 13 completed successfully. Arch, Fedora 44, openSUSE, and Ubuntu 24.04 were still active; Ubuntu 22.04, Debian 12, and Fedora legacy GTK3 remained queued at last check.
+- Root CI remains green on Ubuntu and Windows, and SQLite driver evaluation remains green across its four jobs for commit `f1eb8179a3a95e5cabfa19baebbade03e97b8bf5`.
+- No additional code changes in this update. Windows namespace durability remains unresolved; Restore remains disabled.

@@ -359,3 +359,12 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - [ ] Establish a documented Windows namespace durability barrier with equivalent no-replace and handle-binding guarantees, or keep Windows Restore unavailable.
 - Root CI run: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42682590849. SQLite driver evaluation: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42682590841.
 - Windows Root tests validate the current Windows identity/verified-move code, not namespace crash durability. Restore remains disabled. Do not start the executor, startup recovery, GUI/CLI Restore, or merge to main.
+
+
+## Follow-up — Wails Windows native build proof — 2026-11-09
+
+- [x] Wails v3 native application build, Windows CLI dispatch smoke test, and executable verification passed on Windows in run #42682591267.
+- [ ] Complete the Ubuntu Wails build and Linux WebView/SQLite smoke tests in run #42682591267.
+- [ ] Complete the remaining Linux distribution matrix in run #42682591212.
+- Root CI and SQLite driver evaluation remain green for the tested code commit. Windows native build success does not resolve the separate Windows Restore namespace-durability gate.
+- Restore remains disabled. No executor, startup recovery, GUI/CLI Restore, or main merge.
