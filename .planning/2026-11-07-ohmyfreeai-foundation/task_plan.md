@@ -336,3 +336,14 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - [ ] Establish a documented Windows namespace durability barrier with equivalent no-replace and handle-binding guarantees, or keep Windows Restore unavailable.
 - The Linux implementation is present but not CI-verified. A sync error occurs after the rename may have changed the namespace; the move returns an error and preserves the destination for journal/recovery inspection.
 - Restore remains disabled. Do not start the filesystem executor, startup recovery, or GUI/CLI Restore, and do not merge to main.
+
+
+## Continuation — CI audit and Linux regression-test restoration — 2026-11-09
+
+- [x] Restore the Linux regression test rejecting a symlinked containing directory while retaining the directory-fsync tests.
+- [x] Audit actual completed Root, SQLite-driver, Linux distro, and Wails workflow jobs for commit `6bb79ce73ea558bb07b2d24e889ea0c85f2013fc`.
+- [ ] Obtain a new Root CI run where both Ubuntu and Windows matrix jobs are actually materialized and complete.
+- [ ] Run the restored symlink-parent regression and Linux directory-sync tests in Ubuntu CI.
+- [ ] Establish a documented Windows namespace durability barrier with equivalent no-replace and handle-binding guarantees, or keep Windows Restore unavailable.
+- Root CI's only materialized Ubuntu job passed all steps, but the run reports failure and no Windows job was created. SQLite driver evaluation's three materialized jobs passed, including two Windows jobs, but they do not exercise Restore filesystem code. All seven materialized Linux distro jobs passed. Wails workflow failed with zero jobs.
+- Restore remains disabled. Do not start the executor, startup recovery, GUI/CLI Restore, or merge to main.

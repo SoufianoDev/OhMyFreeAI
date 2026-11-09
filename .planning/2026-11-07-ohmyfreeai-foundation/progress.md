@@ -1192,3 +1192,15 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Added Linux regression coverage for syncing an opened directory descriptor and rejecting an invalid descriptor. Existing verified-move tests also exercise the integrated rename-plus-directory-sync path when run on Linux.
 - Tests have not been executed locally in this connector-only repository session. The next code commit must be verified by actual Ubuntu and Windows Root CI jobs; the previous Root CI run had no jobs and did not execute tests.
 - Windows handle-bound rename still has no established non-admin namespace durability barrier. Keep Windows Restore unavailable and Restore globally disabled; no executor, startup recovery, UI/CLI entry point, or main merge.
+
+
+## Continuation — CI audit and Linux regression-test restoration — 2026-11-09
+
+- Re-audited the completed workflows for commit `6bb79ce73ea558bb07b2d24e889ea0c85f2013fc`.
+- Root CI run #42673055491 reports run-level failure even though its only materialized job, `Validate (ubuntu-latest)`, completed every step successfully, including `go vet ./...`, `go test ./...`, `go test -race ./...`, `go build ./...`, Python tests, frontend syntax, and architecture checks. The configured Windows matrix job was not materialized. This is not Windows Restore test evidence.
+- SQLite driver evaluation run #42673055205 reports run-level failure although all three materialized jobs succeeded: ncruces on Ubuntu, ncruces on Windows, and modernc on Windows. Those jobs test the driver evaluation package, not the Restore filesystem package.
+- Linux distribution run #42673055109 completed all seven materialized distro/stack jobs successfully. This proves those desktop builds/smoke checks, not Windows Restore correctness.
+- Wails run #42673055064 failed with zero jobs. Its workflow-level failure remains unexplained; no job logs exist to diagnose.
+- Restored `TestMoveRestoreFileNoReplaceRejectsSymlinkedContainingDirectory`, which had been accidentally dropped when the new Linux directory-sync tests replaced the file. Kept both directory-sync tests.
+- The restored test has been committed but has not yet been executed by CI. Do not claim this regression is green until a new Linux test job passes.
+- Windows namespace durability remains unresolved. Restore stays disabled; no executor, startup recovery, UI/CLI entry point, or main merge.
