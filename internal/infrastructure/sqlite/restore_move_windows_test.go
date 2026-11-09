@@ -108,11 +108,19 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open write-through source handle: %v", err)
 	}
-	defer windows.CloseHandle(sourceHandle)
+	defer func() {
+		if sourceHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(sourceHandle)
+		}
+	}()
 
 	if err := renameRestoreHandleNoReplace(sourceHandle, guardHandle, filepath.Base(destination)); !errors.Is(err, os.ErrExist) {
 		t.Fatalf("handle-bound no-replace rename error = %v, want os.ErrExist", err)
 	}
+	if err := windows.CloseHandle(sourceHandle); err != nil {
+		t.Fatalf("close source handle after collision: %v", err)
+	}
+	sourceHandle = windows.InvalidHandle
 	for path, want := range map[string]string{
 		source:      "candidate",
 		destination: "existing",
