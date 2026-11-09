@@ -20,7 +20,7 @@ type restoreVolumeInfo struct {
 const (
 	restoreFilePersistentACLs = 0x00000008
 	restoreFileRemoteProtocolInfoClass = 13
-	restoreBroadWriteMask = uint32(0x00000002 | 0x00000004 | 0x00000040 | 0x00010000 | 0x00040000 | 0x00080000 | 0x10000000 | 0x40000000)
+	restoreBroadWriteMask = uint32(0x00000002 | 0x00000004 | 0x00000010 | 0x00000040 | 0x00000100 | 0x00010000 | 0x00040000 | 0x00080000 | 0x10000000 | 0x40000000)
 	restoreSecurityOwnerAndDACL = 0x00000001 | 0x00000004
 )
 
