@@ -376,3 +376,20 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - [x] Complete Arch Linux, Fedora 44 GTK4, and Debian 13 desktop compatibility jobs.
 - [ ] Complete remaining Linux distribution jobs in run #42682591212 (Ubuntu 22.04, openSUSE Tumbleweed, Fedora legacy GTK3, Ubuntu 24.04, Debian 12; some still active/queued at last check).
 - Windows namespace durability remains an independent hard gate. Restore stays disabled; no executor, startup recovery, GUI/CLI Restore, or main merge.
+
+
+## Verification update — Linux distribution matrix completed — 2026-11-09
+
+- [x] Complete all 8 Linux distribution/GTK-WebKit matrix jobs in run [42682591212](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42682591212). All eight succeeded, including native app build, CLI dispatch, and WebView bridge/database reopen smoke tests.
+- [x] Reconfirm branch HEAD after CI: `10b301a32477a53a70f9284e74786c7a6e611ab5`; CI code under test is `f1eb8179a3a95e5cabfa19baebbade03e97b8bf5`, with later commits documentation-only.
+- [ ] Establish a documented Windows namespace durability barrier that preserves handle-bound no-replace semantics, or retain Windows Restore as unavailable.
+- [ ] Keep Restore disabled until the required Linux and Windows safety gates are both met. Do not start executor, durable journal integration, startup recovery, GUI/CLI Restore, or merge to main before then.
+
+### Windows contract review — 2026-11-09
+
+- `FILE_RENAME_INFORMATION_EX` documents no-replace when the replace flag is omitted, but publishes no write-through/durability flag.
+- `MoveFileExW(MOVEFILE_WRITE_THROUGH)` has broad “moved on disk” wording, while its explicit flush guarantee is for copy-and-delete moves. The contract does not unambiguously establish same-volume rename namespace durability; the API is path-based and cannot replace the current handle-bound primitive without weakening source/destination identity guarantees.
+- `NtFlushBuffersFileEx` requires write/append access on the handle. `NtCreateFile` prohibits requesting file-write/file-append rights for directories and prohibits generic access rights for directory opens. No documented, ordinary-user directory flush access recipe was found.
+- `FLUSH_FLAGS_FILE_DATA_SYNC_ONLY` is invalid for directory handles; `ReplaceFileW` says `REPLACEFILE_WRITE_THROUGH` is unsupported.
+- Microsoft Q&A clarification pages were treated as questions, not as authoritative engineering answers. The unresolved point is a missing documented API contract, not a claim about NTFS's internal capabilities.
+- No path-based fallback, overwrite-capable fallback, or undocumented directory flush is accepted. Restore remains disabled.
