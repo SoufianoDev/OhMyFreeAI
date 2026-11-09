@@ -84,6 +84,56 @@ func TestRestoreDirectorySecurityAcceptsPrivateTempDirectory(t *testing.T) {
 	}
 }
 
+func TestRestoreDirectoryACLAcceptsPrivateTempDirectory(t *testing.T) {
+	directory := t.TempDir()
+	handle, err := windows.CreateFile(
+		windows.StringToUTF16Ptr(directory),
+		windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer windows.CloseHandle(handle)
+
+	if err := verifyRestoreDirectoryACL(handle); err != nil {
+		t.Fatalf("verifyRestoreDirectoryACL() rejected private temp directory: %v", err)
+	}
+}
+
+func TestRestoreDirectoryACLAcceptsLocalVolumeRoot(t *testing.T) {
+	directory, err := windows.GetSystemDirectory()
+	if err != nil {
+		t.Fatal(err)
+	}
+	absolute, err := filepath.Abs(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.VolumeName(absolute) + string(filepath.Separator)
+	handle, err := windows.CreateFile(
+		windows.StringToUTF16Ptr(root),
+		windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
+		0,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer windows.CloseHandle(handle)
+
+	if err := verifyRestoreDirectoryACL(handle); err != nil {
+		t.Fatalf("verifyRestoreDirectoryACL() rejected local volume root: %v", err)
+	}
+}
+
 func TestRestoreDirectoryTraversalAcceptsQualifiedLocalVolume(t *testing.T) {
 	directory := t.TempDir()
 	absolute, err := filepath.Abs(directory)
