@@ -1015,3 +1015,36 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Documentation commit: `45b6a9b998eef1e5657b359f971e99dc8313001b` on `foundation/bootstrap`.
 - No application code, live runtime, launcher, or user process was modified. No automated tests were run because this change is documentation-only. The Colab adapter remains policy-gated and disabled.
 - Exa's follow-up search endpoint returned HTTP 500 twice; conclusions above rely on the successfully retrieved official Google documentation, not third-party tutorials.
+
+
+## StoreController gate verification and Windows directory pinning — 2026-11-09
+
+### Requested baseline
+
+- Workflow run [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009), commit `f5396ee592b9b9756779f67aeabd6d7167520c40`, completed successfully on `foundation/bootstrap`.
+- Both jobs passed: Ubuntu `128543483467` and Windows `128543483323`. No failed steps.
+
+### StoreController integration review
+
+- The integration was already present; I did not duplicate it. The Wails composition root opens and migrates the initial Store before constructing the controller, passes the controller to the configuration service and AppService, and closes through the controller after the app exits.
+- AppService retains `*sqlite.StoreController`, not a raw `*sqlite.Store`. Config Load/Save use the controller's repository implementation. GUI and CLI backup export call `CreateWithStoreController`, which holds the shared lease until archive creation and publication finish.
+- Controller tests cover shared/exclusive ordering, writer preference, cancellation, panic/failure fail-closed behavior, Store replacement, shutdown drain, and rejection after close. Backup tests cover an export holding its lease while shutdown waits. The composition root's native Wails smoke also exercises the live service bridge and database reopen.
+- The latest pre-path-hardening integration revision `adde70da56b7af4e71c68796a2e20dbe017d72d6` passed Root CI [42525602855](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42525602855), Wails [42525602932](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42525602932), and Linux distro matrix [42525602852](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42525602852), including all eight distro lanes.
+
+### Windows restore-directory path hardening
+
+- RED checkpoint: `6a93f2e0d76aac977a15e736052e9d2a23e6ed49`. Root CI [42599254395](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42599254395) passed Ubuntu and failed Windows `go vet` because the new tests referenced the not-yet-implemented `openRestoreDirectoryNoReparse`; this was the intended compile-time RED.
+- Implementation: `1c03e8ff76933734c5d08620ebb93e2b376c278c`. The Windows no-replace move now opens the drive root and each directory component in sequence, opening children relative to the retained parent handle with `NtCreateFile`, `FILE_DIRECTORY_FILE`, and `FILE_OPEN_REPARSE_POINT`. Each opened component is checked for directory, reparse-point, and device attributes. UNC/device namespace paths are rejected.
+- The first Windows GREEN attempt exposed a test-harness issue, not a production failure: the test retained an open handle to the nested child while renaming its parent, and Windows returned `Access is denied`. Test correction: `b9f1d579a9587c1df451ca3bed5e8feece045589` captures the child identity and closes that child handle before the rename while retaining only the parent handle under test.
+- Final verification on `b9f1d579a9587c1df451ca3bed5e8feece045589`:
+  - Root CI [42599641312](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42599641312): Ubuntu and Windows passed; Linux race detector passed; vet, Go tests/build, Python tests, frontend syntax and architecture checks passed.
+  - Wails [42599641344](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42599641344): 2/2 passed, including Linux WebView bridge/database reopen and Windows native executable/CLI checks.
+  - SQLite driver evaluation [42599641296](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42599641296): 4/4 passed.
+  - Linux distro matrix [42599641297](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42599641297): 8/8 passed, including Ubuntu 22.04 legacy GTK3/WebKit2GTK 4.1.
+- No comments were added or removed. The new symlink-component test skips when the Windows runner cannot create a directory symlink; the non-verbose CI output does not establish whether that branch skipped. Coverage percentage was not measured. No standalone formatter invocation was performed in this connector-only edit session; Go vet/tests/build passed.
+
+### Remaining boundary
+
+- This change only hardens directory traversal for the low-level Windows move primitive. It does not verify directory owner/DACL privacy, distinguish a local fixed disk from a mapped network drive, or qualify the actual filesystem's support for the no-replace operation.
+- No filesystem recovery executor, startup recovery, app-level Restore service, CLI Restore command, or Restore UI was added. Restore remains disabled.
+- Next: verify the canonical state directory's private owner/DACL and qualify the volume/filesystem before implementing the collision-safe recovery executor. Then add publication/reopen/rollback failure injection and process-death recovery tests before any app-level Restore wiring.
