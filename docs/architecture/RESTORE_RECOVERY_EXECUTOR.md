@@ -338,3 +338,35 @@ The native rename class is not assumed to work on every filesystem/provider. Uns
 ## Windows ancestor ACL closure — 2026-11-09
 
 The Windows directory walk now checks the DACL of the trusted volume root and every opened ancestor component, not only the final state directory. Ancestor checks reject NULL DACLs, unsupported ACE layouts and broad write-capable ACEs; they do not require system-owned ancestors to be owned by the current user. The final canonical state directory additionally requires its owner to match TokenUser or the process token's explicit TokenOwner. The implementation is in commits `7f7d7ee773f5656ebbd414a1c9276446e1b48d34` and `781d44be75346ce7a5506fc1bc6b2e7b12ff3e96`; Root CI [42645966152](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645966152) is pending. Do not treat this additional boundary as verified until both platform jobs complete.
+
+
+## Windows namespace durability gate — 2026-11-09
+
+A further review of the documented user-mode contracts found a blocker that must be resolved before implementing the filesystem executor.
+
+### What is established
+
+- Linux `renameat2(RENAME_NOREPLACE)` provides atomic no-replace namespace mutation when the filesystem supports the flag. Linux `fsync(2)` explicitly states that syncing a file does not necessarily persist its containing directory entry; the parent directory must also be synced. The current Linux move primitive performs the no-replace rename but does **not** yet perform the directory `fsync`. Sources: [rename(2)](https://man7.org/linux/man-pages/man2/rename.2.html), [fsync(2)](https://man7.org/linux/man-pages/man2/fsync.2.html).
+- The current Windows adapter uses a retained source handle and rooted destination-directory handle with native `NtSetInformationFile(FileRenameInformationEx=65)`; the replace flag is omitted. This is the required no-replace, handle-bound operation. The published [MS-FSCC FileRenameInformationEx contract](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c) defines the rename flags and no-replace behavior, but contains no write-through/durability flag. The [NtSetInformationFile documentation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntsetinformationfile) documents the operation and its status return, not a namespace persistence barrier.
+- [FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers) requires a handle with `GENERIC_WRITE`. Its documented volume-wide form requires administrative privileges. The documentation does not establish a supported non-administrative user-mode sequence for flushing the parent directory entry changed by the handle-bound rename.
+- [MoveFileExW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw) documents `MOVEFILE_WRITE_THROUGH`, but the stated flush guarantee specifically describes a move performed as a copy-and-delete operation. It does not establish the required crash-durable namespace guarantee for the same-volume rename path, and replacing the current retained-handle no-replace operation with a path-based move would reintroduce the source-substitution race this design explicitly prevents.
+
+### Required decision
+
+**The Windows durable namespace barrier is unresolved. The filesystem executor is blocked.** Do not infer that NTFS journaling, a successful native rename return, `FlushFileBuffers` on an ordinary directory handle, or `MOVEFILE_WRITE_THROUGH` automatically supplies the missing contract. Do not weaken the no-replace/handle-binding guarantees or add an overwrite-capable fallback to make the API fit.
+
+Before executor implementation, establish one of the following with primary documentation and a regression test on the supported Windows target:
+
+1. A supported user-mode, non-administrative sequence that preserves the retained-handle no-replace rename and durably persists the affected namespace entry; or
+2. A different Windows publication design with equivalent no-overwrite, source-identity, and crash-recovery guarantees.
+
+If neither can be established, Windows Restore must remain unavailable; do not claim the cross-platform Restore safety gate has passed. Linux implementation may proceed independently only if the shared product contract continues to fail closed on Windows and no Restore entry point is exposed.
+
+### Current code status
+
+- Cross-platform no-follow content identity readers now exist in `restore_identity_linux.go` and `restore_identity_windows.go`. They hash from the opened no-follow file object and compare metadata before/after the read.
+- `moveRestoreFileNoReplaceVerified` now verifies the moved destination's size and SHA-256 through that reader. A mismatch or read failure deliberately preserves the destination and returns an error. It does not open SQLite.
+- This verified move helper does **not** provide a namespace durability barrier. The underlying Linux and Windows move primitives currently return after the namespace operation; directory/namespace sync orchestration is still absent.
+- The latest branch head observed during this review is `38ffa21f8b2fef05bc98b80e4ed5c8c1836bd0ff` (`test(sqlite): cover post-move restore identity verification`). The commit-status endpoint returned no checks and the PR-filtered workflow lookup returned no runs for this commit. Therefore the new identity/move tests are **not yet CI-verified** in this review.
+
+Restore remains disabled. No filesystem executor, startup recovery coordinator, or GUI/CLI Restore path may be added until both the identity tests and the platform-specific durability contract are verified.
