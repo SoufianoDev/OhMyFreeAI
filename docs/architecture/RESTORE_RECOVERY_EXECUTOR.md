@@ -320,3 +320,8 @@ The native rename class is not assumed to work on every filesystem/provider. Uns
 - Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765) passed Ubuntu and Windows on `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`; Ubuntu race tests passed. Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) passed both platforms.
 - The exported legacy `RestoreDatabase` helper still performs its own standalone path-based publication and is not the transaction executor. Do not call it from the future journal executor or expose it through GUI/CLI. The executor must stage/verify a candidate separately, then publish only through the qualified no-replace adapter while holding the StoreController exclusive lease.
 - Restore remains disabled. No complete executor, startup coordinator, shared GUI/CLI Restore application service, or abrupt-process-restart verification is claimed.
+
+
+## Windows ancestor ACL closure — 2026-11-09
+
+The Windows directory walk now checks the DACL of the trusted volume root and every opened ancestor component, not only the final state directory. Ancestor checks reject NULL DACLs, unsupported ACE layouts and broad write-capable ACEs; they do not require system-owned ancestors to be owned by the current user. The final canonical state directory additionally requires its owner to match TokenUser or the process token's explicit TokenOwner. The implementation is in commits `7f7d7ee773f5656ebbd414a1c9276446e1b48d34` and `781d44be75346ce7a5506fc1bc6b2e7b12ff3e96`; Root CI [42645966152](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645966152) is pending. Do not treat this additional boundary as verified until both platform jobs complete.
