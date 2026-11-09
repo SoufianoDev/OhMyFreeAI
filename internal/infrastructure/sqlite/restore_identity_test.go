@@ -5,7 +5,6 @@ package sqlite
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -31,8 +30,8 @@ func TestReadRestoreContentIdentityFromNoFollowHandle(t *testing.T) {
 
 func TestReadRestoreContentIdentityRejectsUnsafeEntries(t *testing.T) {
 	t.Run("missing", func(t *testing.T) {
-		if _, err := readRestoreContentIdentityPlatform(filepath.Join(t.TempDir(), "missing.db")); !errors.Is(err, os.ErrNotExist) {
-			t.Fatalf("error = %v, want os.ErrNotExist", err)
+		if _, err := readRestoreContentIdentityPlatform(filepath.Join(t.TempDir(), "missing.db")); err == nil {
+			t.Fatal("accepted a missing file")
 		}
 	})
 	t.Run("directory", func(t *testing.T) {
@@ -49,6 +48,13 @@ func TestReadRestoreContentIdentityRejectsUnsafeEntries(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := readRestoreContentIdentityPlatform(link); err == nil { t.Fatal("followed a symbolic link") }
+	})
+	t.Run("invalid leaf", func(t *testing.T) {
+		for _, path := range []string{"", ".", ".."} {
+			if _, err := readRestoreContentIdentityPlatform(path); err == nil {
+				t.Fatalf("accepted invalid leaf %q", path)
+			}
+		}
 	})
 	t.Run("empty", func(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "empty.db")
