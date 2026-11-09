@@ -12,7 +12,9 @@ Windows Restore path traversal opens each component relative to retained parent 
 
 **The gate is now CI-verified.** Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765), commit `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`, passed Ubuntu and Windows. Ubuntu passed vet, Go tests, race detector, build, Python compile/tests, frontend syntax and architecture checks. Windows passed vet, Go tests, build, Python compile/tests, frontend syntax and architecture checks; Linux-only race detection was skipped as expected. Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) also passed both platforms.
 
-Next: implement a cross-platform no-follow handle-based content identity verifier before writing the filesystem executor. Linux parent-directory pinning is implemented, but the source leaf is still name-selected by renameat2; require post-move SHA-256/size verification through a no-follow handle before any SQLite open, and preserve/stop on mismatch. Then implement the executor test-first with intent/completion journaling, no-replace moves, platform sync barriers, injected failure at every transition, and abrupt-process restart tests on Linux and Windows. Do not add startup recovery, GUI/CLI Restore, or enable Restore until all gates pass.
+The cross-platform no-follow content identity readers and post-move SHA-256/size verification helper are now present in the branch. The helper preserves a moved destination and returns an error on identity mismatch; it does not open SQLite and does not provide a namespace durability barrier. Latest observed branch head: `38ffa21f8b2fef05bc98b80e4ed5c8c1836bd0ff`; no CI status or PR-triggered workflow run was returned for that commit, so these new tests are not yet CI-verified.
+
+**New blocker before executor implementation:** primary Windows API documentation reviewed on 2026-11-09 does not establish a supported non-administrative user-mode durability barrier for the namespace entry changed by the retained-handle `NtSetInformationFile(FileRenameInformationEx=65)` no-replace rename. `FileRenameInformationEx` exposes no write-through flag; `FlushFileBuffers` requires GENERIC_WRITE and only documents volume-wide flushing with administrative privileges; `MoveFileExW(MOVEFILE_WRITE_THROUGH)` does not establish the required guarantee for the same-volume rename path and would abandon the retained-source-handle race protection. Resolve this with primary documentation and a Windows regression test, or keep Restore unavailable on Windows. Linux also still needs parent-directory fsync after each namespace mutation. Do not implement the executor, startup recovery, or GUI/CLI Restore until identity tests and both platform durability contracts are verified.
 
 ## Current Phase
 
@@ -96,6 +98,10 @@ Phase 4
   - [x] Open Windows destination directory component-by-component from the drive root; reject reparse/device/non-directory components and verify pinned-parent behavior on Windows CI
   - [x] Verify canonical state-directory owner and private DACL; fail closed on broad write access (Windows Root CI 42643886765)
   - [x] Qualify the actual volume type and filesystem for the no-replace move; reject unsupported remote/mapped or filesystem types (fixed local NTFS only; Windows Root CI 42643886765)
+  - [x] Add Linux/Windows no-follow content identity readers and post-move SHA-256/size verification that preserves mismatched destinations (implementation present; CI verification pending)
+  - [ ] Verify the current content-identity and post-move verification tests on Ubuntu and Windows CI
+  - [ ] Establish a documented Windows namespace durability barrier for the retained-handle no-replace rename; otherwise keep Windows Restore unavailable
+  - [ ] Add Linux parent-directory fsync after every durable no-replace namespace mutation
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
