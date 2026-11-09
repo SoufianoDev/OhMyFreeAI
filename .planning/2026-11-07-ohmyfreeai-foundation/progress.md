@@ -1103,3 +1103,14 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 ### Next engineering step
 
 Proceed test-first with the collision-safe filesystem recovery executor, following `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md`. It must use the pinned directory/source handles, verify content identities, persist intent/completion around each no-replace mutation, sync namespace changes where supported, and preserve all ambiguous artifacts. Add failure-injection and abrupt-process-restart tests on Linux and Windows before any Restore exposure.
+
+
+## Windows restore ancestor ACL hardening — 2026-11-09
+
+- During post-green StoreController/Restore boundary review, identified that the Windows path walk pinned every directory component but only checked the final state directory's owner/DACL. A writable ancestor could permit namespace replacement at the canonical path across process restarts.
+- Added Windows tests for DACL inspection on a private temporary directory and the local volume root in commit `cc5b770926cf308ab1d255cfa8eef4596ff82e76`. Its workflow run [42645878928](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645878928) was cancelled before test execution when the implementation commit superseded it; no RED is claimed.
+- Added `verifyRestoreDirectoryACL` and shared DACL validation in `restore_security_windows.go`; it rejects NULL DACLs, unsupported ACE layouts and broad write-capable ACEs without imposing a current-user owner requirement on system-owned ancestors.
+- Updated Windows path traversal to apply the ACL check to the volume root and every opened child component before proceeding. The final state directory still additionally requires owner == TokenUser or explicit TokenOwner and passes the fixed-local-NTFS/persistent-ACL gate.
+- Implementation commit `7f7d7ee773f5656ebbd414a1c9276446e1b48d34`; traversal integration commit `781d44be75346ce7a5506fc1bc6b2e7b12ff3e96`.
+- Root CI [42645966152](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645966152) is running on the integrated revision. Both Ubuntu and Windows jobs have started; no test result is claimed yet.
+- Restore remains disabled. This closes an additional Windows namespace-permission gap; it does not replace executor identity checks, durable intent/move orchestration, or process-death recovery.
