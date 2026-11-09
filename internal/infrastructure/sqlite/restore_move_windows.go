@@ -65,7 +65,7 @@ func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
 		_ = windows.CloseHandle(current)
 		return windows.InvalidHandle, fmt.Errorf("validate SQLite restore volume root: %w", err)
 	}
-	if err := verifyRestoreDirectoryACL(current); err != nil {
+	if err := verifyRestoreDirectoryACLWithMask(current, restoreVolumeRootNamespaceMask); err != nil {
 		_ = windows.CloseHandle(current)
 		return windows.InvalidHandle, fmt.Errorf("validate SQLite restore volume-root ACL: %w", err)
 	}
