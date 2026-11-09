@@ -4,6 +4,7 @@ package sqlite
 
 import (
 	"testing"
+	"path/filepath"
 
 	"golang.org/x/sys/windows"
 )
