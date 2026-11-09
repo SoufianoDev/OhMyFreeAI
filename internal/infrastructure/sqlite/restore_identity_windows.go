@@ -17,8 +17,8 @@ import (
 // security-checked directory handle and hashes from that same no-reparse handle.
 func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, error) {
 	var identity RestoreContentIdentity
-	if path == "" || filepath.Base(path) == "." || filepath.Base(path) == string(filepath.Separator) {
-		return identity, fmt.Errorf("SQLite restore identity path is invalid")
+	if err := validateRestoreIdentityLeaf(filepath.Base(path)); err != nil {
+		return identity, err
 	}
 	directory, err := openRestoreDirectoryNoReparse(filepath.Dir(path))
 	if err != nil {
