@@ -94,8 +94,8 @@ Phase 4
   - [x] Add Windows source-handle substitution and no-replace collision tests; observe RED then GREEN on Windows CI
   - [x] Open Windows source leaf relative to the already-pinned directory handle with NtCreateFile; verify directory-path substitution test on Windows CI
 - [x] Open Windows destination directory component-by-component from the drive root; reject reparse/device/non-directory components and verify pinned-parent behavior on Windows CI
-- [ ] Verify canonical state-directory owner and private DACL; fail closed on broad write access
-- [ ] Qualify the actual volume type and filesystem for the no-replace move; reject unsupported remote/mapped or filesystem types
+  - [ ] Verify canonical state-directory owner and private DACL; fail closed on broad write access
+  - [ ] Qualify the actual volume type and filesystem for the no-replace move; reject unsupported remote/mapped or filesystem types
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
