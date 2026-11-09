@@ -6,9 +6,13 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-StoreController integration is complete and verified. The Wails composition root and AppService retain the controller; configuration Load/Save and GUI/CLI backup export hold shared leases for their full operations; shutdown drains through the controller. The controller tests cover writer preference, cancellation, panic/failure fail-closed behavior, replacement, close draining, configuration Load/Save and backup export. On commit 3a814ff960e57da2e60bb7fc7dd697461af8bda1, Root CI 42475338115 passed Ubuntu and Windows (Linux race detector passed), SQLite driver evaluation 42475338112 passed 4/4, Wails proof 42475338129 passed 2/2, and the Linux distribution matrix 42475338092 passed 8/8.
+StoreController integration is complete and reviewed. The Wails composition root creates one controller after the initial Store is opened and migrated, AppService retains the controller rather than a raw Store, config Load/Save use its shared repository leases, GUI and CLI backup export hold shared leases through archive publication, and shutdown drains through the controller. Controller/config/backup drain tests are present.
 
-The planner's staged-candidate rollback gap is closed by commits 5a183916, dd771f6e and 47bbe3e. The Windows no-replace rename boundary is now implemented with NtSetInformationFile(FileRenameInformationEx class 65), rooted at a retained directory handle and operating on an opened source handle. On code/test commit c85c3350, Root CI 42496659593 passed Ubuntu and Windows (including Linux race detector), SQLite driver evaluation 42496659645 passed 4/4, and Wails platform proof 42496659732 passed 2/2. Linux distro matrix 42496659764 passed 8/8. Restore remains disabled. The Windows source leaf is now opened relative to the retained destination directory handle using NtCreateFile and OBJECT_ATTRIBUTES.RootDirectory, with FILE_OPEN_REPARSE_POINT and synchronous-I/O requirements. Root CI 42497620421 passed Ubuntu and Windows (including Linux race detector); SQLite driver evaluation 42497620420 passed 4/4. Wails 42497620429 is still running and distro matrix 42497620422 is queued. The next security task is to open the canonical state-directory path component-by-component without following reparse points, verify its private permissions/ACL and qualify the filesystem before building the durable executor. Process-death recovery and startup integration remain future work.
+The requested baseline run [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) passed on Ubuntu and Windows for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`. The integrated code revision `adde70da56b7af4e71c68796a2e20dbe017d72d6` also passed Root CI 42525602855, Wails 42525602932 and the eight-lane Linux distro matrix 42525602852.
+
+Windows restore-directory traversal is now opened component-by-component from the drive root using retained parent handles and relative `NtCreateFile` opens with reparse-point inspection. The test-first sequence is on this branch: RED commit `6a93f2e0`, implementation `1c03e8ff`, and test-harness correction `b9f1d579`. On `b9f1d579a9587c1df451ca3bed5e8feece045589`, Root CI 42599641312 passed Ubuntu and Windows, Wails 42599641344 passed 2/2, SQLite driver evaluation 42599641296 passed 4/4, and Linux distro matrix 42599641297 passed 8/8.
+
+Next security gate: verify the canonical state directory's owner and private DACL, reject remote/mapped volumes, and qualify the filesystem's support for the no-replace move before implementing the collision-safe recovery executor. Failure injection across publication/reopen/rollback and abrupt-process recovery remain required. Do not add app-level Restore wiring or UI yet; Restore remains disabled.
 
 ## Current Phase
 
@@ -89,6 +93,9 @@ Phase 4
   - [x] Replace Windows path-based MoveFileExW with native NtSetInformationFile(FileRenameInformationEx=65), rooted directory handle and opened source handle
   - [x] Add Windows source-handle substitution and no-replace collision tests; observe RED then GREEN on Windows CI
   - [x] Open Windows source leaf relative to the already-pinned directory handle with NtCreateFile; verify directory-path substitution test on Windows CI
+- [x] Open Windows destination directory component-by-component from the drive root; reject reparse/device/non-directory components and verify pinned-parent behavior on Windows CI
+- [ ] Verify canonical state-directory owner and private DACL; fail closed on broad write access
+- [ ] Qualify the actual volume type and filesystem for the no-replace move; reject unsupported remote/mapped or filesystem types
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
@@ -105,7 +112,7 @@ Phase 4
 - [ ] Add abrupt-process crash/reopen recovery tests
 - [x] Diagnose Windows 8.3/long-path mismatch in journal round-trip and normalize canonical paths
 - [x] Replace fixed Xvfb display :97 with dynamically allocated display numbers in the Linux WebView smoke helper
-- [ ] Record exact pass/fail results; do not equate compilation with runtime certification
+- [x] Record exact pass/fail results; do not equate compilation with runtime certification
 **Status:** in_progress
 
 ### Phase 5: Delivery
