@@ -302,3 +302,14 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - This verifies the Windows TokenUser/TokenOwner owner comparison correction, private DACL checks, broad-principal write rejection, and fixed-local-NTFS/persistent-ACL volume qualification on the Windows CI runner. It does not qualify other Windows filesystem providers or power-loss behavior.
 - Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) passed Ubuntu and Windows native build/smoke checks.
 - Code fix: `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`. No changes were made to `main`; Restore remains disabled.
+
+
+## Latest CI status — verified-move tests — 2026-11-09 18:15Z
+
+- [ ] Root CI run [42671657858](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671657858) did not provide a test result: run conclusion is FAILURE, but the jobs endpoint returned zero jobs and the Actions page said “Waiting for pending jobs”. No code-level failure is established.
+- [ ] Identity helper tests remain unverified on both platforms. The SQLite driver workflow's only created job (Windows modernc) passed, but it does not run the main Restore package; the overall run reports FAILURE with expected matrix cells absent.
+- [ ] Wails Windows native build/CLI smoke passed, but the overall workflow reports FAILURE with the Ubuntu lane absent. Linux distribution compatibility remained in progress on Debian 12 native build.
+- [ ] Re-run/obtain actual Ubuntu and Windows Root CI Go test results for the identity reader and verified-move tests. Do not infer success from the Windows-only ancillary workflows.
+- [ ] Resolve the workflow-level pending-job/scheduling state before another code push; avoid superseding the active Linux distribution run with a no-op commit.
+- [ ] Linux parent-directory fsync and the documented Windows namespace durability barrier remain blocking prerequisites for executor work.
+- Restore remains disabled; no executor, startup recovery, app-level Restore service, CLI/GUI Restore entry point, or merge to main.
