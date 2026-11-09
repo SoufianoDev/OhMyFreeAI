@@ -86,8 +86,19 @@ func verifyRestoreDirectorySecurity(directory windows.Handle) error {
 	if err != nil {
 		return fmt.Errorf("read current process token user: %w", err)
 	}
-	if tokenUser == nil || tokenUser.User.Sid == nil || !owner.Equals(tokenUser.User.Sid) {
-		return fmt.Errorf("restore state directory owner does not match the current user")
+	if tokenUser == nil || tokenUser.User.Sid == nil {
+		return fmt.Errorf("current process token has no valid user SID")
+	}
+	// Windows may assign newly created objects to TokenOwner (often the
+	// Administrators group for an elevated process), rather than TokenUser.
+	// Accept only one of those two identities; do not infer ownership from
+	// broad group membership or from the directory's DACL.
+	defaultOwner, err := restoreTokenDefaultOwner(token)
+	if err != nil {
+		return fmt.Errorf("read current process token default owner: %w", err)
+	}
+	if !owner.Equals(tokenUser.User.Sid) && !owner.Equals(defaultOwner) {
+		return fmt.Errorf("restore state directory owner does not match the current process identity")
 	}
 
 	for index := uint32(0); index < uint32(dacl.AceCount); index++ {
@@ -116,6 +127,30 @@ func verifyRestoreDirectorySecurity(directory windows.Handle) error {
 		}
 	}
 	return nil
+}
+
+type restoreTokenOwner struct {
+	Owner *windows.SID
+}
+
+func restoreTokenDefaultOwner(token windows.Token) (*windows.SID, error) {
+	var size uint32
+	err := windows.GetTokenInformation(token, windows.TokenOwner, nil, 0, &size)
+	if err != windows.ERROR_INSUFFICIENT_BUFFER || size < uint32(unsafe.Sizeof(restoreTokenOwner{})) {
+		if err == nil {
+			return nil, fmt.Errorf("Windows returned an invalid token-owner buffer size %d", size)
+		}
+		return nil, err
+	}
+	buffer := make([]byte, size)
+	if err := windows.GetTokenInformation(token, windows.TokenOwner, &buffer[0], size, &size); err != nil {
+		return nil, err
+	}
+	owner := (*restoreTokenOwner)(unsafe.Pointer(&buffer[0])).Owner
+	if owner == nil || !owner.IsValid() {
+		return nil, fmt.Errorf("current process token default owner SID is invalid")
+	}
+	return owner.Copy()
 }
 
 func isBroadWritableRestoreACE(aceType uint8, mask uint32, sid *windows.SID) bool {
