@@ -51,7 +51,7 @@ func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
 	}
 	current, err := windows.CreateFile(
 		rootPointer,
-		windows.READ_CONTROL|windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
+		windows.READ_CONTROL|windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE|windows.SYNCHRONIZE,
 		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
 		nil,
 		windows.OPEN_EXISTING,
@@ -68,7 +68,8 @@ func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
 
 	remainder := strings.TrimLeft(absolute[len(volume):], string(filepath.Separator))
 	if remainder == "" {
-		return current, nil
+		_ = windows.CloseHandle(current)
+		return windows.InvalidHandle, fmt.Errorf("SQLite restore state directory must not be a volume root")
 	}
 	for _, component := range strings.Split(remainder, string(filepath.Separator)) {
 		next, err := openRestoreDirectoryRelative(current, component)
