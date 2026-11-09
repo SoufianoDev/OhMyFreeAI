@@ -366,7 +366,15 @@ If neither can be established, Windows Restore must remain unavailable; do not c
 
 - Cross-platform no-follow content identity readers now exist in `restore_identity_linux.go` and `restore_identity_windows.go`. They hash from the opened no-follow file object and compare metadata before/after the read.
 - `moveRestoreFileNoReplaceVerified` now verifies the moved destination's size and SHA-256 through that reader. A mismatch or read failure deliberately preserves the destination and returns an error. It does not open SQLite.
-- This verified move helper does **not** provide a namespace durability barrier. The underlying Linux and Windows move primitives currently return after the namespace operation; directory/namespace sync orchestration is still absent.
+- Linux now calls `fsync(2)` on the already-pinned parent-directory descriptor immediately after a successful `renameat2(RENAME_NOREPLACE)`. If that sync fails, the move returns an error and leaves the destination for journal/recovery inspection; it does not reopen the directory by path.
+- Windows still has no established, documented namespace durability barrier for the retained-handle no-replace rename. This remains a hard blocker for Windows Restore and for any cross-platform executor.
 - The latest branch head observed during this review is `38ffa21f8b2fef05bc98b80e4ed5c8c1836bd0ff` (`test(sqlite): cover post-move restore identity verification`). The commit-status endpoint returned no checks and the PR-filtered workflow lookup returned no runs for this commit. Therefore the new identity/move tests are **not yet CI-verified** in this review.
 
 Restore remains disabled. No filesystem executor, startup recovery coordinator, or GUI/CLI Restore path may be added until both the identity tests and the platform-specific durability contract are verified.
+
+
+### Linux directory-sync implementation note — 2026-11-09
+
+The Linux move adapter now syncs the parent directory descriptor it already opened with `openat2` after a successful `renameat2(RENAME_NOREPLACE)`. This is deliberately descriptor-bound: no path-based reopen is introduced. A failed `fsync` returns an error after the namespace move may have occurred; callers must leave the journal in its intent phase and inspect the actual artifacts on restart. The destination is not deleted or replaced.
+
+The Linux implementation and regression tests are present but await a real Ubuntu Root CI run. The Windows namespace durability gate remains unresolved. Restore remains disabled.

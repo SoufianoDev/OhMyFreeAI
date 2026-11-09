@@ -3,6 +3,7 @@
 package sqlite
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"golang.org/x/sys/unix"
@@ -24,5 +25,20 @@ func moveRestoreFileNoReplacePlatform(source, destination string) error {
 
 	sourceName := filepath.Base(source)
 	destinationName := filepath.Base(destination)
-	return unix.Renameat2(dirfd, sourceName, dirfd, destinationName, unix.RENAME_NOREPLACE)
+	if err := unix.Renameat2(dirfd, sourceName, dirfd, destinationName, unix.RENAME_NOREPLACE); err != nil {
+		return err
+	}
+	// The rename changes the directory namespace. Sync the already-pinned
+	// parent handle before reporting the move as durable; never reopen by path.
+	if err := syncRestoreDirectoryHandle(dirfd); err != nil {
+		return fmt.Errorf("sync SQLite restore parent directory after no-replace move: %w", err)
+	}
+	return nil
+}
+
+func syncRestoreDirectoryHandle(directoryFD int) error {
+	if err := unix.Fsync(directoryFD); err != nil {
+		return fmt.Errorf("fsync SQLite restore parent directory: %w", err)
+	}
+	return nil
 }

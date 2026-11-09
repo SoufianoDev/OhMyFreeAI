@@ -1183,3 +1183,12 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - No observed job failure identifies a regression in the verified-move code. However, the main Ubuntu/Windows Root CI test jobs never ran, so the new identity and verified-move tests remain unverified.
 - The run-level failures with missing matrix jobs remain an unresolved GitHub Actions scheduling/runner issue. Do not mask this by calling the workflows green or by claiming all matrix cells passed.
 - Restore remains disabled. Next: obtain an actual Root CI run with Ubuntu and Windows jobs, then verify the identity tests. Continue to defer executor work until the Linux parent-directory fsync and Windows namespace durability gates are resolved.
+
+
+## Continuation — Linux no-replace directory durability barrier — 2026-11-09
+
+- Updated the Linux no-replace move adapter to call `fsync(2)` on the same parent-directory descriptor already pinned with `openat2`, immediately after a successful `renameat2(RENAME_NOREPLACE)`. It does not reopen the directory by path.
+- A directory-sync error is returned to the caller and is not reported as a successful durable move. The namespace operation may already have happened; the destination is deliberately left in place for journal-driven inspection/reconciliation. No rollback, deletion, or overwrite fallback is attempted.
+- Added Linux regression coverage for syncing an opened directory descriptor and rejecting an invalid descriptor. Existing verified-move tests also exercise the integrated rename-plus-directory-sync path when run on Linux.
+- Tests have not been executed locally in this connector-only repository session. The next code commit must be verified by actual Ubuntu and Windows Root CI jobs; the previous Root CI run had no jobs and did not execute tests.
+- Windows handle-bound rename still has no established non-admin namespace durability barrier. Keep Windows Restore unavailable and Restore globally disabled; no executor, startup recovery, UI/CLI entry point, or main merge.

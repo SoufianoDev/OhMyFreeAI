@@ -325,3 +325,14 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 - [ ] Resolve the missing GitHub Actions matrix jobs and obtain a real Ubuntu + Windows Root CI run before marking the new tests verified.
 - [ ] Implement and test Linux parent-directory fsync; establish a documented Windows namespace durability barrier or keep Windows Restore unavailable.
 - Restore remains disabled. No executor, startup recovery, app-level Restore service, CLI/GUI Restore, or main merge.
+
+
+## Continuation — Linux no-replace directory durability barrier — 2026-11-09
+
+- [x] Add parent-directory `fsync` after Linux `renameat2(RENAME_NOREPLACE)`, using the already-pinned `openat2` directory descriptor rather than reopening a path.
+- [x] Add Linux tests for successful directory-descriptor sync and invalid-descriptor error propagation.
+- [ ] Verify the Linux move + fsync and verified-identity tests in a real Ubuntu Root CI job, including race detection.
+- [ ] Verify the cross-platform identity/verified-move tests in a real Windows Root CI job.
+- [ ] Establish a documented Windows namespace durability barrier with equivalent no-replace and handle-binding guarantees, or keep Windows Restore unavailable.
+- The Linux implementation is present but not CI-verified. A sync error occurs after the rename may have changed the namespace; the move returns an error and preserves the destination for journal/recovery inspection.
+- Restore remains disabled. Do not start the filesystem executor, startup recovery, or GUI/CLI Restore, and do not merge to main.
