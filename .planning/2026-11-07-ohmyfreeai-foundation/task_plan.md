@@ -8,7 +8,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 The baseline workflow 42419106009 is verified green on Ubuntu and Windows for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`. StoreController integration and its config/backup leases, shutdown drain, and tests remain complete as recorded below.
 
-Windows Restore path traversal now opens each component relative to a retained parent handle. A new owner/DACL and volume qualification gate has been implemented on `foundation/bootstrap`: current-user ownership, non-NULL DACL, rejection of broad writable ACEs, and fixed-local-NTFS/persistent-ACL qualification. Latest code/test commit: `971a3294fead03dc781eaf9634682ee95d58a992`.
+Windows Restore path traversal now opens each component relative to a retained parent handle. A new owner/DACL and volume qualification gate has been implemented on `foundation/bootstrap`: current-user ownership, non-NULL DACL, rejection of broad writable ACEs, and fixed-local-NTFS/persistent-ACL qualification. Latest code/test commit: `8ee245f32fac31ce9dfa1b058163ee90b4f52960` (includes broad domain-group ACE coverage).
 
 **This new gate is not verified yet.** GitHub combined-status queries returned empty arrays, and the available connector does not expose listing push-triggered workflow runs without a run ID. No Ubuntu/Windows CI result is claimed for the new code. The new tests have not yet produced an observed RED/GREEN cycle.
 
