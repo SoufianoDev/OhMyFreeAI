@@ -122,7 +122,7 @@ The remaining Windows boundary is the initial open of the destination directory 
 
 The Windows no-replace move path now performs these checks on the final opened state-directory handle before returning it to the caller:
 
-- The directory owner SID must equal the current process token user SID.
+- The directory owner SID must equal either the current process TokenUser SID or the explicit TokenOwner SID returned by the current process token. This accounts for Windows' default object-owner selection without accepting arbitrary group membership.
 - A NULL or missing DACL is rejected.
 - Basic allow ACEs are inspected for broad principals (Everyone, Authenticated Users, BUILTIN Users, Guests, Power Users, Pre-Windows 2000 Compatible Access, Interactive, Network and Anonymous). Broad write, add-file, add-subdirectory, delete-child, delete, WRITE_DAC, WRITE_OWNER, generic-write, generic-all, and directory metadata-write rights are rejected.
 - ACE layouts that the implementation does not parse (object/callback ACEs) are rejected rather than ignored.
@@ -131,3 +131,10 @@ The Windows no-replace move path now performs these checks on the final opened s
 The qualification policy is intentionally NTFS-only. ReFS, SMB, removable media, RAM disks, and other providers are not qualified. This is an implementation policy, not a claim that those filesystems cannot support equivalent semantics.
 
 **Verification is pending.** The code and tests have been pushed to `foundation/bootstrap`, latest code/test commit `8ee245f32fac31ce9dfa1b058163ee90b4f52960`. Root CI [42642834055](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834055) is queued on Ubuntu and Windows. Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) is running on both platforms; Linux desktop dependencies passed and Wails CLI installation is in progress. No Windows or Linux test result is claimed for this gate. Restore remains disabled until the gate and the full executor/recovery test matrix pass.
+
+
+## Windows owner/DACL and volume gate — CI verified — 2026-11-09
+
+Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765) passed on commit `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5` on both Ubuntu and Windows. The Windows Go test suite now verifies the owner check against TokenUser or the token's explicit TokenOwner; it also exercises broad-writable ACE rejection, private directory validation, and fixed-local-NTFS/persistent-ACL qualification. Ubuntu Go tests and race detector also passed. Wails run [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) passed on Ubuntu and Windows.
+
+This is CI-runner qualification only. It does not certify ReFS, SMB, mapped drives, removable media, other filesystem providers, arbitrary Windows installations, or power-loss durability. Restore remains disabled because the filesystem executor, durable mutation orchestration, startup recovery, complete failure-injection matrix, and abrupt-process-restart tests are still missing.
