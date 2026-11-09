@@ -884,3 +884,20 @@ The Python files `fix-soufianodev-free-ai.py`, `fix-soufianodev-sse-framing.py`,
 - The Colab FAQ still states that free managed runtimes may be terminated without warning for remote control (including SSH shells/remote desktops) and for bypassing the notebook UI to interact primarily through a web UI. It also disallows unrelated web-service offerings on managed runtimes.
 - Conclusion: MCP is a documented runtime-management interface, not policy clearance for the proposed remote inference topology. Keep the adapter disabled until the exact user workflow is confirmed permitted.
 - Sources: https://developers.google.com/colab/api/reference/mcp/tools_list/create_runtime ; https://research.google.com/colaboratory/intl/en-GB/faq.html
+
+
+## Windows namespace durability contract review — 2026-11-09
+
+### Confirmed API semantics
+
+- Microsoft [MS-FSCC FileRenameInformationEx](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c) specifies that omitting `FILE_RENAME_REPLACE_IF_EXISTS` requires rename to fail if the destination already exists. Its documented flags do not include a write-through or namespace persistence option.
+- Microsoft [MoveFileExW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw) describes `MOVEFILE_WRITE_THROUGH` as waiting until the file is moved on disk, and explicitly guarantees a flush for copy-and-delete moves. The documentation does not unambiguously state that same-volume rename destination-directory metadata is stable before return. This API is path-based rather than relative to the retained source and destination handles used by the current no-replace implementation.
+- Microsoft [NtFlushBuffersFileEx](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntflushbuffersfileex) documents normal flush as writing file data and metadata and synchronizing underlying storage. Its documented `STATUS_ACCESS_DENIED` case applies when the handle has neither write nor append access.
+- Microsoft [NtCreateFile](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile) says not to specify `FILE_WRITE_DATA` or `FILE_APPEND_DATA` when opening a directory and says generic access rights cannot be specified for a directory. The published contracts therefore do not provide a clear, supported standard-user directory-handle access mask satisfying the flush routine's write/append requirement.
+- `FLUSH_FLAGS_FILE_DATA_SYNC_ONLY` is documented as invalid for directory handles. Microsoft [ReplaceFileW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-replacefilew) marks `REPLACEFILE_WRITE_THROUGH` unsupported.
+
+### Decision
+
+No documented Windows user-mode sequence has been established that simultaneously provides (1) retained-handle/relative-target no-replace rename semantics, (2) namespace durability before success, and (3) standard-user operation. This is a documentation/contract gap; it is not evidence that NTFS itself cannot persist directory metadata. Microsoft Q&A clarification threads reviewed during this pass are questions, not authoritative engineering answers, and are not treated as confirmation.
+
+Do not weaken the executor by using path-based `MoveFileExW`, overwrite-capable fallbacks, or undocumented directory-flush access combinations. Keep Windows Restore unavailable and Restore globally disabled until a documented equivalent is proven or the storage architecture is redesigned with equivalent guarantees.
