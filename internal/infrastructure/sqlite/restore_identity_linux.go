@@ -17,8 +17,8 @@ import (
 // the leaf without following links, and hashes bytes from that same descriptor.
 func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, error) {
 	var identity RestoreContentIdentity
-	if path == "" || filepath.Base(path) == "." || filepath.Base(path) == string(filepath.Separator) {
-		return identity, fmt.Errorf("SQLite restore identity path is invalid")
+	if err := validateRestoreIdentityLeaf(filepath.Base(path)); err != nil {
+		return identity, err
 	}
 	parent, err := unix.Openat2(unix.AT_FDCWD, filepath.Dir(path), &unix.OpenHow{
 		Flags: uint64(unix.O_RDONLY | unix.O_DIRECTORY | unix.O_CLOEXEC),
