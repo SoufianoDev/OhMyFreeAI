@@ -21,6 +21,7 @@ const (
 	restoreFilePersistentACLs = 0x00000008
 	restoreFileRemoteProtocolInfoClass = 13
 	restoreBroadWriteMask = uint32(0x00000002 | 0x00000004 | 0x00000010 | 0x00000040 | 0x00000100 | 0x00010000 | 0x00040000 | 0x00080000 | 0x10000000 | 0x40000000)
+	restoreAncestorNamespaceMask = uint32(0x00000040 | 0x00010000 | 0x00040000 | 0x00080000 | 0x10000000)
 	restoreSecurityOwnerAndDACL = 0x00000001 | 0x00000004
 )
 
@@ -131,10 +132,10 @@ func verifyRestoreDirectoryACL(directory windows.Handle) error {
 	if descriptor != nil {
 		defer windows.LocalFree(windows.Handle(unsafe.Pointer(descriptor)))
 	}
-	return verifyRestoreDirectoryDACL(dacl)
+	return verifyRestoreDirectoryDACL(dacl, restoreAncestorNamespaceMask)
 }
 
-func verifyRestoreDirectoryDACL(dacl *windows.ACL) error {
+func verifyRestoreDirectoryDACL(dacl *windows.ACL, prohibitedMask uint32) error {
 	if dacl == nil {
 		return fmt.Errorf("restore directory has a NULL DACL; access is not restricted")
 	}
@@ -155,7 +156,7 @@ func verifyRestoreDirectoryDACL(dacl *windows.ACL) error {
 		if !sid.IsValid() {
 			return fmt.Errorf("restore directory DACL contains an invalid SID")
 		}
-		if isBroadWritableRestoreACE(ace.Header.AceType, uint32(ace.Mask), sid) {
+		if isBroadRestoreACE(ace.Header.AceType, uint32(ace.Mask), sid, prohibitedMask) {
 			return fmt.Errorf("restore directory grants broad write or delete access")
 		}
 	}
@@ -187,7 +188,11 @@ func restoreTokenDefaultOwner(token windows.Token) (*windows.SID, error) {
 }
 
 func isBroadWritableRestoreACE(aceType uint8, mask uint32, sid *windows.SID) bool {
-	if aceType != windows.ACCESS_ALLOWED_ACE_TYPE || mask&restoreBroadWriteMask == 0 || sid == nil || !sid.IsValid() {
+	return isBroadRestoreACE(aceType, mask, sid, restoreBroadWriteMask)
+}
+
+func isBroadRestoreACE(aceType uint8, mask uint32, sid *windows.SID, prohibitedMask uint32) bool {
+	if aceType != windows.ACCESS_ALLOWED_ACE_TYPE || mask&prohibitedMask == 0 || sid == nil || !sid.IsValid() {
 		return false
 	}
 	for _, wellKnown := range []windows.WELL_KNOWN_SID_TYPE{
