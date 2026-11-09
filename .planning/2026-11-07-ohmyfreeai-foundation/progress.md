@@ -1171,3 +1171,15 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - The earlier runs for intermediate commit `ee223221` were superseded/cancelled by the later test commit. No test result is claimed for those cancelled runs.
 - Do not add a code commit merely to force another workflow while the distro matrix remains active. Recheck GitHub Actions after the active lane completes; if root CI still has no jobs, use an actual workflow-level retry path if available or record the infrastructure limitation. Do not mark identity tests verified until Ubuntu and Windows Go test jobs actually execute.
 - Restore remains disabled. No executor, startup recovery, CLI/GUI Restore, or main merge.
+
+
+## CI closure — verified-move revision — 2026-11-09 18:16Z
+
+- Final inspected code-test SHA: `38ffa21f8b2fef05bc98b80e4ed5c8c1836bd0ff`. Documentation-only follow-ups moved the branch head afterward; they do not change the tested code.
+- Root CI [42671657858](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671657858): FAILURE with zero jobs returned by the GitHub jobs endpoint and no job logs. The Actions page displayed “Waiting for pending jobs”. There is no platform test output for this run.
+- SQLite driver evaluation [42671658166](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671658166): workflow FAILURE; its only created Windows modernc job passed. The log confirms module verification, production migration test, and SQLite driver evaluation passed. Expected matrix lanes were absent; this workflow does not execute the main Restore package.
+- Wails platform proof [42671658474](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671658474): workflow FAILURE; its only created Windows job passed native build, Windows CLI smoke, and executable verification. The Ubuntu lane was absent.
+- Linux distribution matrix [42671658275](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42671658275): workflow FAILURE; the only created job, Debian 12 / legacy GTK3-WebKit2GTK 4.1, completed SUCCESS. Its log confirms native build, CLI smoke, two WebView-to-Go bridge launches, and database reopen passed. Seven other matrix lanes were not created. Wails binding generation emitted warnings about an initial untagged WebKitGTK 6.0 probe in this GTK3 lane, but the tagged GTK3 build and all smoke steps passed.
+- No observed job failure identifies a regression in the verified-move code. However, the main Ubuntu/Windows Root CI test jobs never ran, so the new identity and verified-move tests remain unverified.
+- The run-level failures with missing matrix jobs remain an unresolved GitHub Actions scheduling/runner issue. Do not mask this by calling the workflows green or by claiming all matrix cells passed.
+- Restore remains disabled. Next: obtain an actual Root CI run with Ubuntu and Windows jobs, then verify the identity tests. Continue to defer executor work until the Linux parent-directory fsync and Windows namespace durability gates are resolved.
