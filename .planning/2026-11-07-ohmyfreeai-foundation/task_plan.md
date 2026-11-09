@@ -6,13 +6,13 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-StoreController integration is complete and reviewed. The Wails composition root creates one controller after the initial Store is opened and migrated, AppService retains the controller rather than a raw Store, config Load/Save use its shared repository leases, GUI and CLI backup export hold shared leases through archive publication, and shutdown drains through the controller. Controller/config/backup drain tests are present.
+The baseline workflow 42419106009 is verified green on Ubuntu and Windows for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`. StoreController integration and its config/backup leases, shutdown drain, and tests remain complete as recorded below.
 
-The requested baseline run [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) passed on Ubuntu and Windows for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`. The integrated code revision `adde70da56b7af4e71c68796a2e20dbe017d72d6` also passed Root CI 42525602855, Wails 42525602932 and the eight-lane Linux distro matrix 42525602852.
+Windows Restore path traversal now opens each component relative to a retained parent handle. A new owner/DACL and volume qualification gate has been implemented on `foundation/bootstrap`: current-user ownership, non-NULL DACL, rejection of broad writable ACEs, and fixed-local-NTFS/persistent-ACL qualification. Latest code/test commit: `971a3294fead03dc781eaf9634682ee95d58a992`.
 
-Windows restore-directory traversal is now opened component-by-component from the drive root using retained parent handles and relative `NtCreateFile` opens with reparse-point inspection. The test-first sequence is on this branch: RED commit `6a93f2e0`, implementation `1c03e8ff`, and test-harness correction `b9f1d579`. On `b9f1d579a9587c1df451ca3bed5e8feece045589`, Root CI 42599641312 passed Ubuntu and Windows, Wails 42599641344 passed 2/2, SQLite driver evaluation 42599641296 passed 4/4, and Linux distro matrix 42599641297 passed 8/8.
+**This new gate is not verified yet.** GitHub combined-status queries returned empty arrays, and the available connector does not expose listing push-triggered workflow runs without a run ID. No Ubuntu/Windows CI result is claimed for the new code. The new tests have not yet produced an observed RED/GREEN cycle.
 
-Next security gate: verify the canonical state directory's owner and private DACL, reject remote/mapped volumes, and qualify the filesystem's support for the no-replace move before implementing the collision-safe recovery executor. Failure injection across publication/reopen/rollback and abrupt-process recovery remain required. Do not add app-level Restore wiring or UI yet; Restore remains disabled.
+Next action: obtain the Root CI run for `971a3294`, inspect both platform jobs and failure logs, correct any failures, then verify the remaining required workflows. Keep Restore disabled. Do not implement or wire the filesystem executor until the security/volume gate passes CI and the remaining failure-injection/process-death requirements are completed.
 
 ## Current Phase
 
