@@ -130,4 +130,4 @@ The Windows no-replace move path now performs these checks on the final opened s
 
 The qualification policy is intentionally NTFS-only. ReFS, SMB, removable media, RAM disks, and other providers are not qualified. This is an implementation policy, not a claim that those filesystems cannot support equivalent semantics.
 
-**Verification is pending.** The code and tests have been pushed to `foundation/bootstrap`, latest commit `971a3294fead03dc781eaf9634682ee95d58a992`. The GitHub connector returned no combined status checks and does not expose push-run listing without a workflow run ID. No Windows or Linux CI result is claimed for this gate. Restore remains disabled until the gate and the full executor/recovery test matrix pass.
+**Verification is pending.** The code and tests have been pushed to `foundation/bootstrap`, latest code/test commit `8ee245f32fac31ce9dfa1b058163ee90b4f52960`. The GitHub connector returned no combined status checks and does not expose push-run listing without a workflow run ID. No Windows or Linux CI result is claimed for this gate. Restore remains disabled until the gate and the full executor/recovery test matrix pass.
