@@ -157,7 +157,7 @@ func verifyRestoreDirectoryDACL(dacl *windows.ACL, prohibitedMask uint32) error 
 			return fmt.Errorf("restore directory DACL contains an invalid SID")
 		}
 		if isBroadRestoreACE(ace.Header.AceType, uint32(ace.Mask), sid, prohibitedMask) {
-			return fmt.Errorf("restore directory grants broad write or delete access")
+			return fmt.Errorf("restore directory ACE %d for %s grants prohibited mask 0x%08x (policy mask 0x%08x)", index, sid.String(), uint32(ace.Mask), prohibitedMask)
 		}
 	}
 	return nil
