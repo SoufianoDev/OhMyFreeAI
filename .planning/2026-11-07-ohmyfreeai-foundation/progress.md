@@ -1114,3 +1114,13 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Implementation commit `7f7d7ee773f5656ebbd414a1c9276446e1b48d34`; traversal integration commit `781d44be75346ce7a5506fc1bc6b2e7b12ff3e96`.
 - Root CI [42645966152](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645966152) is running on the integrated revision. Both Ubuntu and Windows jobs have started; no test result is claimed yet.
 - Restore remains disabled. This closes an additional Windows namespace-permission gap; it does not replace executor identity checks, durable intent/move orchestration, or process-death recovery.
+
+## Restore recovery planner correction — 2026-11-09 16:30Z
+
+- Confirmed Root CI [42649675343](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42649675343) completed SUCCESS on `7b0ad259b5a741229e0d492b38c2a38b7a1dc3ec`; Ubuntu and Windows passed, and Ubuntu race detection passed.
+- Test-first regression: `cd14e2e6a415b6decd77ac7a0b8036c8a6a0d6e3` added cases for candidate loss during `preserving-previous`. The test-only commit failed on Ubuntu as expected because the planner still accepted both states; no Windows RED claim is made.
+- Fix `7b0ad259b5a741229e0d492b38c2a38b7a1dc3ec` now requires the staged candidate identity in `preserving-previous`. The planner returns an empty plan and `ErrRestoreRecoveryAmbiguous` when it is missing.
+- Reconciled executor documentation with actual code: all three intent-phase planner truth tables and both platform no-replace primitives exist; the filesystem executor and process-death tests do not.
+- Identified a remaining Linux boundary: the parent directory is pinned with openat2, but the source leaf is still selected by name at rename time. The executor must hash/size-verify the moved file through a no-follow opened handle after each move and before opening SQLite; mismatch means preserve and stop.
+- Primary durability reference: Linux fsync(2) explicitly says syncing a file does not necessarily persist its containing directory entry; sync the parent directory as a separate step. Windows journal publication uses MOVEFILE_WRITE_THROUGH; durable journal removal intentionally remains unsupported.
+- Next: implement cross-platform no-follow handle-based content identity verification, then build the executor one journaled no-replace move at a time with injected failures and abrupt-process restart tests. Keep Restore disabled and do not add GUI/CLI/startup wiring.
