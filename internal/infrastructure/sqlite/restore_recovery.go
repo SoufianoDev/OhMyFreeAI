@@ -195,7 +195,7 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 
 	case RestorePhasePreservingPrevious:
 		if !hadPrevious || files.Quarantine != RestoreFileMissing ||
-			files.Staging != RestoreFileMissing && files.Staging != RestoreFileCandidate {
+			files.Staging != RestoreFileCandidate {
 			return ambiguous("preserving-previous requires a prior database, an untouched quarantine path, and no unverified staging artifact")
 		}
 		switch {
