@@ -1230,3 +1230,25 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Linux distribution run #42682591212: Arch Linux, Fedora 44 GTK4, and Debian 13 completed successfully. Ubuntu 22.04, openSUSE Tumbleweed, Fedora 44 legacy GTK3, and Ubuntu 24.04 were still active; Debian 12 remained queued at last check. Workflow still in progress.
 - Root CI #42682590849 and SQLite driver evaluation #42682590841 are both green. These runs tested code commit `f1eb8179a3a95e5cabfa19baebbade03e97b8bf5`; subsequent commits were documentation-only.
 - Windows namespace durability remains unresolved despite successful Windows compilation/tests and Wails build. Restore remains disabled.
+
+
+## Continuation — Linux matrix completion and Windows durability contract review — 2026-11-09T19:47Z
+
+### CI verification
+- Linux distribution compatibility run #42682591212 completed successfully: all 8/8 jobs passed (Arch Linux rolling / GTK4-WebKit6; Fedora 44 / GTK4-WebKit6; Ubuntu 22.04 / legacy GTK3-WebKit41; openSUSE Tumbleweed / GTK4-WebKit6; Fedora 44 legacy GTK3 / WebKit41; Debian 13 / GTK4-WebKit6; Ubuntu 24.04 / GTK4-WebKit6; Debian 12 / legacy GTK3-WebKit41).
+- Each of the eight jobs completed the native Wails application build, CLI dispatch smoke test, and live WebView-to-Go bridge/database reopen smoke test. The run-level conclusion is success.
+- The run tested code commit `f1eb8179a3a95e5cabfa19baebbade03e97b8bf5`. Branch HEAD was rechecked and remains documentation-only descendant `10b301a32477a53a70f9284e74786c7a6e611ab5`.
+- Linux matrix run: https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42682591212
+
+### Windows durability research
+- Re-read the Microsoft contracts for `MoveFileExW`, `FILE_RENAME_INFORMATION_EX`, `NtFlushBuffersFileEx`, `NtCreateFile`, file access rights, and `ReplaceFileW`.
+- `FILE_RENAME_INFORMATION_EX` documents no-replace behavior when `FILE_RENAME_REPLACE_IF_EXISTS` is omitted, but its published flags contain no write-through or namespace-durability flag. It remains the handle-relative no-replace primitive, not a documented durability barrier.
+- `MoveFileExW(MOVEFILE_WRITE_THROUGH)` says the call does not return until the file is moved on disk, but its explicit flush guarantee is scoped to copy-and-delete moves. The public contract does not clearly extend that guarantee to a same-volume rename's destination directory entry. It is also path-based, so substituting it would abandon the current retained-source-handle/rooted-destination semantics and reintroduce path substitution concerns.
+- `NtFlushBuffersFileEx(Flags=0)` documents flushing file data/metadata and synchronizing storage, but its error contract requires write or append access. The `NtCreateFile` documentation says not to request `FILE_WRITE_DATA` or `FILE_APPEND_DATA` for directories and says generic access rights cannot be specified for a directory. No documented, reconciled user-mode directory-handle access contract was found.
+- `FLUSH_FLAGS_FILE_DATA_SYNC_ONLY` is expressly invalid for directory handles. `ReplaceFileW` documents `REPLACEFILE_WRITE_THROUGH` as unsupported.
+- The two Microsoft Q&A pages reviewed are technical clarification questions, not an authoritative Microsoft engineering answer. Their existence is not treated as Microsoft confirmation. The blocker is the gap between the published API contracts, not a claim that NTFS cannot persist directory metadata.
+- Decision unchanged: no documented non-admin Windows barrier currently satisfies both handle-bound no-replace semantics and the required namespace durability guarantee. Do not add a path-based or overwrite-capable fallback. Windows Restore remains unavailable; Restore stays globally disabled.
+
+### Scope and next work
+- No application code changed in this continuation. No Restore executor, journal integration, startup recovery, GUI/CLI Restore, or merge to main was started.
+- Continue evaluating only documented Windows APIs or an alternative storage design that can prove equivalent safety. Otherwise retain the explicit Windows gate and record the limitation.
