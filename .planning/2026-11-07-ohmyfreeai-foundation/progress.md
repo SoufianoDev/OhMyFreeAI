@@ -1074,3 +1074,32 @@ Proceed with the collision-safe filesystem recovery executor only after designin
 - Updated `restore_security_windows.go` to retrieve TokenOwner with `GetTokenInformation(TokenOwner)` and accept the directory owner only when it equals either TokenUser or the token's default owner. DACL broad-write checks remain unchanged and fail-closed; no arbitrary group membership is accepted.
 - Fix commit: `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5` on `foundation/bootstrap`. This is a targeted code correction; no new CI result exists yet. Re-run Root CI and inspect Windows test output before proceeding.
 - Restore remains disabled. No executor, journal, startup recovery or UI work started.
+
+
+## CI closure and lifecycle review — 2026-11-09 15:30Z
+
+### Windows security gate result
+
+- Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765) completed SUCCESS on commit `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`.
+- Ubuntu job `129251819154`: SUCCESS. Go vet, Go tests, Linux race detector, Go build, Python compile/tests, frontend syntax and architecture boundaries all passed.
+- Windows job `129251819474`: SUCCESS. Go vet/tests/build, Python compile/tests, frontend syntax and architecture boundaries passed; Linux-only race step skipped as expected.
+- Job logs were retrieved for both platforms; no failure markers or failed steps.
+- Wails run [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) previously completed successfully on Ubuntu and Windows.
+
+### StoreController and composition-root review
+
+- Re-read `internal/infrastructure/sqlite/store_controller.go` and its test suite. The controller is already integrated; no duplicate implementation was added.
+- Verified Wails composition in `desktop-src/main.go.tmpl`: migrate before controller creation; create one application-lifetime controller; configure `appconfig.Service` with the controller; pass the same controller to AppService; defer bounded controller.Close after `app.Run`.
+- Verified `desktop-src/app_service.go.tmpl`: AppService retains the controller, not a raw Store; backup export calls `CreateWithStoreController`; config load/save use the controller-backed repository.
+- Verified `internal/infrastructure/backup/archive.go` and `archive_controller_test.go`: archive creation holds a shared lease for the complete archive operation/publication; test pauses at publication and proves Close cannot drain until export releases its lease.
+- StoreController tests cover shared/exclusive ordering, writer preference, cancellation, stale-store replacement, close drain, closed-controller rejection, panic fail-closed, stress, and config load/save drain. No missing integration work was found in these areas.
+
+### Documentation correction
+
+- Updated task plan to close the Windows owner/DACL and volume qualification gates with the actual CI evidence and mark executor/startup recovery as the next implementation phase.
+- The Windows policy is deliberately limited to fixed local NTFS with persistent ACLs. Token owner validation accepts only TokenUser or the process token's explicit TokenOwner; broad-write DACL rejection remains fail-closed.
+- Restore remains disabled. No executor, startup recovery, app-level Restore service or UI was introduced in this review.
+
+### Next engineering step
+
+Proceed test-first with the collision-safe filesystem recovery executor, following `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md`. It must use the pinned directory/source handles, verify content identities, persist intent/completion around each no-replace mutation, sync namespace changes where supported, and preserve all ambiguous artifacts. Add failure-injection and abrupt-process-restart tests on Linux and Windows before any Restore exposure.
