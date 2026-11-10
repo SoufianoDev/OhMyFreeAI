@@ -1361,7 +1361,9 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - The latest SQLite driver evaluation run `42775712758` completed successfully: all four modernc/ncruces × Ubuntu/Windows jobs passed.
 - The latest Wails platform proof run `42775712787` completed successfully: both Ubuntu and Windows jobs passed. Ubuntu included the native WebView-to-Go bridge and database-reopen smoke.
 - The latest Linux distribution compatibility run `42775712919` completed successfully: all eight jobs passed. In particular, `Ubuntu 22.04 / legacy-gtk3-webkit41` (job `129693622514`) completed every required build, CLI, and WebView/database-reopen step successfully.
-- The prior report's pending-job/log-fetch issue is resolved by querying the current workflow and job state. The earlier 404 did not establish a test failure; no code defect was evidenced, so no blind retry or speculative code change was made.
+- The prior report's pending-job/log-fetch issue is resolved by querying the current workflow and job state. The earlier 404 did not establish a failure in the distro workflow; the latest run is 8/8 successful.
+- Also inspected the failed Root CI run `42775485018` (commit `cab00b8`) and fetched both platform job logs. Both failed in `go test ./...` with the same regression: journal writes accepted illegal phase transitions, changed immutable transaction metadata, allowed candidate identity in invalid phases, and permitted replacing malformed/terminal journals. This was a real production validation gap, not runner flakiness.
+- The immediate follow-up code commit `beab78a` fixed the root cause by validating existing journal contents and enforcing immutable metadata, candidate identity timing, allowed phase transitions, and terminal-only journal removal. The exact code commit passed Root CI `42775712875` on Ubuntu and Windows; the other three workflow families also passed on that commit.
 - No workflow was active at the time of this reconciliation.
 
 ### Changes made
