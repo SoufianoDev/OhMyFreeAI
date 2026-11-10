@@ -368,6 +368,8 @@ The implementation is handle-bound, but the available Microsoft contract does no
 
 The current Windows implementation is valuable identity protection and requests write-through behavior, but this review cannot certify the rename's directory-entry durability after power loss from the cited public contract alone. Do not describe the Windows namespace durability gate as resolved. Do not infer a guarantee from NTFS CI success or process-crash tests.
 
+This is not limited to database-artifact moves. `WriteRestoreJournal` writes and flushes a temporary JSON file, then publishes/replaces `restore-journal.json`. The Windows publisher performs that replacement through `NtSetInformationFile(FileRenameInformationEx=65)` using the write-through source handle. Therefore every intent/completion journal phase currently depends on the same unproven namespace-durability boundary. A successful `WriteRestoreJournal` return must not be treated as a proven durable intent for a future executor until this gate is closed.
+
 No ordinary-user directory-handle flush recipe with a documented, supported contract has been established in this review. Do not add an undocumented directory flush, a path-based fallback, `MoveFileExW`, or an overwrite-capable fallback to make the test pass. Keep the gate unresolved until a supported contract or a different journal/database protocol removes the dependency.
 
 Linux continues to use `fsync` on the pinned parent-directory FD after successful no-replace namespace mutations. Its source-leaf selection race remains separate: the executor must verify size/SHA-256 from a no-follow handle after every move and before SQLite is opened.
