@@ -1405,3 +1405,35 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - The journal uses one fixed filename and transition validation keeps transaction ID and transaction metadata immutable. Therefore, after a terminal journal is written, a later transaction cannot safely start on Windows: removal is unsupported and a new transaction cannot replace the old transaction's metadata through the transition validator.
 - Do not ignore the removal error, delete the journal through a weaker path API, or overwrite terminal evidence. Before implementing the transaction executor, design a durable multi-transaction journal lifecycle that preserves old evidence and supports crash-safe discovery/recovery, then add Linux/Windows failure-injection and process-death tests for rollover.
 - No source code changed in this review. Restore remains disabled; no startup recovery, GUI/CLI Restore or main merge was added.
+
+
+## 2026-11-10 15:45Z — Windows namespace durability re-review and journal rollover blocker
+
+### Repository and CI reconciliation
+- Current branch: `foundation/bootstrap`; current branch head before this progress entry: `11ccba2f2b125775b991744642bf087d4171652f`.
+- Latest code-bearing commit remains `beab78a04f4ef9ae1421247983d25da66ffc3986`. The later commits through `11ccba2` are planning/documentation updates; no production source changed after `beab78a`.
+- Root CI [42775712875](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712875) was checked at job, step and log level. Both Ubuntu and Windows passed. Logs confirm both checked out exactly `beab78a04f4ef9ae1421247983d25da66ffc3986`. Ubuntu Go race detector passed; Windows correctly skipped the Linux-only race step. Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks passed on both platforms.
+- SQLite driver evaluation [42775712758](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712758): all 4 modernc/ncruces × Ubuntu/Windows jobs passed; job steps and checkout SHA were inspected.
+- Wails proof [42775712787](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712787): both jobs passed. Linux native build, CLI smoke, executable verification, live WebView bridge and database reopen passed; Windows native build, CLI dispatch and executable verification passed. Platform-specific skipped steps were expected.
+- Linux distribution matrix [42775712919](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712919): all 8 distro jobs passed, including Ubuntu 22.04 legacy GTK3/WebKit41. The Ubuntu 22.04 job's full build, CLI and WebView/database-reopen steps were inspected.
+- These workflows verify `beab78a`; they do not verify power-loss durability. The current branch head is documentation-only beyond that code commit.
+- Current compare against `main`: 818 commits ahead, 0 behind. Do not merge the branch wholesale.
+
+### Windows namespace durability documentation correction
+- Re-reviewed primary Microsoft sources through Exa: [File Caching](https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching), [NtCreateFile](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile), [FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers), and [MS-FSCC FileRenameInformationEx](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c).
+- The current Windows code opens the source relative to a pinned directory handle with native `FILE_WRITE_THROUGH`, flushes the source handle, and calls handle-bound `NtSetInformationFile(FileRenameInformationEx=65)`. This is useful handle/identity protection and a write-through request.
+- The earlier documentation statement that Microsoft explicitly guarantees NTFS rename metadata durability was too strong. `NtCreateFile` describes `FILE_WRITE_THROUGH` in terms of file data writes; File Caching discusses metadata caching generally but does not explicitly promise that a parent directory's namespace entry changed by this handle-based rename is durable; MS-FSCC defines rename/no-replace semantics but no durability flag. `FlushFileBuffers` documentation describes flushing the specified file handle, not its parent directory entry.
+- Therefore the Windows namespace-durability gate is **unresolved**, not closed. No undocumented directory flush, path-based fallback, `MoveFileExW`, or overwrite-capable fallback is acceptable. The previous claim is explicitly withdrawn in `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md`; the task plan was corrected accordingly.
+- Linux's documented boundary remains clearer: [fsync(2)](https://man7.org/linux/man-pages/man2/fsync.2.html) says syncing a file does not necessarily sync its directory entry; the Linux adapter syncs the pinned parent directory FD after the namespace mutation.
+
+### Journal rollover blocker
+- `restore_journal.go` uses one fixed `restore-journal.json`; `validateRestoreJournalTransition` keeps transaction ID and transaction metadata immutable.
+- `RemoveRestoreJournal` permits only `committed` or `rolled-back` records, then calls the platform adapter. The Windows adapter intentionally returns `errRestoreJournalRemovalUnsupported`; its test asserts the terminal journal remains present.
+- A second transaction therefore cannot start safely on Windows with the current single-file lifecycle. Do not work around this by calling `os.Remove`, weakening publication, or overwriting terminal/ambiguous evidence.
+- Exa review included SQLite atomic-commit guidance, Linux `fsync(2)`, ext4 journal documentation and Windows primary API docs. No journal rollover design was approved in this session. An append-only or archived multi-transaction format still needs a complete crash-discovery protocol and platform-specific durable publication proof before implementation.
+
+### Changes made
+- Updated `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md` in commit [032d55c](https://github.com/SoufianoDev/OhMyFreeAI/commit/032d55c94ef39bc2792cd43bae1e13aa19d26b6e) to withdraw the unsupported Windows rename-durability claim and document the exact source contracts and unresolved boundary.
+- Updated `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md` in commit [11ccba2](https://github.com/SoufianoDev/OhMyFreeAI/commit/11ccba2f2b125775b991744642bf087d4171652f) to make both Windows namespace durability and journal rollover explicit prerequisites before the executor.
+- No production code changed; no Restore executor, startup recovery, UI/CLI Restore or main merge was started.
+- Restore remains disabled. Next engineering work is to design and prove a journal lifecycle that does not depend on unsupported Windows directory-entry durability, or to establish a documented supported Windows namespace-durability contract. Only then proceed to executor design and its Linux/Windows process-death/failure-injection matrix.
