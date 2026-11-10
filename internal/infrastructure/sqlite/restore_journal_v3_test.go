@@ -33,7 +33,16 @@ func validV3TestJournal(root string) RestoreJournal {
 func TestRestoreJournalV3RoundTripPersistsIntentAndContentIdentities(t *testing.T) {
 	root := restoreTestDir(t)
 	journal := validV3TestJournal(root)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("write v3 prepared journal: %v", err)
+	}
+	journal.Phase = RestorePhaseStaging
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("write v3 staging journal: %v", err)
+	}
 	journal.Phase = RestorePhasePreservingPrevious
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
 	if err := WriteRestoreJournal(root, journal); err != nil {
 		t.Fatalf("write v3 intent journal: %v", err)
 	}

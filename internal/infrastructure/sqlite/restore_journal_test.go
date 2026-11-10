@@ -71,10 +71,16 @@ func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 		t.Fatalf("journal permissions = %o, want 600", info.Mode().Perm())
 	}
 
-	journal.Phase = RestorePhasePreviousPreserved
-	journal.UpdatedAt = time.Now().UTC().Add(time.Second)
-	if err := WriteRestoreJournal(root, journal); err != nil {
-		t.Fatalf("atomically update restore journal: %v", err)
+	for _, phase := range []RestorePhase{
+		RestorePhaseStaging,
+		RestorePhasePreservingPrevious,
+		RestorePhasePreviousPreserved,
+	} {
+		journal.Phase = phase
+		journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+		if err := WriteRestoreJournal(root, journal); err != nil {
+			t.Fatalf("advance restore journal to %q: %v", phase, err)
+		}
 	}
 	got, err = ReadRestoreJournal(root)
 	if err != nil {
@@ -82,6 +88,13 @@ func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 	}
 	if got.Phase != RestorePhasePreviousPreserved || !got.UpdatedAt.Equal(journal.UpdatedAt) {
 		t.Fatalf("updated journal = %#v, want phase %q and timestamp %s", got, journal.Phase, journal.UpdatedAt)
+	}
+	for _, phase := range []RestorePhase{RestorePhasePublishing, RestorePhasePublished, RestorePhaseReopening, RestorePhaseCommitted} {
+		journal.Phase = phase
+		journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+		if err := WriteRestoreJournal(root, journal); err != nil {
+			t.Fatalf("advance journal to terminal phase %q: %v", phase, err)
+		}
 	}
 	if runtime.GOOS == "windows" {
 		if err := RemoveRestoreJournal(root); !errors.Is(err, errRestoreJournalRemovalUnsupported) {
@@ -270,33 +283,28 @@ func TestReadRestoreJournalRejectsLegacyVersionTwo(t *testing.T) {
 }
 
 func TestRestoreJournalV3AcceptsIntentAndTerminalPhases(t *testing.T) {
-	root := restoreTestDir(t)
 	for _, phase := range []RestorePhase{
 		RestorePhasePreservingPrevious,
+		RestorePhasePreviousPreserved,
 		RestorePhasePublishing,
 		RestorePhaseRestoringPrevious,
 		RestorePhaseRolledBack,
 	} {
 		t.Run(string(phase), func(t *testing.T) {
+			root := restoreTestDir(t)
 			journal := validTestRestoreJournal(root)
 			journal.Phase = phase
-			if err := WriteRestoreJournal(root, journal); err != nil {
-				t.Fatalf("write v3 phase %q: %v", phase, err)
-			}
-			got, err := ReadRestoreJournal(root)
-			if err != nil {
-				t.Fatalf("read v3 phase %q: %v", phase, err)
-			}
-			if got.Phase != phase {
-				t.Fatalf("phase = %q, want %q", got.Phase, phase)
+			if _, err := canonicalizeRestoreJournal(root, journal); err != nil {
+				t.Fatalf("canonicalize v3 phase %q: %v", phase, err)
 			}
 		})
 	}
 }
 
 func TestWriteRestoreJournalRequiresCandidateIdentityBeforePublication(t *testing.T) {
-	root := restoreTestDir(t)
 	for _, phase := range []RestorePhase{
+		RestorePhasePreservingPrevious,
+		RestorePhasePreviousPreserved,
 		RestorePhasePublishing,
 		RestorePhasePublished,
 		RestorePhaseReopening,
@@ -305,12 +313,13 @@ func TestWriteRestoreJournalRequiresCandidateIdentityBeforePublication(t *testin
 		RestorePhaseRolledBack,
 	} {
 		t.Run(string(phase), func(t *testing.T) {
+			root := restoreTestDir(t)
 			journal := validTestRestoreJournal(root)
 			journal.Phase = phase
 			journal.CandidateSHA256 = ""
 			journal.CandidateSize = 0
-			if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
-				t.Fatalf("write without candidate identity error = %v, want ErrRestoreJournalInvalid", err)
+			if _, err := canonicalizeRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+				t.Fatalf("canonicalize without candidate identity error = %v, want ErrRestoreJournalInvalid", err)
 			}
 		})
 	}
@@ -442,5 +451,223 @@ func TestWriteRestoreJournalRejectsNonRegularTransactionPaths(t *testing.T) {
 	journal.StagingPath = directory
 	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
 		t.Fatalf("write with directory staging path error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
+
+func advanceTestRestoreJournal(t *testing.T, root string, journal *RestoreJournal, phase RestorePhase) {
+	t.Helper()
+	journal.Phase = phase
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, *journal); err != nil {
+		t.Fatalf("advance journal to %q: %v", phase, err)
+	}
+}
+
+func TestWriteRestoreJournalAllowsDocumentedCommitAndRollbackSequences(t *testing.T) {
+	tests := []struct {
+		name       string
+		noPrevious bool
+		phases     []RestorePhase
+	}{
+		{
+			name: "replace existing database",
+			phases: []RestorePhase{
+				RestorePhaseStaging,
+				RestorePhasePreservingPrevious,
+				RestorePhasePreviousPreserved,
+				RestorePhasePublishing,
+				RestorePhasePublished,
+				RestorePhaseReopening,
+				RestorePhaseCommitted,
+			},
+		},
+		{
+			name: "rollback existing database",
+			phases: []RestorePhase{
+				RestorePhaseStaging,
+				RestorePhasePreservingPrevious,
+				RestorePhasePreviousPreserved,
+				RestorePhasePublishing,
+				RestorePhasePublished,
+				RestorePhaseReopening,
+				RestorePhaseRestoringPrevious,
+				RestorePhaseRolledBack,
+			},
+		},
+		{
+			name: "first database commit",
+			noPrevious: true,
+			phases: []RestorePhase{
+				RestorePhaseStaging,
+				RestorePhasePublishing,
+				RestorePhasePublished,
+				RestorePhaseReopening,
+				RestorePhaseCommitted,
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := restoreTestDir(t)
+			journal := validTestRestoreJournal(root)
+			if test.noPrevious {
+				journal.PreviousDatabaseExisted = boolPointer(false)
+				journal.RollbackPath = ""
+				journal.PreviousSHA256 = ""
+				journal.PreviousSize = 0
+			}
+			if err := WriteRestoreJournal(root, journal); err != nil {
+				t.Fatalf("write prepared journal: %v", err)
+			}
+			for _, phase := range test.phases {
+				advanceTestRestoreJournal(t, root, &journal, phase)
+			}
+			got, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read final journal: %v", err)
+			}
+			if got.Phase != test.phases[len(test.phases)-1] {
+				t.Fatalf("final phase = %q, want %q", got.Phase, test.phases[len(test.phases)-1])
+			}
+		})
+	}
+}
+
+func TestWriteRestoreJournalRejectsIllegalPhaseTransitionAndPreservesCurrentJournal(t *testing.T) {
+	root := restoreTestDir(t)
+	journal := validTestRestoreJournal(root)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("write prepared journal: %v", err)
+	}
+	invalid := journal
+	invalid.Phase = RestorePhasePublished
+	invalid.UpdatedAt = invalid.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, invalid); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("illegal prepared-to-published transition error = %v, want ErrRestoreJournalInvalid", err)
+	}
+	got, err := ReadRestoreJournal(root)
+	if err != nil {
+		t.Fatalf("read journal after rejected transition: %v", err)
+	}
+	if got.Phase != RestorePhasePrepared || got.TransactionID != journal.TransactionID {
+		t.Fatalf("rejected transition changed durable journal: %#v", got)
+	}
+}
+
+func TestWriteRestoreJournalAllowsCandidateIdentityOnlyDuringStaging(t *testing.T) {
+	root := restoreTestDir(t)
+	journal := validTestRestoreJournal(root)
+	journal.CandidateSHA256 = ""
+	journal.CandidateSize = 0
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("write prepared journal without staged identity: %v", err)
+	}
+	journal.Phase = RestorePhaseStaging
+	journal.CandidateSHA256 = strings.Repeat("d", 64)
+	journal.CandidateSize = 8192
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("record candidate identity during staging: %v", err)
+	}
+	journal.CandidateSHA256 = strings.Repeat("e", 64)
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("candidate identity mutation error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
+func TestWriteRestoreJournalRejectsImmutableTransactionMetadataChanges(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*RestoreJournal)
+	}{
+		{"transaction ID", func(j *RestoreJournal) { j.TransactionID = "different-transaction" }},
+		{"target path", func(j *RestoreJournal) { j.TargetPath = filepath.Join(filepath.Dir(j.TargetPath), "other.db") }},
+		{"archive digest", func(j *RestoreJournal) { j.ArchiveSHA256 = strings.Repeat("d", 64) }},
+		{"archive size", func(j *RestoreJournal) { j.ArchiveSize++ }},
+		{"previous digest", func(j *RestoreJournal) { j.PreviousSHA256 = strings.Repeat("d", 64) }},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root := restoreTestDir(t)
+			journal := validTestRestoreJournal(root)
+			if err := WriteRestoreJournal(root, journal); err != nil {
+				t.Fatalf("write prepared journal: %v", err)
+			}
+			advanceTestRestoreJournal(t, root, &journal, RestorePhaseStaging)
+			invalid := journal
+			test.mutate(&invalid)
+			invalid.UpdatedAt = invalid.UpdatedAt.Add(time.Second)
+			if err := WriteRestoreJournal(root, invalid); !errors.Is(err, ErrRestoreJournalInvalid) {
+				t.Fatalf("metadata mutation error = %v, want ErrRestoreJournalInvalid", err)
+			}
+		})
+	}
+}
+
+func TestWriteRestoreJournalRefusesToOverwriteMalformedExistingJournal(t *testing.T) {
+	root := restoreTestDir(t)
+	path := filepath.Join(root, restoreJournalFileName)
+	malformed := []byte("{not-json")
+	if err := os.WriteFile(path, malformed, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := WriteRestoreJournal(root, validTestRestoreJournal(root)); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("overwrite malformed journal error = %v, want ErrRestoreJournalInvalid", err)
+	}
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, malformed) {
+		t.Fatalf("malformed journal was overwritten: %q", got)
+	}
+}
+
+func TestWriteRestoreJournalRejectsNewTransactionWhileTerminalJournalExists(t *testing.T) {
+	root := restoreTestDir(t)
+	journal := validTestRestoreJournal(root)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatal(err)
+	}
+	for _, phase := range []RestorePhase{
+		RestorePhaseStaging,
+		RestorePhasePreservingPrevious,
+		RestorePhasePreviousPreserved,
+		RestorePhasePublishing,
+		RestorePhasePublished,
+		RestorePhaseReopening,
+		RestorePhaseCommitted,
+	} {
+		advanceTestRestoreJournal(t, root, &journal, phase)
+	}
+	newTransaction := validTestRestoreJournal(root)
+	newTransaction.TransactionID = "next-transaction"
+	if err := WriteRestoreJournal(root, newTransaction); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("replace terminal transaction journal error = %v, want ErrRestoreJournalInvalid", err)
+	}
+}
+
+func TestRemoveRestoreJournalRejectsNonterminalPhase(t *testing.T) {
+	root := restoreTestDir(t)
+	journal := validTestRestoreJournal(root)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatal(err)
+	}
+	if err := RemoveRestoreJournal(root); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("remove prepared journal error = %v, want ErrRestoreJournalInvalid", err)
+	}
+	if _, err := ReadRestoreJournal(root); err != nil {
+		t.Fatalf("nonterminal journal was removed: %v", err)
+	}
+}
+
+func TestWriteRestoreJournalRejectsInitialNonPreparedPhase(t *testing.T) {
+	root := restoreTestDir(t)
+	journal := validTestRestoreJournal(root)
+	journal.Phase = RestorePhaseStaging
+	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("initial staging journal error = %v, want ErrRestoreJournalInvalid", err)
 	}
 }
