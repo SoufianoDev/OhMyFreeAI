@@ -430,3 +430,13 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - Correct accidental extra indentation in the Windows source-open declarations.
 - Base commit's other CI: SQLite 4/4, Wails 2/2, Linux distro matrix 8/8. Fresh Root CI is required for this test-only correction.
 - Restore remains disabled; no executor, startup recovery, UI/CLI integration, or merge to main.
+
+
+## 2026-11-10 00:15Z — Windows directory rename test ordering
+
+- Root CI `42726626677`: Ubuntu succeeded; Windows failed in the new regression when it tried to rename a directory while a file handle inside that directory remained open.
+- Microsoft FILE_RENAME_INFORMATION documentation explicitly describes restrictions on renaming directories containing open files. The test must not violate that platform rule.
+- Reorder the regression: retain the directory handle, rename the directory before opening its source file, create a replacement directory/decoy at the old path, then open the source from the pinned directory handle and execute the handle-relative rename.
+- The decoy validation test uses the same rename-before-open order. No production code changed.
+- Run fresh Windows Root CI; do not mark Windows safety verified until Go tests pass.
+- Restore remains disabled; no executor, startup recovery, UI/CLI integration, or merge to main.

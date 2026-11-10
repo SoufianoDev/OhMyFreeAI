@@ -1306,3 +1306,12 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Also corrected accidental extra indentation in the Windows source-open declarations in the move path, journal publisher, and tests.
 - The implementation remains native `NtSetInformationFile(FileRenameInformationEx)` class 65 with the pinned directory handle in `RootDirectory`, a single relative leaf, and the same `FILE_FLAG_WRITE_THROUGH` source handle. No full-path rename or overwrite-capable fallback.
 - This revision is pending fresh Windows Root CI. Do not mark the Windows safety gate passed until the Go package tests succeed on Windows. Restore remains disabled; no executor/recovery/UI/CLI integration and no merge to main.
+
+
+## Windows directory-rename regression sequencing — 2026-11-10 00:15Z
+
+- Root CI [42726626677](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42726626677) on `ec10edfbc91e3edd937abd71fad94e8a5fa2ca3f`: Ubuntu passed; Windows Go tests failed in the new directory-rename regression. The Windows log confirmed `Access is denied` when renaming the directory while the source file handle was open.
+- Microsoft documents that a directory cannot be renamed while files in its tree have open handles. The test now renames the pinned directory before opening the source file, then creates a replacement directory and decoy at the original path. It opens the source through the retained directory handle and checks that the native relative rename lands only in the renamed original directory.
+- The separate decoy-handle validation test likewise creates the replacement tree after renaming the pinned directory and rejects a handle opened from that replacement.
+- This changes test ordering only; production rename implementation is unchanged. Fresh Windows Root CI is required.
+- Restore remains disabled; no executor/recovery/UI/CLI integration and no merge to main.

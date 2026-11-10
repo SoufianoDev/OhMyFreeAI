@@ -132,15 +132,9 @@ func TestRenameRestoreHandleNoReplaceStaysBoundToPinnedDirectoryAfterDirectoryRe
 		t.Fatalf("open qualified restore directory: %v", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
-	sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
-	if err != nil {
-		t.Fatalf("open write-through source relative to pinned directory: %v", err)
-	}
-	defer func() {
-		if sourceHandle != windows.InvalidHandle {
-			_ = windows.CloseHandle(sourceHandle)
-		}
-	}()
+
+	// Windows does not allow renaming a directory while a file in its tree
+	// has an open handle. Rename the directory before opening the source.
 	if err := os.Rename(directory, movedDirectory); err != nil {
 		t.Fatalf("rename pinned destination directory: %v", err)
 	}
@@ -151,6 +145,16 @@ func TestRenameRestoreHandleNoReplaceStaysBoundToPinnedDirectoryAfterDirectoryRe
 	if err := os.WriteFile(decoySource, []byte("decoy candidate"), 0o600); err != nil {
 		t.Fatal(err)
 	}
+
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
+	if err != nil {
+		t.Fatalf("open write-through source relative to pinned directory: %v", err)
+	}
+	defer func() {
+		if sourceHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(sourceHandle)
+		}
+	}()
 	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, "published.db"); err != nil {
 		t.Fatalf("rename opened source relative to pinned directory handle: %v", err)
 	}
