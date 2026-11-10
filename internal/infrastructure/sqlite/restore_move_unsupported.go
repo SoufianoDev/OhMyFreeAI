@@ -9,3 +9,7 @@ var ErrRestoreMoveUnsupported = errors.New("atomic no-replace SQLite restore mov
 func moveRestoreFileNoReplacePlatform(string, string) error {
 	return ErrRestoreMoveUnsupported
 }
+
+func validateRestoreStateDirectoryPlatform(string) error {
+	return ErrRestoreMoveUnsupported
+}

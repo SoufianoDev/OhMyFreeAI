@@ -94,6 +94,26 @@ func TestInspectRestoreRecoveryFilesRejectsSymlinkWithoutChangingIt(t *testing.T
 	}
 }
 
+func TestReadRestoreContentIdentityDoesNotTreatMissingParentAsMissingLeaf(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "missing-parent", "missing.db")
+	if _, err := readRestoreContentIdentityPlatform(path); err == nil || errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("readRestoreContentIdentityPlatform() error = %v, want a non-NotExist parent error", err)
+	}
+}
+
+func TestCanonicalStateDirectoryRejectsNonPrivateDirectory(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("POSIX owner/mode checks are Linux-specific")
+	}
+	root := t.TempDir()
+	if err := os.Chmod(root, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := canonicalStateDirectory(root); err == nil {
+		t.Fatal("accepted a state directory accessible to group members")
+	}
+}
+
 func TestReadRestoreContentIdentityReportsMissingLeafAsNotExist(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "missing.db")
 	if _, err := readRestoreContentIdentityPlatform(path); !errors.Is(err, os.ErrNotExist) {

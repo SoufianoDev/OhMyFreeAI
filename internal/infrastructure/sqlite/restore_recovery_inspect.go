@@ -6,10 +6,13 @@ import (
 	"os"
 )
 
+// inspectRestoreRecoveryFiles takes a read-only identity snapshot of the
+// transaction artifacts. It does not execute the recovery plan or open SQLite;
+// the executor must revalidate each artifact at its mutation boundary.
 func inspectRestoreRecoveryFiles(stateDirectory string, journal RestoreJournal) (RestoreRecoveryFiles, error) {
 	ambiguous := func(reason string, cause error) (RestoreRecoveryFiles, error) {
 		if cause != nil {
-			return RestoreRecoveryFiles{}, fmt.Errorf("%w: %s: %v", ErrRestoreRecoveryAmbiguous, reason, cause)
+			return RestoreRecoveryFiles{}, fmt.Errorf("%w: %s: %w", ErrRestoreRecoveryAmbiguous, reason, cause)
 		}
 		return RestoreRecoveryFiles{}, fmt.Errorf("%w: %s", ErrRestoreRecoveryAmbiguous, reason)
 	}

@@ -26,9 +26,15 @@ func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, er
 		Resolve: unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS,
 	})
 	if err != nil {
+		if errors.Is(err, unix.ENOENT) {
+			return identity, fmt.Errorf("open SQLite restore identity parent directory: path does not exist (%v)", err)
+		}
 		return identity, fmt.Errorf("open SQLite restore identity parent without symlink traversal: %w", err)
 	}
 	defer unix.Close(parent)
+	if err := verifyRestoreDirectoryPrivateFD(parent); err != nil {
+		return identity, fmt.Errorf("validate private SQLite restore identity parent directory: %w", err)
+	}
 
 	fd, err := unix.Openat2(parent, filepath.Base(path), &unix.OpenHow{
 		Flags: uint64(unix.O_RDONLY | unix.O_CLOEXEC | unix.O_NOFOLLOW),

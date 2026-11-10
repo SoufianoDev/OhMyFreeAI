@@ -295,9 +295,9 @@ func renameRestoreHandleReplace(source, destinationDirectory windows.Handle, des
 }
 
 // renameRestoreHandle issues FILE_RENAME_INFORMATION_EX through the exact
-// source handle opened with FILE_FLAG_WRITE_THROUGH. RootDirectory anchors the
-// destination to the retained directory object; FileName is a single relative
-// leaf, so no ancestor path is re-resolved during the rename.
+// source handle opened with the native FILE_WRITE_THROUGH CreateOptions bit.
+// RootDirectory anchors the destination to the retained directory object;
+// FileName is a single relative leaf, so no ancestor path is re-resolved.
 func renameRestoreHandle(source, destinationDirectory windows.Handle, destinationLeaf string, replace bool) error {
 	if err := validateRestoreMoveLeaf(destinationLeaf); err != nil {
 		return err

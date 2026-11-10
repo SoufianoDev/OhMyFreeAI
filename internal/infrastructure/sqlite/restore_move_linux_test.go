@@ -61,3 +61,25 @@ func TestSyncRestoreDirectoryHandleRejectsInvalidDescriptor(t *testing.T) {
 		t.Fatal("syncRestoreDirectoryHandle() accepted an invalid directory descriptor")
 	}
 }
+
+func TestMoveRestoreFileNoReplaceRejectsNonPrivateContainingDirectory(t *testing.T) {
+	directory := t.TempDir()
+	source := filepath.Join(directory, "source.db")
+	destination := filepath.Join(directory, "target.db")
+	if err := os.WriteFile(source, []byte("candidate"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(directory, 0o750); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := moveRestoreFileNoReplace(source, destination); err == nil {
+		t.Fatal("accepted a containing directory with group permissions")
+	}
+	if _, err := os.Lstat(source); err != nil {
+		t.Fatalf("source changed despite rejected directory: %v", err)
+	}
+	if _, err := os.Lstat(destination); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("destination unexpectedly exists: %v", err)
+	}
+}

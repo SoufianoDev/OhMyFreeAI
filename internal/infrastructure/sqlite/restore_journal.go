@@ -197,10 +197,14 @@ func canonicalStateDirectory(path string) (string, error) {
 	if err != nil || !info.IsDir() {
 		return "", fmt.Errorf("%w: state directory is not a directory", ErrRestoreJournalInvalid)
 	}
+	canonical := filepath.Clean(resolved)
+	if err := validateRestoreStateDirectoryPlatform(canonical); err != nil {
+		return "", fmt.Errorf("%w: state directory security validation failed: %w", ErrRestoreJournalInvalid, err)
+	}
 	// Persist the resolved spelling consistently. Windows may expose the same
 	// directory through both a long path and an 8.3 alias; mixing those forms
 	// across journal writes and reads breaks exact round-trip comparisons.
-	return filepath.Clean(resolved), nil
+	return canonical, nil
 }
 
 func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJournal, error) {

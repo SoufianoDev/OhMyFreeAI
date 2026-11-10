@@ -22,6 +22,9 @@ func moveRestoreFileNoReplacePlatform(source, destination string) error {
 		return err
 	}
 	defer unix.Close(dirfd)
+	if err := verifyRestoreDirectoryPrivateFD(dirfd); err != nil {
+		return fmt.Errorf("validate private SQLite restore parent directory: %w", err)
+	}
 
 	sourceName := filepath.Base(source)
 	destinationName := filepath.Base(destination)
