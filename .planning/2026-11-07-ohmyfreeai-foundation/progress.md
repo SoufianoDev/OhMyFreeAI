@@ -1448,7 +1448,7 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - No production source changed. Restore remains disabled.
 
 
-## 2026-11-10 22:xxZ — FIFO identity hardening, CI closure and Windows durability re-review
+## 2026-11-10 — FIFO identity hardening, CI closure and Windows durability re-review
 
 ### Repository and code change
 - Reconciled the remote branch before editing: `foundation/bootstrap` was at documentation-only head `a5dd3e60ec3806bc6f1416513d0ec81d6ebf0029`; the last behavior-changing code commit was `beab78a`. The 19 commits between them changed only planning/progress/architecture documentation.

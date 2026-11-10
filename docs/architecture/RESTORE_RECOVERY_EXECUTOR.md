@@ -345,7 +345,7 @@ The move helper is still isolated. It is not yet called by a transaction executo
 The Windows directory walk now checks the DACL of the trusted volume root and every opened ancestor component, not only the final state directory. Ancestor checks reject NULL DACLs, unsupported ACE layouts and broad write-capable ACEs; they do not require system-owned ancestors to be owned by the current user. The final canonical state directory additionally requires its owner to match TokenUser or the process token's explicit TokenOwner. The implementation is in commits `7f7d7ee773f5656ebbd414a1c9276446e1b48d34` and `781d44be75346ce7a5506fc1bc6b2e7b12ff3e96`; Root CI [42645966152](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645966152) is pending. Do not treat this additional boundary as verified until both platform jobs complete.
 
 
-## Windows namespace durability gate — initial unresolved review (superseded by the 2026-11-10 22:xxZ review)
+## Windows namespace durability gate — initial unresolved review (superseded by the 2026-11-10 write-through documentation re-review)
 
 The implementation is handle-bound, but the available Microsoft contract does not conclusively establish durable persistence of the parent-directory namespace update performed by `NtSetInformationFile(FileRenameInformationEx=65)`. The previous statement that the documentation explicitly guaranteed rename metadata durability was too strong and is withdrawn.
 
@@ -395,7 +395,7 @@ Do not use the legacy path-based `RestoreDatabase` helper from this executor. Do
 
 
 
-## Windows NTFS write-through rename contract — re-reviewed 2026-11-10 22:xxZ
+## Windows NTFS write-through rename contract — re-reviewed 2026-11-10
 
 The earlier conclusion that the public Microsoft contract did not cover rename metadata was too conservative and is superseded for the project's explicitly qualified fixed-local-NTFS path.
 
