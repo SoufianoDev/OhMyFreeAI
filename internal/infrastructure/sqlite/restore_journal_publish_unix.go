@@ -15,11 +15,8 @@ func publishRestoreJournal(source, destination string) error {
 	return syncRestoreDirectory(filepath.Dir(destination))
 }
 
-func removeRestoreJournal(directory, path string) error {
-	if err := os.Remove(path); err != nil {
-		return fmt.Errorf("remove SQLite restore journal: %w", err)
-	}
-	return syncRestoreDirectory(directory)
+func removeRestoreJournal(string, string) error {
+	return errRestoreJournalRemovalUnsupported
 }
 
 func syncRestoreDirectory(path string) error {

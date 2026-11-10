@@ -96,20 +96,15 @@ func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 			t.Fatalf("advance journal to terminal phase %q: %v", phase, err)
 		}
 	}
-	if runtime.GOOS == "windows" {
-		if err := RemoveRestoreJournal(root); !errors.Is(err, errRestoreJournalRemovalUnsupported) {
-			t.Fatalf("remove restore journal error = %v, want unsupported", err)
-		}
-		if _, err := ReadRestoreJournal(root); err != nil {
-			t.Fatalf("journal disappeared after unsupported removal: %v", err)
-		}
-		return
+	if err := RemoveRestoreJournal(root); !errors.Is(err, errRestoreJournalRemovalUnsupported) {
+		t.Fatalf("remove terminal restore journal error = %v, want retained-history error", err)
 	}
-	if err := RemoveRestoreJournal(root); err != nil {
-		t.Fatalf("remove restore journal: %v", err)
+	got, err = ReadRestoreJournal(root)
+	if err != nil {
+		t.Fatalf("read retained terminal journal: %v", err)
 	}
-	if _, err := ReadRestoreJournal(root); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("read removed journal error = %v, want os.ErrNotExist", err)
+	if got.Phase != RestorePhaseCommitted {
+		t.Fatalf("terminal journal phase after rejected removal = %q, want committed", got.Phase)
 	}
 }
 
@@ -625,7 +620,7 @@ func TestWriteRestoreJournalRefusesToOverwriteMalformedExistingJournal(t *testin
 	}
 }
 
-func TestWriteRestoreJournalRejectsNewTransactionWhileTerminalJournalExists(t *testing.T) {
+func TestWriteRestoreJournalAllowsNewTransactionAfterTerminalJournalExists(t *testing.T) {
 	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	if err := WriteRestoreJournal(root, journal); err != nil {
@@ -642,10 +637,32 @@ func TestWriteRestoreJournalRejectsNewTransactionWhileTerminalJournalExists(t *t
 	} {
 		advanceTestRestoreJournal(t, root, &journal, phase)
 	}
+
 	newTransaction := validTestRestoreJournal(root)
 	newTransaction.TransactionID = "next-transaction"
-	if err := WriteRestoreJournal(root, newTransaction); !errors.Is(err, ErrRestoreJournalInvalid) {
-		t.Fatalf("replace terminal transaction journal error = %v, want ErrRestoreJournalInvalid", err)
+	newTransaction.StagingPath = filepath.Join(root, ".restore-stage-next.db")
+	newTransaction.RollbackPath = filepath.Join(root, ".restore-rollback-next.db")
+	newTransaction.CandidateQuarantinePath = filepath.Join(root, ".restore-candidate-quarantine-next.db")
+	if err := WriteRestoreJournal(root, newTransaction); err != nil {
+		t.Fatalf("start a new transaction while retaining terminal history: %v", err)
+	}
+
+	ledger, err := readRestoreJournalLedger(root)
+	if err != nil {
+		t.Fatalf("read retained journal ledger: %v", err)
+	}
+	if len(ledger.Transactions) != 2 {
+		t.Fatalf("retained transaction count = %d, want 2", len(ledger.Transactions))
+	}
+	if ledger.Transactions[0].Phase != RestorePhaseCommitted || ledger.Transactions[1].Phase != RestorePhasePrepared {
+		t.Fatalf("retained phases = %q, %q; want committed, prepared", ledger.Transactions[0].Phase, ledger.Transactions[1].Phase)
+	}
+	got, err := ReadRestoreJournal(root)
+	if err != nil {
+		t.Fatalf("read current transaction: %v", err)
+	}
+	if got.TransactionID != newTransaction.TransactionID || got.Phase != RestorePhasePrepared {
+		t.Fatalf("current transaction = %#v, want new prepared transaction", got)
 	}
 }
 

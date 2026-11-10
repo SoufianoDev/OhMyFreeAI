@@ -1,13 +1,11 @@
 package sqlite
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,14 +13,16 @@ import (
 )
 
 const (
-	restoreJournalFileName = "restore-journal.json"
-	restoreJournalVersion  = 3
-	maxRestoreJournalBytes = 16 << 10
+	restoreJournalFileName          = "restore-journal.json"
+	restoreJournalVersion           = 3
+	restoreJournalLedgerVersion     = 1
+	maxRestoreJournalBytes          = 1 << 20
+	maxRestoreJournalTransactions   = 256
 )
 
 var (
 	ErrRestoreJournalInvalid = errors.New("SQLite restore journal is invalid")
-	errRestoreJournalRemovalUnsupported = errors.New("durable SQLite restore journal removal is unsupported on Windows")
+	errRestoreJournalRemovalUnsupported = errors.New("SQLite restore journal history is retained and cannot be removed automatically")
 )
 
 type RestorePhase string
@@ -60,8 +60,9 @@ type RestoreJournal struct {
 	UpdatedAt      time.Time    `json:"updated_at"`
 }
 
-// WriteRestoreJournal publishes the journal using a same-directory temporary
-// file and the platform-specific namespace persistence barrier.
+// WriteRestoreJournal atomically publishes the latest state of one transaction
+// in a bounded ledger. Terminal transaction records are retained so a later
+// restore can start without deleting evidence or relying on journal removal.
 func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	root, err := canonicalStateDirectory(stateDirectory)
 	if err != nil {
@@ -74,31 +75,57 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	if err != nil {
 		return err
 	}
-	data, err := json.Marshal(journal)
+
+	ledger, readErr := readRestoreJournalLedger(root)
+	switch {
+	case errors.Is(readErr, os.ErrNotExist):
+		ledger = restoreJournalLedger{Version: restoreJournalLedgerVersion}
+	case readErr != nil:
+		// A malformed, unreadable, or non-regular existing journal is evidence
+		// that must be preserved. Never replace it with a new transaction.
+		return fmt.Errorf("%w: refusing to overwrite a journal ledger that cannot be validated: %v", ErrRestoreJournalInvalid, readErr)
+	}
+
+	existingIndex := -1
+	for i := range ledger.Transactions {
+		if ledger.Transactions[i].TransactionID == journal.TransactionID {
+			existingIndex = i
+			break
+		}
+	}
+	if existingIndex >= 0 {
+		if err := validateRestoreJournalTransition(ledger.Transactions[existingIndex], journal); err != nil {
+			return err
+		}
+		ledger.Transactions[existingIndex] = journal
+	} else {
+		if journal.Phase != RestorePhasePrepared {
+			return fmt.Errorf("%w: a new transaction must begin in phase %q", ErrRestoreJournalInvalid, RestorePhasePrepared)
+		}
+		for _, existing := range ledger.Transactions {
+			if !terminalRestorePhase(existing.Phase) {
+				return fmt.Errorf("%w: transaction %q is still active in phase %q", ErrRestoreJournalInvalid, existing.TransactionID, existing.Phase)
+			}
+		}
+		if len(ledger.Transactions) >= maxRestoreJournalTransactions {
+			return fmt.Errorf("%w: retained transaction history reached its %d-record limit", ErrRestoreJournalInvalid, maxRestoreJournalTransactions)
+		}
+		ledger.Transactions = append(ledger.Transactions, journal)
+	}
+
+	ledger, err = validateRestoreJournalLedger(root, ledger)
 	if err != nil {
-		return fmt.Errorf("encode SQLite restore journal: %w", err)
+		return err
+	}
+	data, err := json.Marshal(ledger)
+	if err != nil {
+		return fmt.Errorf("encode SQLite restore journal ledger: %w", err)
 	}
 	if len(data) > maxRestoreJournalBytes {
-		return fmt.Errorf("%w: journal exceeds size limit", ErrRestoreJournalInvalid)
+		return fmt.Errorf("%w: journal ledger exceeds size limit", ErrRestoreJournalInvalid)
 	}
 
 	journalPath := filepath.Join(root, restoreJournalFileName)
-	existing, readErr := ReadRestoreJournal(root)
-	switch {
-	case readErr == nil:
-		if err := validateRestoreJournalTransition(existing, journal); err != nil {
-			return err
-		}
-	case errors.Is(readErr, os.ErrNotExist):
-		if journal.Phase != RestorePhasePrepared {
-			return fmt.Errorf("%w: a new journal must begin in phase %q", ErrRestoreJournalInvalid, RestorePhasePrepared)
-		}
-	default:
-		// A malformed, unreadable, or non-regular existing journal is evidence
-		// that must be preserved. Never replace it with a new transaction.
-		return fmt.Errorf("%w: refusing to overwrite an existing journal that cannot be validated: %v", ErrRestoreJournalInvalid, readErr)
-	}
-
 	temporary, err := os.CreateTemp(root, ".restore-journal-*.tmp")
 	if err != nil {
 		return fmt.Errorf("create temporary SQLite restore journal: %w", err)
@@ -126,68 +153,50 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 		return fmt.Errorf("close SQLite restore journal: %w", err)
 	}
 	if err := publishRestoreJournal(temporaryPath, journalPath); err != nil {
-		return fmt.Errorf("publish SQLite restore journal: %w", err)
+		return fmt.Errorf("publish SQLite restore journal ledger: %w", err)
 	}
 	published = true
 	return nil
 }
 
-// ReadRestoreJournal strictly decodes and validates the durable journal.
-// Missing journals are reported as os.ErrNotExist.
+// ReadRestoreJournal strictly decodes the retained transaction ledger and
+// returns its sole active transaction, or the newest terminal record when idle.
+// A legacy single-record v3 journal is accepted and migrated on the next write.
 func ReadRestoreJournal(stateDirectory string) (RestoreJournal, error) {
 	var empty RestoreJournal
 	root, err := canonicalStateDirectory(stateDirectory)
 	if err != nil {
 		return empty, err
 	}
-	journalPath := filepath.Join(root, restoreJournalFileName)
-	info, err := os.Lstat(journalPath)
+	ledger, err := readRestoreJournalLedger(root)
 	if err != nil {
 		return empty, err
 	}
-	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxRestoreJournalBytes {
-		return empty, fmt.Errorf("%w: journal is not a bounded regular file", ErrRestoreJournalInvalid)
-	}
-	data, err := os.ReadFile(journalPath)
-	if err != nil {
-		return empty, fmt.Errorf("read SQLite restore journal: %w", err)
-	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	var journal RestoreJournal
-	if err := decoder.Decode(&journal); err != nil {
-		return empty, fmt.Errorf("%w: decode journal: %v", ErrRestoreJournalInvalid, err)
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return empty, fmt.Errorf("%w: trailing journal data", ErrRestoreJournalInvalid)
-	}
-	journal, err = canonicalizeRestoreJournal(root, journal)
-	if err != nil {
-		return empty, err
-	}
-	return journal, nil
+	return currentRestoreJournal(ledger)
 }
 
-// RemoveRestoreJournal removes the committed/recovered journal when the
-// platform can durably persist the namespace change. Callers must first finish
-// recovery and retain rollback artifacts according to the application policy.
+// RemoveRestoreJournal validates the current state but retains the ledger.
+// Terminal records are part of the transaction history and are not deleted.
 func RemoveRestoreJournal(stateDirectory string) error {
 	root, err := canonicalStateDirectory(stateDirectory)
 	if err != nil {
 		return err
 	}
-	journal, err := ReadRestoreJournal(root)
+	ledger, err := readRestoreJournalLedger(root)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
 	}
 	if err != nil {
 		return err
 	}
-	if journal.Phase != RestorePhaseCommitted && journal.Phase != RestorePhaseRolledBack {
-		return fmt.Errorf("%w: only a committed or rolled-back journal may be removed", ErrRestoreJournalInvalid)
+	current, err := currentRestoreJournal(ledger)
+	if err != nil {
+		return err
 	}
-	journalPath := filepath.Join(root, restoreJournalFileName)
-	return removeRestoreJournal(root, journalPath)
+	if !terminalRestorePhase(current.Phase) {
+		return fmt.Errorf("%w: only a committed or rolled-back journal may be retired", ErrRestoreJournalInvalid)
+	}
+	return removeRestoreJournal(root, filepath.Join(root, restoreJournalFileName))
 }
 
 func canonicalStateDirectory(path string) (string, error) {
