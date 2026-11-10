@@ -12,7 +12,7 @@ import (
 )
 
 func TestReadRestoreContentIdentityFromNoFollowHandle(t *testing.T) {
-	directory := t.TempDir()
+	directory := restoreTestDir(t)
 	path := filepath.Join(directory, "candidate.db")
 	content := []byte("verified SQLite restore candidate")
 	if err := os.WriteFile(path, content, 0o600); err != nil { t.Fatal(err) }
@@ -31,17 +31,17 @@ func TestReadRestoreContentIdentityFromNoFollowHandle(t *testing.T) {
 
 func TestReadRestoreContentIdentityRejectsUnsafeEntries(t *testing.T) {
 	t.Run("missing", func(t *testing.T) {
-		if _, err := readRestoreContentIdentityPlatform(filepath.Join(t.TempDir(), "missing.db")); err == nil {
+		if _, err := readRestoreContentIdentityPlatform(filepath.Join(restoreTestDir(t), "missing.db")); err == nil {
 			t.Fatal("accepted a missing file")
 		}
 	})
 	t.Run("directory", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "candidate.db")
+		path := filepath.Join(restoreTestDir(t), "candidate.db")
 		if err := os.Mkdir(path, 0o700); err != nil { t.Fatal(err) }
 		if _, err := readRestoreContentIdentityPlatform(path); err == nil { t.Fatal("accepted a directory") }
 	})
 	t.Run("symbolic link", func(t *testing.T) {
-		directory := t.TempDir()
+		directory := restoreTestDir(t)
 		target, link := filepath.Join(directory, "real.db"), filepath.Join(directory, "candidate.db")
 		if err := os.WriteFile(target, []byte("must not follow"), 0o600); err != nil { t.Fatal(err) }
 		if err := os.Symlink(target, link); err != nil {
@@ -58,7 +58,7 @@ func TestReadRestoreContentIdentityRejectsUnsafeEntries(t *testing.T) {
 		}
 	})
 	t.Run("empty", func(t *testing.T) {
-		path := filepath.Join(t.TempDir(), "empty.db")
+		path := filepath.Join(restoreTestDir(t), "empty.db")
 		if err := os.WriteFile(path, nil, 0o600); err != nil { t.Fatal(err) }
 		if _, err := readRestoreContentIdentityPlatform(path); err == nil { t.Fatal("accepted an empty file") }
 	})

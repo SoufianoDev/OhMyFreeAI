@@ -9,7 +9,7 @@ import (
 )
 
 func TestInspectRestoreRecoveryFilesIdentifiesCandidatePreviousAndMissing(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	candidate := []byte("candidate database bytes")
 	previous := []byte("previous database bytes")
 	candidateIdentity := restoreIdentityForTest(candidate)
@@ -40,7 +40,7 @@ func TestInspectRestoreRecoveryFilesIdentifiesCandidatePreviousAndMissing(t *tes
 }
 
 func TestInspectRestoreRecoveryFilesMarksUnexpectedContentAsMismatch(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.Phase = RestorePhasePrepared
 
@@ -58,7 +58,7 @@ func TestInspectRestoreRecoveryFilesMarksUnexpectedContentAsMismatch(t *testing.
 }
 
 func TestInspectRestoreRecoveryFilesRejectsIndistinguishableCandidateAndPrevious(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.CandidateSHA256 = journal.PreviousSHA256
 	journal.CandidateSize = journal.PreviousSize
@@ -72,8 +72,8 @@ func TestInspectRestoreRecoveryFilesRejectsSymlinkWithoutChangingIt(t *testing.T
 	if runtime.GOOS == "windows" {
 		t.Skip("creating symlinks may require elevated privileges on Windows")
 	}
-	root := t.TempDir()
-	outside := filepath.Join(t.TempDir(), "outside.db")
+	root := restoreTestDir(t)
+	outside := filepath.Join(restoreTestDir(t), "outside.db")
 	if err := os.WriteFile(outside, []byte("outside database"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -95,7 +95,7 @@ func TestInspectRestoreRecoveryFilesRejectsSymlinkWithoutChangingIt(t *testing.T
 }
 
 func TestReadRestoreContentIdentityDoesNotTreatMissingParentAsMissingLeaf(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "missing-parent", "missing.db")
+	path := filepath.Join(restoreTestDir(t), "missing-parent", "missing.db")
 	if _, err := readRestoreContentIdentityPlatform(path); err == nil || errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("readRestoreContentIdentityPlatform() error = %v, want a non-NotExist parent error", err)
 	}
@@ -115,7 +115,7 @@ func TestCanonicalStateDirectoryRejectsNonPrivateDirectory(t *testing.T) {
 }
 
 func TestReadRestoreContentIdentityReportsMissingLeafAsNotExist(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "missing.db")
+	path := filepath.Join(restoreTestDir(t), "missing.db")
 	if _, err := readRestoreContentIdentityPlatform(path); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("readRestoreContentIdentityPlatform() error = %v, want os.ErrNotExist", err)
 	}

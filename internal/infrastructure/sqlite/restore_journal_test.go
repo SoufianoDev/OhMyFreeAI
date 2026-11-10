@@ -44,7 +44,7 @@ func canonicalTestRestorePath(t *testing.T, path string) string {
 }
 
 func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.RollbackPath = filepath.Join(root, ".restore-rollback.db")
 	if err := WriteRestoreJournal(root, journal); err != nil {
@@ -101,7 +101,7 @@ func TestRestoreJournalRoundTripAndAtomicPhaseUpdate(t *testing.T) {
 }
 
 func TestWriteRestoreJournalFillsMissingTimestamp(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.UpdatedAt = time.Time{}
 	before := time.Now().Add(-time.Second)
@@ -118,8 +118,8 @@ func TestWriteRestoreJournalFillsMissingTimestamp(t *testing.T) {
 }
 
 func TestWriteRestoreJournalRejectsPathsOutsideStateDirectory(t *testing.T) {
-	root := t.TempDir()
-	outside := t.TempDir()
+	root := restoreTestDir(t)
+	outside := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.StagingPath = filepath.Join(outside, "stage.db")
 	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
@@ -128,7 +128,7 @@ func TestWriteRestoreJournalRejectsPathsOutsideStateDirectory(t *testing.T) {
 }
 
 func TestWriteRestoreJournalRejectsInvalidPhaseAndArchiveIdentity(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.Phase = RestorePhase("unknown")
 	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
@@ -149,7 +149,7 @@ func TestWriteRestoreJournalRejectsInvalidPhaseAndArchiveIdentity(t *testing.T) 
 }
 
 func TestReadRestoreJournalRejectsUnknownFieldsAndTrailingData(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	path := filepath.Join(root, restoreJournalFileName)
 	for _, content := range []string{
 		`{"version":1,"unknown":true}`,
@@ -168,7 +168,7 @@ func TestReadRestoreJournalRejectsSymlink(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("creating symlinks may require elevated privileges on Windows")
 	}
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	target := filepath.Join(root, "target")
 	if err := os.WriteFile(target, []byte("{}"), 0o600); err != nil {
 		t.Fatalf("write symlink target: %v", err)
@@ -185,7 +185,7 @@ func TestWriteRestoreJournalRejectsSymlinkedTransactionPath(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("creating symlinks may require elevated privileges on Windows")
 	}
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	outside := filepath.Join(root, "outside.db")
 	if err := os.WriteFile(outside, []byte("not a database"), 0o600); err != nil {
 		t.Fatalf("write outside file: %v", err)
@@ -203,7 +203,7 @@ func TestWriteRestoreJournalRejectsSymlinkedTransactionPath(t *testing.T) {
 
 
 func TestRestoreJournalPreservesExplicitNoPreviousDatabase(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.PreviousDatabaseExisted = boolPointer(false)
 	journal.RollbackPath = ""
@@ -222,7 +222,7 @@ func TestRestoreJournalPreservesExplicitNoPreviousDatabase(t *testing.T) {
 }
 
 func TestReadRestoreJournalRejectsMissingPreviousDatabaseMetadata(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.PreviousDatabaseExisted = nil
 	data, err := json.Marshal(journal)
@@ -238,7 +238,7 @@ func TestReadRestoreJournalRejectsMissingPreviousDatabaseMetadata(t *testing.T) 
 }
 
 func TestReadRestoreJournalRejectsLegacyVersionOne(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.Version = 1
 	data, err := json.Marshal(journal)
@@ -254,7 +254,7 @@ func TestReadRestoreJournalRejectsLegacyVersionOne(t *testing.T) {
 }
 
 func TestReadRestoreJournalRejectsLegacyVersionTwo(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.Version = 2
 	data, err := json.Marshal(journal)
@@ -270,7 +270,7 @@ func TestReadRestoreJournalRejectsLegacyVersionTwo(t *testing.T) {
 }
 
 func TestRestoreJournalV3AcceptsIntentAndTerminalPhases(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	for _, phase := range []RestorePhase{
 		RestorePhasePreservingPrevious,
 		RestorePhasePublishing,
@@ -295,7 +295,7 @@ func TestRestoreJournalV3AcceptsIntentAndTerminalPhases(t *testing.T) {
 }
 
 func TestWriteRestoreJournalRequiresCandidateIdentityBeforePublication(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	for _, phase := range []RestorePhase{
 		RestorePhasePublishing,
 		RestorePhasePublished,
@@ -317,7 +317,7 @@ func TestWriteRestoreJournalRequiresCandidateIdentityBeforePublication(t *testin
 }
 
 func TestWriteRestoreJournalRejectsIncompleteOrInvalidContentIdentities(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	tests := []struct {
 		name string
 		mutate func(*RestoreJournal)
@@ -343,7 +343,7 @@ func TestWriteRestoreJournalRejectsIncompleteOrInvalidContentIdentities(t *testi
 }
 
 func TestWriteRestoreJournalRequiresPreviousIdentityIffPreviousDatabaseExists(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.PreviousSHA256 = ""
 	journal.PreviousSize = 0
@@ -360,7 +360,7 @@ func TestWriteRestoreJournalRequiresPreviousIdentityIffPreviousDatabaseExists(t 
 }
 
 func TestWriteRestoreJournalRejectsCandidateQuarantinePathCollisions(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	for _, path := range []string{
 		filepath.Join(root, "state.db"),
 		filepath.Join(root, ".restore-stage.db"),
@@ -375,8 +375,8 @@ func TestWriteRestoreJournalRejectsCandidateQuarantinePathCollisions(t *testing.
 }
 
 func TestWriteRestoreJournalRejectsCandidateQuarantineOutsideStateDirectory(t *testing.T) {
-	root := t.TempDir()
-	outside := t.TempDir()
+	root := restoreTestDir(t)
+	outside := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.CandidateQuarantinePath = filepath.Join(outside, "candidate.db")
 	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
@@ -387,7 +387,7 @@ func TestWriteRestoreJournalRejectsCandidateQuarantineOutsideStateDirectory(t *t
 
 
 func TestWriteRestoreJournalRejectsInconsistentRollbackMetadata(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.RollbackPath = ""
 	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
@@ -402,7 +402,7 @@ func TestWriteRestoreJournalRejectsInconsistentRollbackMetadata(t *testing.T) {
 }
 
 func TestReadRestoreJournalRejectsInconsistentRollbackMetadata(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validTestRestoreJournal(root)
 	journal.RollbackPath = ""
 	data, err := json.Marshal(journal)
@@ -433,7 +433,7 @@ func TestReadRestoreJournalRejectsInconsistentRollbackMetadata(t *testing.T) {
 
 
 func TestWriteRestoreJournalRejectsNonRegularTransactionPaths(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	directory := filepath.Join(root, "stage-directory")
 	if err := os.Mkdir(directory, 0o700); err != nil {
 		t.Fatalf("create staging directory: %v", err)

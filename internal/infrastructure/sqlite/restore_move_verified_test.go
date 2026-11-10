@@ -16,7 +16,7 @@ func restoreIdentityForTest(content []byte) RestoreContentIdentity {
 }
 
 func TestMoveRestoreFileNoReplaceVerified(t *testing.T) {
-	directory := t.TempDir()
+	directory := restoreTestDir(t)
 	source := filepath.Join(directory, "candidate.staging")
 	destination := filepath.Join(directory, "candidate.db")
 	content := []byte("verified candidate bytes")
@@ -40,7 +40,7 @@ func TestMoveRestoreFileNoReplaceVerified(t *testing.T) {
 }
 
 func TestMoveRestoreFileNoReplaceVerifiedPreservesIdentityMismatch(t *testing.T) {
-	directory := t.TempDir()
+	directory := restoreTestDir(t)
 	source := filepath.Join(directory, "candidate.staging")
 	destination := filepath.Join(directory, "candidate.db")
 	actual := []byte("different candidate bytes")
@@ -65,7 +65,7 @@ func TestMoveRestoreFileNoReplaceVerifiedPreservesIdentityMismatch(t *testing.T)
 }
 
 func TestMoveRestoreFileNoReplaceVerifiedRejectsInvalidExpectedIdentityBeforeMove(t *testing.T) {
-	directory := t.TempDir()
+	directory := restoreTestDir(t)
 	source := filepath.Join(directory, "candidate.staging")
 	destination := filepath.Join(directory, "candidate.db")
 	content := []byte("candidate bytes")

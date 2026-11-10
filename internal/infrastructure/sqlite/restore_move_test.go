@@ -12,7 +12,7 @@ import (
 
 func TestMoveRestoreFileNoReplace(t *testing.T) {
 	t.Run("moves regular file", func(t *testing.T) {
-		directory := t.TempDir()
+		directory := restoreTestDir(t)
 		source := filepath.Join(directory, "source.db")
 		destination := filepath.Join(directory, "target.db")
 		if err := os.WriteFile(source, []byte("candidate"), 0o600); err != nil {
@@ -35,7 +35,7 @@ func TestMoveRestoreFileNoReplace(t *testing.T) {
 	})
 
 	t.Run("destination collision preserves both files", func(t *testing.T) {
-		directory := t.TempDir()
+		directory := restoreTestDir(t)
 		source := filepath.Join(directory, "source.db")
 		destination := filepath.Join(directory, "target.db")
 		if err := os.WriteFile(source, []byte("candidate"), 0o600); err != nil {
@@ -64,7 +64,7 @@ func TestMoveRestoreFileNoReplace(t *testing.T) {
 	})
 
 	t.Run("rejects symbolic-link source", func(t *testing.T) {
-		directory := t.TempDir()
+		directory := restoreTestDir(t)
 		realFile := filepath.Join(directory, "real.db")
 		source := filepath.Join(directory, "source.db")
 		destination := filepath.Join(directory, "target.db")
@@ -90,7 +90,7 @@ func TestMoveRestoreFileNoReplace(t *testing.T) {
 	})
 
 	t.Run("rejects non-regular source", func(t *testing.T) {
-		directory := t.TempDir()
+		directory := restoreTestDir(t)
 		source := filepath.Join(directory, "source")
 		destination := filepath.Join(directory, "target")
 		if err := os.Mkdir(source, 0o700); err != nil {
@@ -106,7 +106,7 @@ func TestMoveRestoreFileNoReplace(t *testing.T) {
 	})
 
 	t.Run("requires one containing directory", func(t *testing.T) {
-		directory := t.TempDir()
+		directory := restoreTestDir(t)
 		source := filepath.Join(directory, "source.db")
 		destinationDirectory := filepath.Join(directory, "other")
 		if err := os.Mkdir(destinationDirectory, 0o700); err != nil {
@@ -127,7 +127,7 @@ func TestMoveRestoreFileNoReplace(t *testing.T) {
 }
 
 func TestMoveRestoreFileNoReplaceConcurrentCollision(t *testing.T) {
-	directory := t.TempDir()
+	directory := restoreTestDir(t)
 	destination := filepath.Join(directory, "target.db")
 	sources := []string{
 		filepath.Join(directory, "candidate-a.db"),

@@ -31,7 +31,7 @@ func validV3TestJournal(root string) RestoreJournal {
 }
 
 func TestRestoreJournalV3RoundTripPersistsIntentAndContentIdentities(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validV3TestJournal(root)
 	journal.Phase = RestorePhasePreservingPrevious
 	if err := WriteRestoreJournal(root, journal); err != nil {
@@ -55,7 +55,7 @@ func TestRestoreJournalV3RoundTripPersistsIntentAndContentIdentities(t *testing.
 }
 
 func TestRestoreJournalV3RejectsVersionTwo(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validV3TestJournal(root)
 	journal.Version = 2
 	data, err := json.Marshal(journal)
@@ -90,7 +90,7 @@ func TestRestoreJournalV3RejectsIdentityPairsAndInvalidDigests(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			root := t.TempDir()
+			root := restoreTestDir(t)
 			journal := validV3TestJournal(root)
 			test.mutate(&journal)
 			if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
@@ -101,7 +101,7 @@ func TestRestoreJournalV3RejectsIdentityPairsAndInvalidDigests(t *testing.T) {
 }
 
 func TestRestoreJournalV3RejectsQuarantinePathCollisions(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validV3TestJournal(root)
 	journal.CandidateQuarantinePath = journal.TargetPath
 	if err := WriteRestoreJournal(root, journal); !errors.Is(err, ErrRestoreJournalInvalid) {
@@ -115,7 +115,7 @@ func TestRestoreJournalV3RejectsQuarantinePathCollisions(t *testing.T) {
 }
 
 func TestRestoreJournalV3FirstDatabaseOmitsPreviousIdentity(t *testing.T) {
-	root := t.TempDir()
+	root := restoreTestDir(t)
 	journal := validV3TestJournal(root)
 	journal.PreviousDatabaseExisted = boolPointer(false)
 	journal.RollbackPath = ""
