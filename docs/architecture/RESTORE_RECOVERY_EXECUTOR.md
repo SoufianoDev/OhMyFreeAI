@@ -345,7 +345,7 @@ The move helper is still isolated. It is not yet called by a transaction executo
 The Windows directory walk now checks the DACL of the trusted volume root and every opened ancestor component, not only the final state directory. Ancestor checks reject NULL DACLs, unsupported ACE layouts and broad write-capable ACEs; they do not require system-owned ancestors to be owned by the current user. The final canonical state directory additionally requires its owner to match TokenUser or the process token's explicit TokenOwner. The implementation is in commits `7f7d7ee773f5656ebbd414a1c9276446e1b48d34` and `781d44be75346ce7a5506fc1bc6b2e7b12ff3e96`; Root CI [42645966152](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645966152) is pending. Do not treat this additional boundary as verified until both platform jobs complete.
 
 
-## Windows namespace durability gate — unresolved after documentation re-review — 2026-11-10
+## Windows namespace durability gate — initial unresolved review (superseded by the 2026-11-10 22:xxZ review)
 
 The implementation is handle-bound, but the available Microsoft contract does not conclusively establish durable persistence of the parent-directory namespace update performed by `NtSetInformationFile(FileRenameInformationEx=65)`. The previous statement that the documentation explicitly guaranteed rename metadata durability was too strong and is withdrawn.
 
@@ -392,4 +392,16 @@ Implement the transaction executor as an isolated infrastructure component that 
 8. Add Linux/Windows failure-injection and abrupt-process-death/restart tests before any startup, GUI or CLI wiring.
 
 Do not use the legacy path-based `RestoreDatabase` helper from this executor. Do not enable Restore until the complete test matrix passes on both platforms.
+
+
+
+## Windows NTFS write-through rename contract — re-reviewed 2026-11-10 22:xxZ
+
+The earlier conclusion that the public Microsoft contract did not cover rename metadata was too conservative and is superseded for the project's explicitly qualified fixed-local-NTFS path.
+
+Microsoft Learn's [CreateFileW documentation](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew), under Caching Behavior, explicitly states that a write-through request causes NTFS to flush metadata changes such as timestamp updates or a rename operation. The native [NtCreateFile documentation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile) defines the native `FILE_WRITE_THROUGH` CreateOptions bit as `0x00000002`. The current adapter uses that native option in `openRestoreSourceWriteThrough`, calls `FlushFileBuffers` on the opened source, then passes the exact same source handle to `NtSetInformationFile(FileRenameInformationEx=65)`. The rename destination is anchored to the retained state-directory handle through `RootDirectory`; artifact moves omit the replace flag.
+
+Together these documented contracts support the NTFS write-through metadata barrier for the handle-bound rename used by this implementation. The existing volume policy remains fixed local NTFS with persistent ACLs only. This does not establish hardware-independent power-loss safety: storage devices/controllers must honor flush requests. It does not qualify ReFS, SMB, removable media or other filesystem providers.
+
+This closes the documented Windows namespace-metadata prerequisite for both artifact moves and the current journal replacement operation. It does **not** close the independent journal lifecycle problem: the single fixed journal cannot be retired on Windows, so a terminal transaction blocks the next one. A retained multi-transaction journal format with crash-safe discovery is still required before implementing the filesystem executor.
 

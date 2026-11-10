@@ -1446,3 +1446,29 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Updated `RESTORE_RECOVERY_EXECUTOR.md` in commit [7346f34](https://github.com/SoufianoDev/OhMyFreeAI/commit/7346f3438887797f0286a2f0a12578d833ea518c) to record the access-contract gap.
 - Clarified that Windows journal phase publication uses the same handle-bound replacement rename as database-artifact publication. Thus the unresolved namespace-durability gate blocks every intent/completion journal update, not merely artifact moves. This clarification is in [18a8f83](https://github.com/SoufianoDev/OhMyFreeAI/commit/18a8f8371b6441af6763b647d9079c1709f844df) and the task-plan correction [a05da29](https://github.com/SoufianoDev/OhMyFreeAI/commit/a05da293e60db419c6c012b89367b4a7884ca0b0).
 - No production source changed. Restore remains disabled.
+
+
+## 2026-11-10 22:xxZ — FIFO identity hardening, CI closure and Windows durability re-review
+
+### Repository and code change
+- Reconciled the remote branch before editing: `foundation/bootstrap` was at documentation-only head `a5dd3e60ec3806bc6f1416513d0ec81d6ebf0029`; the last behavior-changing code commit was `beab78a`. The 19 commits between them changed only planning/progress/architecture documentation.
+- Added `O_NONBLOCK` to the Linux no-follow identity leaf open. Without it, a source leaf swapped to a FIFO after the earlier move preflight could block in `openat2` before the regular-file check. The flag has no effect on normal regular-file reads.
+- Added `TestReadRestoreContentIdentityRejectsFIFOWithoutBlocking`, which creates a FIFO and asserts the identity reader returns an error promptly rather than hanging.
+- Commit: [45b9ac80d701c888a2c1eb07f8ed0f297aa7307b](https://github.com/SoufianoDev/OhMyFreeAI/commit/45b9ac80d701c888a2c1eb07f8ed0f297aa7307b). Only the Linux identity reader and its Linux-specific regression test changed in that code commit.
+
+### CI verification for the exact code commit
+- Root CI [42913865169](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42913865169): Ubuntu and Windows 2/2 SUCCESS. Both job logs show checkout of `45b9ac80d701c888a2c1eb07f8ed0f297aa7307b`. Ubuntu passed `go vet ./...`, `go test ./...`, `go test -race ./...`, build, Python compile/tests, frontend syntax and architecture checks. Windows passed vet, Go tests/build, Python compile/tests, frontend syntax and architecture checks; the Linux-only race step was skipped as designed.
+- SQLite driver evaluation [42913865376](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42913865376): all four modernc/ncruces × Ubuntu/Windows jobs SUCCESS.
+- Wails proof [42913865308](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42913865308): attempt 1 had one Ubuntu-only environment failure at the WebView smoke step because Xvfb did not allocate a display within 10 seconds. The failed Ubuntu job was rerun without a code change; attempt 2 passed both Ubuntu and Windows. The Ubuntu logs show CLI smoke success, two GetSnapshot bridge calls on each of two application launches, and `WEBVIEW_REOPEN_PASS`. Windows native build, CLI smoke and executable verification passed.
+- Linux distribution compatibility [42913865277](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42913865277): 8/8 jobs SUCCESS, including the Ubuntu 22.04 legacy GTK3/WebKit41 job.
+
+### Windows namespace durability contract correction
+- Re-reviewed Microsoft's [CreateFileW write-through documentation](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew). It explicitly states that a write-through request causes NTFS to flush metadata changes, including rename operations.
+- The native [NtCreateFile documentation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile) defines native `FILE_WRITE_THROUGH` as CreateOptions bit `0x00000002`. The current Windows adapter opens the source relative to the retained directory handle with that option and uses the same handle for handle-bound `NtSetInformationFile(FileRenameInformationEx=65)`.
+- This resolves the documented NTFS namespace-metadata barrier under the current fixed-local-NTFS policy. It is not hardware-independent power-loss certification and does not qualify other providers. The architecture document now records the superseding evidence.
+- The independent Windows journal rollover blocker remains: terminal journals cannot be durably removed, and the single fixed filename prevents another transaction. Next design a retained multi-transaction journal with crash-safe discovery and no deletion of evidence.
+
+### Remaining safety state
+- The no-follow identity reader and verified no-replace move helper are tested, but no transaction executor invokes them yet.
+- The journal lifecycle, filesystem executor, durable intent/mutation orchestration, rollback/quarantine execution, startup recovery coordinator and process-death/restart matrix remain incomplete.
+- Restore remains disabled. No GUI/CLI Restore, startup recovery wiring or merge to `main` was added.
