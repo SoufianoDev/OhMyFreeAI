@@ -1377,3 +1377,31 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Verified the Ubuntu 22.04 job's individual steps: setup, container initialization, native dependency installation, checkout, Go/Node setup, pkg-config configuration, pinned Wails CLI installation, actual desktop build, native CLI smoke, and live WebView-to-Go/database-reopen smoke all succeeded.
 - No local test execution is claimed; this session performed a read-only GitHub Actions reconciliation and planning-document update.
 - Restore remains disabled and is not connected to startup recovery, GUI, or CLI.
+
+
+## 2026-11-10 14:19Z — StoreController gate re-verification and next Restore prerequisite
+
+### Requested workflow verification
+- Inspected Root CI run [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`.
+- Ubuntu and Windows jobs both completed successfully (2/2). Both completed module verification, Go vet/tests/build, Python compile/tests, frontend JavaScript syntax and architecture checks. No failed steps were present in either job. This run predates the current code head and is not used as the sole proof for later changes.
+
+### Current branch and code verification
+- Current branch: `foundation/bootstrap`; branch head is documentation-only commit `e086fa76895c2d46ab4bfeee7bd5d104e4bd5e3f`, which changes only this task plan. Latest verified code commit remains `beab78a04f4ef9ae1421247983d25da66ffc3986`.
+- Root CI [42775712875](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712875): Ubuntu and Windows 2/2 SUCCESS.
+- SQLite driver evaluation [42775712758](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712758): modernc/ncruces × Ubuntu/Windows 4/4 SUCCESS.
+- Wails platform proof [42775712787](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712787): Ubuntu and Windows 2/2 SUCCESS.
+- Linux distribution compatibility [42775712919](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712919): 8/8 SUCCESS, including Ubuntu 22.04 legacy GTK3/WebKit41.
+- The Root, SQLite, Wails and distro job lists were fetched and inspected; no failed or pending jobs were returned.
+
+### StoreController review — integration already complete
+- Reviewed `internal/infrastructure/sqlite/store_controller.go` and all 16 lifecycle tests in `store_controller_test.go`: shared/exclusive drain, writer preference, cancellation, panic/failure fail-closed behavior, replacement, close/rejection, concurrent stress, configuration round-trip and Load/Save drain.
+- Re-verified `desktop-src/main.go.tmpl`: startup opens and migrates the Store before creating one application-lifetime StoreController; the configuration service and AppService receive that controller; application shutdown uses a bounded controller Close after `app.Run`.
+- Re-verified `desktop-src/app_service.go.tmpl`: AppService retains the controller, not a raw Store. Config Load/Save go through the controller-backed repository. GUI backup export calls `CreateWithStoreController`.
+- Re-verified CLI backup export creates a controller for the existing database and closes it through the controller. Backup inspection does not access the live Store.
+- Re-verified `Manager.CreateWithStoreController`: it wraps the entire snapshot/archive/verification/publication operation in `WithShared`. `TestManagerCreateWithStoreControllerDrainsBeforeClose` blocks at the publication barrier and proves Close waits for the export lease. No duplicate integration changes were needed.
+
+### New executor prerequisite found
+- `RemoveRestoreJournal` validates a terminal phase, then delegates to the platform adapter. The Windows adapter currently returns `errRestoreJournalRemovalUnsupported` unconditionally.
+- The journal uses one fixed filename and transition validation keeps transaction ID and transaction metadata immutable. Therefore, after a terminal journal is written, a later transaction cannot safely start on Windows: removal is unsupported and a new transaction cannot replace the old transaction's metadata through the transition validator.
+- Do not ignore the removal error, delete the journal through a weaker path API, or overwrite terminal evidence. Before implementing the transaction executor, design a durable multi-transaction journal lifecycle that preserves old evidence and supports crash-safe discovery/recovery, then add Linux/Windows failure-injection and process-death tests for rollover.
+- No source code changed in this review. Restore remains disabled; no startup recovery, GUI/CLI Restore or main merge was added.
