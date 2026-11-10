@@ -4,10 +4,10 @@ package sqlite
 
 import (
 	"crypto/sha256"
-	"errors"
-	"os"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
 	"unsafe"
@@ -15,7 +15,9 @@ import (
 	"golang.org/x/sys/windows"
 )
 
-// readRestoreContentIdentityPlatform opens the leaf relative to a retained,
+//
+//
+	// readRestoreContentIdentityPlatform opens the leaf relative to a retained,
 // security-checked directory handle and hashes from that same no-reparse handle.
 func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, error) {
 	var identity RestoreContentIdentity
