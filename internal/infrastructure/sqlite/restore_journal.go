@@ -83,12 +83,20 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	}
 
 	journalPath := filepath.Join(root, restoreJournalFileName)
-	if info, statErr := os.Lstat(journalPath); statErr == nil {
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("%w: journal path is not a regular file", ErrRestoreJournalInvalid)
+	existing, readErr := ReadRestoreJournal(root)
+	switch {
+	case readErr == nil:
+		if err := validateRestoreJournalTransition(existing, journal); err != nil {
+			return err
 		}
-	} else if !errors.Is(statErr, os.ErrNotExist) {
-		return fmt.Errorf("inspect SQLite restore journal: %w", statErr)
+	case errors.Is(readErr, os.ErrNotExist):
+		if journal.Phase != RestorePhasePrepared {
+			return fmt.Errorf("%w: a new journal must begin in phase %q", ErrRestoreJournalInvalid, RestorePhasePrepared)
+		}
+	default:
+		// A malformed, unreadable, or non-regular existing journal is evidence
+		// that must be preserved. Never replace it with a new transaction.
+		return fmt.Errorf("%w: refusing to overwrite an existing journal that cannot be validated: %v", ErrRestoreJournalInvalid, readErr)
 	}
 
 	temporary, err := os.CreateTemp(root, ".restore-journal-*.tmp")
@@ -168,16 +176,17 @@ func RemoveRestoreJournal(stateDirectory string) error {
 	if err != nil {
 		return err
 	}
-	journalPath := filepath.Join(root, restoreJournalFileName)
-	if info, statErr := os.Lstat(journalPath); statErr == nil {
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("%w: journal path is not a regular file", ErrRestoreJournalInvalid)
-		}
-	} else if errors.Is(statErr, os.ErrNotExist) {
+	journal, err := ReadRestoreJournal(root)
+	if errors.Is(err, os.ErrNotExist) {
 		return nil
-	} else {
-		return fmt.Errorf("inspect SQLite restore journal: %w", statErr)
 	}
+	if err != nil {
+		return err
+	}
+	if journal.Phase != RestorePhaseCommitted && journal.Phase != RestorePhaseRolledBack {
+		return fmt.Errorf("%w: only a committed or rolled-back journal may be removed", ErrRestoreJournalInvalid)
+	}
+	journalPath := filepath.Join(root, restoreJournalFileName)
 	return removeRestoreJournal(root, journalPath)
 }
 
@@ -266,7 +275,9 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 	if err := validateRestoreContentIdentity(journal.CandidateSHA256, journal.CandidateSize, "candidate", false); err != nil {
 		return RestoreJournal{}, err
 	}
-	candidateRequired := journal.Phase == RestorePhasePublishing ||
+	candidateRequired := journal.Phase == RestorePhasePreservingPrevious ||
+		journal.Phase == RestorePhasePreviousPreserved ||
+		journal.Phase == RestorePhasePublishing ||
 		journal.Phase == RestorePhasePublished ||
 		journal.Phase == RestorePhaseReopening ||
 		journal.Phase == RestorePhaseRestoringPrevious ||
@@ -274,6 +285,13 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 		journal.Phase == RestorePhaseRolledBack
 	if candidateRequired && journal.CandidateSHA256 == "" {
 		return RestoreJournal{}, fmt.Errorf("%w: candidate identity is required in phase %q", ErrRestoreJournalInvalid, journal.Phase)
+	}
+	previousRequired := journal.Phase == RestorePhasePreservingPrevious ||
+		journal.Phase == RestorePhasePreviousPreserved ||
+		journal.Phase == RestorePhaseRestoringPrevious ||
+		journal.Phase == RestorePhaseRolledBack
+	if previousRequired && !*journal.PreviousDatabaseExisted {
+		return RestoreJournal{}, fmt.Errorf("%w: phase %q requires a previous database", ErrRestoreJournalInvalid, journal.Phase)
 	}
 	if !*journal.PreviousDatabaseExisted && (journal.PreviousSHA256 != "" || journal.PreviousSize != 0) {
 		return RestoreJournal{}, fmt.Errorf("%w: previous database identity is unexpected when no previous database exists", ErrRestoreJournalInvalid)
@@ -342,3 +360,67 @@ func validRestorePhase(phase RestorePhase) bool {
 	}
 }
 
+
+
+// validateRestoreJournalTransition prevents a later write from changing the
+// transaction's identity or skipping a durable intent/completion phase.
+func validateRestoreJournalTransition(current, next RestoreJournal) error {
+	invalid := func(reason string) error {
+		return fmt.Errorf("%w: %s", ErrRestoreJournalInvalid, reason)
+	}
+	if current.Version != next.Version ||
+		current.TransactionID != next.TransactionID ||
+		current.TargetPath != next.TargetPath ||
+		current.StagingPath != next.StagingPath ||
+		current.RollbackPath != next.RollbackPath ||
+		current.CandidateQuarantinePath != next.CandidateQuarantinePath ||
+		current.PreviousDatabaseExisted == nil ||
+		next.PreviousDatabaseExisted == nil ||
+		*current.PreviousDatabaseExisted != *next.PreviousDatabaseExisted ||
+		current.ArchiveSHA256 != next.ArchiveSHA256 ||
+		current.ArchiveSize != next.ArchiveSize ||
+		current.PreviousSHA256 != next.PreviousSHA256 ||
+		current.PreviousSize != next.PreviousSize {
+		return invalid("transaction metadata and previous-database identity are immutable")
+	}
+	if current.CandidateSHA256 != "" {
+		if next.CandidateSHA256 != current.CandidateSHA256 || next.CandidateSize != current.CandidateSize {
+			return invalid("candidate identity cannot be changed or cleared")
+		}
+	} else if next.CandidateSHA256 != "" && next.Phase != RestorePhaseStaging {
+		return invalid("candidate identity may only be recorded during staging")
+	}
+	if !validRestorePhaseTransition(current.Phase, next.Phase, *current.PreviousDatabaseExisted) {
+		return invalid(fmt.Sprintf("illegal phase transition %q -> %q", current.Phase, next.Phase))
+	}
+	return nil
+}
+
+func validRestorePhaseTransition(current, next RestorePhase, hasPrevious bool) bool {
+	if current == next {
+		return true
+	}
+	switch current {
+	case RestorePhasePrepared:
+		return next == RestorePhaseStaging
+	case RestorePhaseStaging:
+		if hasPrevious {
+			return next == RestorePhasePreservingPrevious
+		}
+		return next == RestorePhasePublishing
+	case RestorePhasePreservingPrevious:
+		return next == RestorePhasePreviousPreserved
+	case RestorePhasePreviousPreserved:
+		return next == RestorePhasePublishing || (hasPrevious && next == RestorePhaseRestoringPrevious)
+	case RestorePhasePublishing:
+		return next == RestorePhasePublished || (hasPrevious && next == RestorePhaseRestoringPrevious)
+	case RestorePhasePublished:
+		return next == RestorePhaseReopening || (hasPrevious && next == RestorePhaseRestoringPrevious)
+	case RestorePhaseReopening:
+		return next == RestorePhaseCommitted || (hasPrevious && next == RestorePhaseRestoringPrevious)
+	case RestorePhaseRestoringPrevious:
+		return next == RestorePhaseRolledBack
+	default:
+		return false
+	}
+}

@@ -89,7 +89,9 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 		files.Rollback != RestoreFileMissing {
 		return ambiguous("unexpected previous database identity or rollback artifact")
 	}
-	candidateRequired := journal.Phase == RestorePhasePublishing ||
+	candidateRequired := journal.Phase == RestorePhasePreservingPrevious ||
+		journal.Phase == RestorePhasePreviousPreserved ||
+		journal.Phase == RestorePhasePublishing ||
 		journal.Phase == RestorePhasePublished ||
 		journal.Phase == RestorePhaseReopening ||
 		journal.Phase == RestorePhaseRestoringPrevious ||
