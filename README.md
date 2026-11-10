@@ -11,7 +11,7 @@ OhMyFreeAI is a cross-platform desktop application focused on managing model art
 - Free-only. No paid hosting, model APIs, or mandatory paid dependencies.
 - Linux and Windows are first-class targets; macOS is deferred.
 - Go 1.27.3 is the target toolchain; Go owns application logic and lifecycle.
-- Wails is a desktop-shell candidate; its major version is not locked until the Linux/Windows proof-of-concept passes.
+- Wails v3.0.0 is pinned as the desktop shell; Linux defaults to GTK4/WebKitGTK 6.0, with a tested legacy GTK3/WebKitGTK 4.1 compatibility path.
 - Frontend: semantic HTML, CSS, and JavaScript ES modules, using Material Design 3 tokens and accessible interaction patterns.
 - SQLite is the planned application store.
 - llama.cpp is the primary inference engine, subject to exact artifact/backend/runtime compatibility checks.
@@ -21,7 +21,7 @@ OhMyFreeAI is a cross-platform desktop application focused on managing model art
 
 ## Status
 
-This repository is in the architecture/bootstrap phase. The current work is on `foundation/bootstrap`. The earlier Wails monitor archives and Python patch/monitor scripts are audit inputs, not production code.
+This repository is in the architecture/bootstrap phase. The current work is on `foundation/bootstrap`. The native Wails v3.0.0 build passes on Linux and Windows; Linux live WebView-to-Go bridge/database-reopen smoke tests pass. The earlier Wails monitor archives and Python patch/monitor scripts are audit inputs, not production code.
 
 ## Documentation
 
@@ -45,13 +45,16 @@ This repository is in the architecture/bootstrap phase. The current work is on `
 
 Project-scoped agent skills live in [`.agents/skills/`](.agents/skills/README.md). Planning records live under [`.planning/`](.planning/). Read the active task plan before making architectural changes.
 
+## Linux WebKitGTK signal diagnostic
+
+JavaScriptCore uses `SIGUSR1` (signal 10 on Linux) for GC thread suspend/resume. Depending on the host's existing signal handlers, WebKitGTK may print `Overriding existing handler for signal 10. Set JSC_SIGNAL_FOR_GC if you want WebKit to use a different signal`. Wails v3.0.0 contains the upstream Linux signal-stack compatibility fix: it leaves `SIGUSR1` to JavaScriptCore, reapplies Go's `SA_ONSTACK` requirement to the other relevant signals during initial WebView creation, and reapplies it after `WEBKIT_LOAD_FINISHED`. Do not silence the message by assigning an arbitrary `JSC_SIGNAL_FOR_GC` value; that signal participates in JavaScriptCore's GC coordination. The warning was not reproduced in the current Ubuntu 24.04 CI smoke test, which successfully exercised the bridge twice and reopened the database.
+
 ## Current engineering gate
 
 Do not start broad model-catalog implementation or enable remote inference until:
 1. the Colab Free usage pattern is policy-reviewed and explicitly permitted;
-2. the Wails major version passes a Linux and Windows proof-of-concept;
-3. llama.cpp binary distribution is pinned to a tested stable release/backend combination;
-4. the exact model/checkpoint/quantization has passed a real load and inference test.
+2. llama.cpp binary distribution is pinned to a tested stable release/backend combination;
+3. the exact model/checkpoint/quantization has passed a real load and inference test.
 
 ## License
 

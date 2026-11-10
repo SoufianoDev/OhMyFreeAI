@@ -1315,3 +1315,31 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - The separate decoy-handle validation test likewise creates the replacement tree after renaming the pinned directory and rejects a handle opened from that replacement.
 - This changes test ordering only; production rename implementation is unchanged. Fresh Windows Root CI is required.
 - Restore remains disabled; no executor/recovery/UI/CLI integration and no merge to main.
+
+
+## Verification closure — Windows relative rename regression and WebKit signal audit — 2026-11-10 00:20Z
+
+### Current code commit
+- Branch `foundation/bootstrap`, code HEAD `410dbf88d091e012f360fe5f3fe409da05811615`: [commit](https://github.com/SoufianoDev/OhMyFreeAI/commit/410dbf88d091e012f360fe5f3fe409da05811615).
+
+### CI on `410dbf8`
+- Root CI [42726913181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42726913181): Ubuntu and Windows both SUCCESS. Windows Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks passed; Linux Go race detector passed. Windows correctly skipped Linux-only race detection.
+- SQLite driver evaluation [42726913184](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42726913184): all four jobs SUCCESS (modernc and ncruces on Ubuntu and Windows).
+- Wails platform proof [42726913002](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42726913002): both jobs SUCCESS. Linux native build, CLI smoke, executable verification, two live frontend-to-Go bridge calls and database reopen smoke passed. Windows native build, CLI smoke and executable verification passed.
+- Linux distro compatibility [42725119228](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42725119228) on ancestor commit `79c3e6f`: 8/8 jobs SUCCESS. No production code changed after that matrix; later commits changed only Windows tests and planning records.
+- Root CI run [42726626677] on intermediate commit `ec10edf` passed Ubuntu and failed Windows only in a test setup that attempted to rename a directory while a file in it remained open. The test was reordered to rename before opening the source. The final Windows Root CI above passes.
+
+### Windows handle-bound rename
+- The final regression now proves: rename the retained directory object before opening its source; create a decoy replacement tree at the old path; open the source using the retained directory handle's resolved path; then perform `NtSetInformationFile(FileRenameInformationEx)` with the destination directory handle in `RootDirectory`. The original content must publish only into the retained directory, and the decoy remains untouched.
+- The independent decoy-handle validation test and journal relative-replace test also pass in Windows Root CI.
+- This verifies the implementation and regressions on the Windows CI runner. It is not a hardware-independent power-loss proof and does not activate Restore.
+
+### JSC signal 10 investigation
+- Exa research reviewed WebKit's configurable GC-signal work and upstream Wails changes [#5507](https://github.com/wailsapp/wails/commit/6329e9d2bec94a6916b9a700667b78a9569a3d9b) and [#5530](https://github.com/wailsapp/wails/commit/ef782b77c892b6a7e45c3227f73fb0e20d0ed600).
+- Inspected the actual Wails `v3.0.0` tag source. GTK4 and GTK3 paths both leave `SIGUSR1` to JavaScriptCore (do not add Go's `SA_ONSTACK` flag to JSC's handler), schedule the signal-stack compatibility repair for the first five seconds after WebView creation, and reapply it at `WEBKIT_LOAD_FINISHED`.
+- The warning is a known JSC signal-handler ownership diagnostic, not proof by itself of a failed WebView. Do not set `JSC_SIGNAL_FOR_GC` to an arbitrary signal as a cosmetic workaround. The current Linux CI smoke log did not reproduce the warning; it did pass both bridge calls and database reopen.
+- No local signal-handler override was added; the project uses the pinned Wails v3.0.0 upstream implementation.
+
+### Remaining safety boundary
+- Restore remains disabled. Passing Go tests and CI does not prove crash/power-loss durability across hardware, storage controllers, or filesystems.
+- Do not start Restore Executor, durable journal integration, startup recovery, UI/CLI Restore, or merge to `main` until all required safety gates are separately demonstrated.

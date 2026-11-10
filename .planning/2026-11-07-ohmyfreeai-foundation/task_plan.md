@@ -440,3 +440,16 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - The decoy validation test uses the same rename-before-open order. No production code changed.
 - Run fresh Windows Root CI; do not mark Windows safety verified until Go tests pass.
 - Restore remains disabled; no executor, startup recovery, UI/CLI integration, or merge to main.
+
+
+## 2026-11-10 — Verification and JSC signal handling
+
+- [x] Correct the Windows directory-rename regression ordering to respect Windows' open-file rename restrictions.
+- [x] Verify final Windows handle-relative no-replace rename, decoy rejection, and journal relative replacement in Windows Root CI.
+- [x] Root CI on `410dbf88d091e012f360fe5f3fe409da05811615`: Ubuntu + Windows SUCCESS; Go vet/tests/build, Python tests, frontend syntax and architecture checks passed; Ubuntu race detection passed.
+- [x] SQLite driver evaluation on the same commit: modernc/ncruces × Ubuntu/Windows 4/4 SUCCESS.
+- [x] Wails v3.0.0 platform proof on the same commit: Ubuntu + Windows SUCCESS; Linux live bridge and database reopen smoke passed; Windows native build/CLI smoke passed.
+- [x] Linux distribution compatibility matrix on ancestor `79c3e6f`: 8/8 SUCCESS; no production code changed in subsequent test/planning commits.
+- [x] Investigate `Overriding existing handler for signal 10`: verified Wails v3.0.0's upstream fix leaves JSC's SIGUSR1 handler alone, reapplies Go-compatible SA_ONSTACK flags to other relevant signals during first WebView initialization, and re-applies after page load. No arbitrary `JSC_SIGNAL_FOR_GC` override is warranted.
+- [ ] Keep Restore disabled until full namespace durability, post-move identity, journal recovery and platform safety gates are independently complete. CI success is not a power-loss guarantee.
+- No Restore executor, startup recovery, UI/CLI Restore, or merge to main.
