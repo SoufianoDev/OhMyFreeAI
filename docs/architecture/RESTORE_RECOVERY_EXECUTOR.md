@@ -345,24 +345,34 @@ The move helper is still isolated. It is not yet called by a transaction executo
 The Windows directory walk now checks the DACL of the trusted volume root and every opened ancestor component, not only the final state directory. Ancestor checks reject NULL DACLs, unsupported ACE layouts and broad write-capable ACEs; they do not require system-owned ancestors to be owned by the current user. The final canonical state directory additionally requires its owner to match TokenUser or the process token's explicit TokenOwner. The implementation is in commits `7f7d7ee773f5656ebbd414a1c9276446e1b48d34` and `781d44be75346ce7a5506fc1bc6b2e7b12ff3e96`; Root CI [42645966152](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645966152) is pending. Do not treat this additional boundary as verified until both platform jobs complete.
 
 
-## Windows namespace durability gate — resolved for qualified NTFS — 2026-11-10
+## Windows namespace durability gate — unresolved after documentation re-review — 2026-11-10
 
-The earlier blocker is superseded by the current handle-bound write-through implementation and primary Microsoft documentation review.
+The implementation is handle-bound, but the available Microsoft contract does not conclusively establish durable persistence of the parent-directory namespace update performed by `NtSetInformationFile(FileRenameInformationEx=65)`. The previous statement that the documentation explicitly guaranteed rename metadata durability was too strong and is withdrawn.
 
-### Established contract
+### What the implementation currently does
 
-- The source is opened relative to the retained state-directory handle with native `NtCreateFile` and `FILE_WRITE_THROUGH` CreateOptions 0x00000002.
-- The source handle is flushed with `FlushFileBuffers` before the rename.
-- The no-replace rename is performed through that same source handle using `NtSetInformationFile(FileRenameInformationEx=65)`; the replacement flag is omitted and the destination is rooted at the retained directory handle.
-- Microsoft documents the native `FILE_WRITE_THROUGH` option and documents that a write-through request causes NTFS to flush metadata changes, including rename operations, resulting from processing the request.
-- The volume gate restricts this path to fixed local NTFS with persistent ACLs. Unsupported filesystem/provider combinations remain fail-closed.
-- Linux performs `fsync` on the pinned parent-directory FD after each successful no-replace namespace mutation.
+- Opens the source relative to the retained state-directory handle with native `NtCreateFile`, `FILE_OPEN_REPARSE_POINT`, and native `FILE_WRITE_THROUGH` CreateOptions 0x00000002.
+- Calls `FlushFileBuffers` on the source handle before rename.
+- Performs the no-replace rename through that same source handle using `NtSetInformationFile(FileRenameInformationEx=65)`; the replacement flag is omitted and the destination is rooted at the retained directory handle.
+- Restricts the supported Windows volume to fixed local NTFS with persistent ACLs. Other filesystem/provider combinations remain fail-closed.
 
-### What this does not establish
+### What the primary documentation actually establishes
 
-- It is not a hardware-independent power-loss certification. Storage devices, controllers, virtualization layers or filesystems that falsely acknowledge flush/write-through requests remain outside the application's guarantee.
-- It does not eliminate Linux's source-leaf name-selection race. The executor must verify size/SHA-256 from a no-follow handle after every move and before SQLite is opened.
-- It does not implement a filesystem transaction executor, startup recovery, rollback orchestration or process-death tests.
+- Microsoft [File Caching](https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching) says file-system metadata is always cached and that metadata changes must be flushed or the file opened with `FILE_FLAG_WRITE_THROUGH`. It does not explicitly describe the durability of the parent-directory entry changed by a handle-based rename.
+- Microsoft [NtCreateFile](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile) describes native `FILE_WRITE_THROUGH` as requiring data written to the file to be transferred before a write request completes. That wording does not explicitly specify the crash-durability contract for `FileRenameInformationEx`.
+- Microsoft [MS-FSCC FileRenameInformationEx](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c) specifies rename layout, relative `RootDirectory`, and no-replace behavior when the replace flag is absent. It defines no write-through or durable-directory-entry flag.
+- Microsoft [FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers) flushes buffers for the specified file handle. The reviewed contract does not say that flushing the renamed file handle also durably flushes its containing directory's namespace entry.
+- Linux has a clearer documented boundary: [fsync(2)](https://man7.org/linux/man-pages/man2/fsync.2.html) explicitly says syncing a file does not necessarily sync its directory entry and requires a separate directory-FD `fsync`. The current Linux adapter performs that parent-directory sync after namespace mutation.
+
+### Gate decision
+
+The current Windows implementation is valuable identity protection and requests write-through behavior, but this review cannot certify the rename's directory-entry durability after power loss from the cited public contract alone. Do not describe the Windows namespace durability gate as resolved. Do not infer a guarantee from NTFS CI success or process-crash tests.
+
+No ordinary-user directory-handle flush recipe with a documented, supported contract has been established in this review. Do not add an undocumented directory flush, a path-based fallback, `MoveFileExW`, or an overwrite-capable fallback to make the test pass. Keep the gate unresolved until a supported contract or a different journal/database protocol removes the dependency.
+
+Linux continues to use `fsync` on the pinned parent-directory FD after successful no-replace namespace mutations. Its source-leaf selection race remains separate: the executor must verify size/SHA-256 from a no-follow handle after every move and before SQLite is opened.
+
+This gate is independent of the still-blocking Windows terminal-journal rollover problem. The filesystem transaction executor, startup recovery, rollback orchestration and process-death tests remain unimplemented.
 
 ### Required next implementation step
 
