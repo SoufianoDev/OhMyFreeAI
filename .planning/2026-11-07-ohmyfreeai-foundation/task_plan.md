@@ -6,15 +6,20 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-The baseline workflow 42419106009 passed Ubuntu and Windows on `f5396ee592b9b9756779f67aeabd6d7167520c40`. StoreController integration is already present and verified: Wails composition root, AppService, config repository, GUI/CLI backup leases, shutdown drain, stale-store rejection and failure-safe replacement tests.
+Latest verified code head: `9ca1f7e6de8ecca00970b3201601ca70f31ddb95` on `foundation/bootstrap` (2026-11-10). The latest commit adjusts Restore test fixtures to use private state directories; its parent `66fc1cea213aa575dd704aa22a922d53f7186b75` added the production private-directory boundary.
 
-Windows Restore path traversal opens each component relative to retained parent handles. The owner/DACL and volume gate is implemented on `foundation/bootstrap`: directory ownership must match either the process TokenUser or its explicit TokenOwner; NULL DACLs and broad writable ACEs are rejected; only fixed local NTFS with persistent ACLs is qualified.
+All workflow families for that exact code commit completed successfully:
 
-**The gate is now CI-verified.** Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765), commit `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5`, passed Ubuntu and Windows. Ubuntu passed vet, Go tests, race detector, build, Python compile/tests, frontend syntax and architecture checks. Windows passed vet, Go tests, build, Python compile/tests, frontend syntax and architecture checks; Linux-only race detection was skipped as expected. Wails [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) also passed both platforms.
+- Root CI [42772101619](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101619): Ubuntu and Windows passed; Ubuntu race detector passed.
+- SQLite driver matrix [42772101510](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101510): modernc/ncruces on Ubuntu/Windows, 4/4 passed.
+- Wails platform proof [42772101659](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101659): 2/2 passed, including Linux native build/CLI/WebView bridge/database reopen and Windows native build/CLI/executable verification.
+- Linux distribution compatibility [42772101557](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101557): 8/8 passed.
 
-The cross-platform no-follow content identity readers and post-move SHA-256/size verification helper are now present in the branch. The helper preserves a moved destination and returns an error on identity mismatch; it does not open SQLite and does not provide a namespace durability barrier. Latest observed branch head: `38ffa21f8b2fef05bc98b80e4ed5c8c1836bd0ff`; no CI status or PR-triggered workflow run was returned for that commit, so these new tests are not yet CI-verified.
+The Linux parent-directory durability step is implemented: the no-replace move syncs the already-pinned parent directory FD after rename. The Windows NTFS durability gate is now documented against Microsoft's `NtCreateFile(FILE_WRITE_THROUGH)` and `CreateFile(FILE_FLAG_WRITE_THROUGH)` contracts; the same retained source handle is flushed and used for the native handle-bound no-replace rename. This is a documented NTFS write-through request, not hardware-independent power-loss certification. Cross-platform no-follow identity readers and the post-move SHA-256/size helper are present, but the helper is not yet integrated into a transaction executor.
 
-**New blocker before executor implementation:** primary Windows API documentation reviewed on 2026-11-09 does not establish a supported non-administrative user-mode durability barrier for the namespace entry changed by the retained-handle `NtSetInformationFile(FileRenameInformationEx=65)` no-replace rename. `FileRenameInformationEx` exposes no write-through flag; `FlushFileBuffers` requires GENERIC_WRITE and only documents volume-wide flushing with administrative privileges; `MoveFileExW(MOVEFILE_WRITE_THROUGH)` does not establish the required guarantee for the same-volume rename path and would abandon the retained-source-handle race protection. Resolve this with primary documentation and a Windows regression test, or keep Restore unavailable on Windows. Linux also still needs parent-directory fsync after each namespace mutation. Do not implement the executor, startup recovery, or GUI/CLI Restore until identity tests and both platform durability contracts are verified.
+**Next engineering unit:** implement the isolated Restore transaction executor around a fully staged candidate. It must use StoreController's exclusive lease, durable journal intent-before-mutation, no-replace moves, post-move identity verification, rollback/quarantine retention, verified reopen, and fail-closed behavior. Then add failure-injection and abrupt-process-death/restart tests on Linux and Windows. Do not wire startup recovery or GUI/CLI Restore and do not enable Restore before that matrix passes.
+
+**Delivery warning:** GitHub compare currently reports `foundation/bootstrap` as 804 commits ahead of `main` (0 behind). There are no open pull requests. Do not merge the branch wholesale. When the first genuinely testable build is ready, prepare a clean, selective delivery commit/release branch containing only required runtime/build files and essential user documentation; keep planning history, experiments and temporary artifacts out of `main`. No merge is authorized by the current CI result.
 
 ## Current Phase
 
@@ -98,10 +103,10 @@ Phase 4
   - [x] Open Windows destination directory component-by-component from the drive root; reject reparse/device/non-directory components and verify pinned-parent behavior on Windows CI
   - [x] Verify canonical state-directory owner and private DACL; fail closed on broad write access (Windows Root CI 42643886765)
   - [x] Qualify the actual volume type and filesystem for the no-replace move; reject unsupported remote/mapped or filesystem types (fixed local NTFS only; Windows Root CI 42643886765)
-  - [x] Add Linux/Windows no-follow content identity readers and post-move SHA-256/size verification that preserves mismatched destinations (implementation present; CI verification pending)
-  - [ ] Verify the current content-identity and post-move verification tests on Ubuntu and Windows CI
-  - [ ] Establish a documented Windows namespace durability barrier for the retained-handle no-replace rename; otherwise keep Windows Restore unavailable
-  - [ ] Add Linux parent-directory fsync after every durable no-replace namespace mutation
+  - [x] Add Linux/Windows no-follow content identity readers and post-move SHA-256/size verification that preserves mismatched destinations
+  - [x] Verify content-identity and post-move verification tests on Ubuntu and Windows CI (Root CI 42772101619)
+  - [x] Establish and document the Windows NTFS write-through metadata barrier for the retained-handle no-replace rename (Microsoft NtCreateFile/CreateFile contracts; Windows Root CI 42772101619)
+  - [x] Add Linux parent-directory fsync after every durable no-replace namespace mutation (Ubuntu Root CI 42772101619)
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [ ] Implement collision-safe filesystem recovery executor and startup recovery before canonical Store open
   - [ ] Integrate journal phases with staged restore publication, verified reopen and rollback
@@ -115,7 +120,7 @@ Phase 4
 - [x] Implement framework-independent GUI-default CLI parser with typed unknown-command/extra-argument errors and unit tests
 - [x] Verify the built native executable handles `--help`, `--version`, `doctor`, unknown commands and read-only doctor behavior on Ubuntu 24.04 and Windows (Wails run 42409974970)
 - [x] Verify native CLI smoke on all eight Linux distro lanes (run 42410214638)
-- [ ] Add abrupt-process crash/reopen recovery tests
+- [ ] Add abrupt-process crash/reopen recovery tests on Linux and Windows
 - [x] Diagnose Windows 8.3/long-path mismatch in journal round-trip and normalize canonical paths
 - [x] Replace fixed Xvfb display :97 with dynamically allocated display numbers in the Linux WebView smoke helper
 - [x] Record exact pass/fail results; do not equate compilation with runtime certification
@@ -453,3 +458,16 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - [x] Investigate `Overriding existing handler for signal 10`: verified Wails v3.0.0's upstream fix leaves JSC's SIGUSR1 handler alone, reapplies Go-compatible SA_ONSTACK flags to other relevant signals during first WebView initialization, and re-applies after page load. No arbitrary `JSC_SIGNAL_FOR_GC` override is warranted.
 - [ ] Keep Restore disabled until full namespace durability, post-move identity, journal recovery and platform safety gates are independently complete. CI success is not a power-loss guarantee.
 - No Restore executor, startup recovery, UI/CLI Restore, or merge to main.
+
+
+## 2026-11-10 07:11Z — Restore platform-gate closure and current CI
+
+- Verified branch head `9ca1f7e6de8ecca00970b3201601ca70f31ddb95` on `foundation/bootstrap`; latest commit message: `test(sqlite): use private restore test directories`.
+- Root CI [42772101619](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101619): Ubuntu and Windows jobs SUCCESS. Ubuntu passed vet, Go tests, race detector, build, Python compile/tests, frontend syntax and architecture checks. Windows passed vet, Go tests, build, Python compile/tests, frontend syntax and architecture checks; Linux-only race step skipped as expected.
+- SQLite driver evaluation [42772101510](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101510): 4/4 modernc/ncruces × Ubuntu/Windows jobs SUCCESS.
+- Wails platform proof [42772101659](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101659): 2/2 jobs SUCCESS. Linux native build, CLI smoke, executable verification, WebView bridge and database reopen passed; Windows native build, CLI smoke and executable verification passed.
+- Linux distribution compatibility [42772101557](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101557): 8/8 distro jobs SUCCESS (Debian 12/13, Ubuntu 22.04/24.04, Fedora 44 GTK3/GTK4, Arch rolling, openSUSE Tumbleweed).
+- Linux no-replace move now fsyncs the pinned parent-directory FD after rename. Windows source open uses native FILE_WRITE_THROUGH, FlushFileBuffers, and the same retained handle for NtSetInformationFile(FileRenameInformationEx=65) with no replacement. Microsoft primary documentation now supports the NTFS metadata-flush request for rename operations. This is not a hardware-independent power-loss guarantee.
+- No transaction executor, automatic startup recovery, process-death test matrix, or GUI/CLI Restore path exists. Restore remains disabled.
+- GitHub compare reports 804 commits ahead and 0 behind main; no open PR exists. Do not merge the branch wholesale. The first real testable delivery must be curated selectively.
+- Next: implement the isolated StoreController-backed transaction executor with intent-before-mutation journaling, no-replace moves, post-move identity verification, rollback/quarantine retention, verified reopen and Linux/Windows process-death tests.

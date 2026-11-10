@@ -74,25 +74,32 @@ Every intent phase must have an exhaustive truth table for target, staging, roll
 
 ## Current implementation status
 
-Implemented:
-- Strict durable journal v3 with intent-phase names, canonical path confinement, candidate-quarantine metadata, and paired candidate/previous content identities.
+Implemented as low-level primitives only:
+
+- Strict durable journal v3 with intent phases, canonical path confinement, candidate-quarantine metadata, and paired candidate/previous content identities.
 - Identity-aware pure recovery planner for completed phases and all three intent phases: preserving-previous, publishing, and restoring-previous. Contradictory states return an empty plan and an ambiguity error.
-- Linux no-replace move primitive: openat2 pins the containing directory while rejecting symlink/magic-link traversal; renameat2(RENAME_NOREPLACE) performs the namespace move.
-- Windows no-replace move primitive: opens the state-directory path component-by-component from a volume-root handle, rejects reparse points, opens the source leaf relative to the pinned directory handle, and uses native NtSetInformationFile(FileRenameInformationEx=65) without the replace flag.
-- Windows final-directory owner/DACL and fixed-local-NTFS/persistent-ACL qualification gate.
-- StoreController leases and lower-level SQLite backup/staging primitives.
+- Linux no-replace move: `openat2` pins the private containing directory, `renameat2(RENAME_NOREPLACE)` performs the move, and the same pinned parent directory FD is synced with `fsync` before success is reported.
+- Windows no-replace move: the state-directory path is opened component-by-component from the volume root; the source leaf is opened relative to the retained directory handle with native `FILE_WRITE_THROUGH`; `FlushFileBuffers` is called before the same source handle is renamed using `NtSetInformationFile(FileRenameInformationEx=65)` with the replace flag omitted.
+- Windows owner/DACL and volume qualification: fixed local NTFS with persistent ACLs only. ReFS, SMB, removable and unknown volumes fail closed.
+- Linux and Windows no-follow content identity readers, plus `moveRestoreFileNoReplaceVerified`, which checks the moved destination's size and SHA-256 through a no-follow handle and preserves it on mismatch.
+- Platform-specific journal publication: Linux syncs the containing directory after same-directory publication; Windows uses the same handle-bound native write-through rename path for journal replacement. Durable journal deletion remains unsupported on Windows.
+- StoreController shared/exclusive leases and lower-level SQLite backup/staging primitives.
 
 Not implemented:
-- Filesystem transaction executor, startup recovery coordinator, process-death/failure-injection executor tests, and application-level restore orchestration.
-- A Linux source-leaf identity binding across the final name-based rename. The current Linux primitive pins the parent directory, but its source leaf is still selected by name after earlier path validation. The executor must verify the moved artifact's expected size and SHA-256 from a no-follow opened handle immediately after each move and before any database open; on mismatch it must preserve the artifact and stop. It must never use an overwrite-capable fallback.
-- Explicit power-loss qualification beyond the documented platform sync contracts.
 
-The latest recovery-planner regression test exposed a lost-candidate state in preserving-previous. The planner now requires a verified candidate at staging for that phase. Root CI [42649675343](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42649675343) completed SUCCESS on commit 7b0ad259b5a741229e0d492b38c2a38b7a1dc3ec: Ubuntu and Windows passed; Linux race detection passed.
+- Filesystem transaction executor, startup recovery coordinator, process-death/failure-injection executor tests, and application-level Restore orchestration.
+- Integration of the post-move identity verifier into every transaction move. The future executor must call it immediately after each successful no-replace move and before any SQLite database open.
+- Automatic reconciliation of journal intent phases after process death.
+- Hardware-independent power-loss qualification.
 
-Durability constraints: Linux fsync(2) does not by itself persist the containing directory entry; the parent directory must also be synced. On Windows, the journal publisher uses MOVEFILE_WRITE_THROUGH, while journal deletion remains unsupported rather than reporting false success. These are explicit platform boundaries, not a blanket cross-platform power-loss guarantee.
+Threat and durability boundaries:
 
-Restore remains disabled. Ambiguous artifacts must remain untouched; no startup recovery, GUI/CLI Restore, or application-level Restore service may be enabled until the executor's identity, no-replace, sync, failure-injection, and restart tests pass on Linux and Windows.
+- Linux still selects the source leaf by name at the final `renameat2` call. The private state directory blocks untrusted cross-user namespace writers, while post-move no-follow size/SHA-256 verification detects a substituted artifact before SQLite is opened. This is not a claim that every same-user concurrent mutation race is eliminated.
+- Windows is qualified only for fixed local NTFS with persistent ACLs. The documented write-through metadata-flush request is used on the exact source handle processed by the handle-bound rename. This is not a hardware-independent power-loss guarantee; storage devices/controllers may not honor flush requests correctly.
+- Windows journal removal remains unsupported. Do not delete or replace a terminal journal in a way that loses its rollback/quarantine references.
+- The exported legacy `RestoreDatabase` helper remains a separate path-based implementation. Do not call it from the journal executor or expose it through GUI/CLI.
 
+Restore remains disabled. Do not add startup recovery, GUI/CLI Restore, or application-level Restore service until the executor's identity, no-replace, journal, rollback, process-death and restart tests pass on Linux and Windows.
 
 ## Version-3 journal contract (implementation gate)
 
@@ -168,13 +175,14 @@ Any other state—including identity mismatch, unreadable/unverified files, unex
 
 ### Platform no-replace move primitive
 
-Implemented as an isolated primitive, not yet called by a restore executor:
+Implemented and verified as isolated primitives; neither is yet called by a transaction executor:
 
-- Linux: golang.org/x/sys/unix.Renameat2 with unix.RENAME_NOREPLACE. Unsupported-kernel/filesystem errors are returned unchanged; there is no replacement-capable fallback.
-- Windows: golang.org/x/sys/windows.MoveFileEx with MOVEFILE_WRITE_THROUGH, deliberately omitting MOVEFILE_REPLACE_EXISTING and MOVEFILE_COPY_ALLOWED. Same-directory validation keeps the operation on one volume; existing destinations fail and are mapped to os.ErrExist.
-- Shared preflight rejects empty/equal paths, cross-directory moves, and sources that are symlinks or non-regular files. The OS operation remains the authoritative atomic destination-collision check.
-
-The primitive does not sync the containing directory, persist journal phases, verify database content identities, or coordinate StoreController leases. The executor must perform those operations in the prescribed order. The Lstat preflight is not a standalone defense against a hostile writer racing inside the state directory; callers must supply the canonical private state directory and revalidate transaction paths immediately before mutation. No executor/startup integration is claimed.
+- Linux: `openat2` pins the common parent directory and rejects symlink/magic-link traversal; `renameat2(RENAME_NOREPLACE)` performs the atomic no-replace move; `fsync` is called on the already-pinned parent directory FD before the operation reports success. Unsupported kernel/filesystem errors fail closed.
+- Windows: opens the canonical state directory component-by-component from a trusted volume-root handle; opens the source leaf relative to that retained directory handle using `NtCreateFile` with native `FILE_WRITE_THROUGH` (CreateOptions 0x2); flushes the source handle; then uses `NtSetInformationFile(FileRenameInformationEx=65)` on that same handle with the replacement flag unset. Existing destinations fail; unsupported providers fail closed.
+- Shared preflight rejects empty/equal paths, cross-directory moves, invalid leaves and non-regular sources. The OS operation remains authoritative for destination collision.
+- `moveRestoreFileNoReplaceVerified` wraps the move and verifies the moved destination's expected size and SHA-256 through a no-follow handle. On mismatch or read failure, the destination is preserved and the call fails.
+- The Linux source leaf remains name-selected at mutation time; the post-move identity check is mandatory and must occur before SQLite opens the destination. No overwrite-capable fallback is allowed.
+- Journal publication is separate from artifact movement: journal updates intentionally replace the prior journal atomically, while candidate/previous database artifacts must always use the no-replace move adapter.
 
 ### Research sources
 
@@ -188,35 +196,37 @@ The primitive does not sync the containing directory, persist journal phases, ve
 Test-first commit 61a19ea5932bbda9ef722e8789c5af42cabe4c45 produced expected RED in Root Go CI run 42438137306: go vet failed because moveRestoreFileNoReplace did not yet exist. The implementation and platform-specific tests were then added. On code commit d717eac7096d98c3b59b1b9ebd39aa1cff6e2d93, Root Go CI run 42438368020 passed on Ubuntu and Windows, including Linux race tests; SQLite driver matrix run 42438368022 passed 4/4. Wails run 42438368038 and Linux distribution run 42438368003 were still running at the time of this update. A separate retry of the failed Ubuntu 22.04 GTK3 WebView smoke from run 42437541325 was also in progress. Do not infer those pending results.
 
 
-## Journal namespace durability by platform — 2026-11-08
+## Journal namespace durability by platform — verified implementation
 
-The previous shared `syncRestoreDirectory` helper silently returned success on Windows. That was not a valid equivalent of POSIX directory `fsync`, and it overstated the journal's durability contract.
+The journal publisher uses platform-specific namespace persistence rather than pretending that directory `fsync` is portable:
 
-The journal publication path is now platform-specific:
-
-- Non-Windows: write and sync the temporary journal, atomically rename it over the current journal in the same directory, then sync the containing directory. A directory-sync error is returned.
-- Windows: write and sync the temporary journal, then publish it with `MoveFileExW(MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH)`. This requests the documented write-through move behavior; the code no longer pretends that `os.Open(directory).Sync()` is the Windows equivalent.
-- Windows journal removal currently fails closed with `errRestoreJournalRemovalUnsupported`; it leaves the journal intact. There is no production caller today, and no destructive cleanup should depend on an unproven namespace-deletion barrier.
+- Linux: write the temporary journal, sync the file, close it, atomically rename it in the same directory, then sync the containing directory. A directory-sync error is returned; callers must leave the durable intent/artifacts for inspection and must not continue to the next destructive move.
+- Windows: write and sync the temporary journal, open it relative to the retained state-directory handle with native `FILE_WRITE_THROUGH`, call `FlushFileBuffers`, then publish it with the handle-bound `NtSetInformationFile(FileRenameInformationEx=65)` path. Replacement is permitted only for this journal update; it is not the artifact move primitive. The source handle is the same write-through object processed by the rename.
+- Windows journal deletion still returns `errRestoreJournalRemovalUnsupported`. Leave the journal intact; do not report a deletion as durable.
 
 ### Windows durability boundary
 
-Microsoft documents that `FlushFileBuffers` requires a handle with `GENERIC_WRITE`, and its directory-handle guidance lists supported directory-handle APIs without listing `FlushFileBuffers`. Microsoft also documents `MOVEFILE_WRITE_THROUGH` as not returning until the move is performed on disk, while the explicit flush guarantee in its flag description is phrased for copy-and-delete moves. This implementation uses same-directory/same-volume replacement and requests write-through, but this alone is not an end-to-end power-loss certification for the Restore protocol.
-
-Restore remains disabled. Before Windows Restore can be enabled, the full executor must reconcile source/target identities after every move result, retain rollback artifacts, and pass process-death/restart tests on NTFS. Other Windows filesystem classes remain unverified and must fail closed unless separately qualified. Hardware and storage stacks that falsely acknowledge flush/write-through are outside the application's guarantee.
+Microsoft's `NtCreateFile` documentation defines `FILE_WRITE_THROUGH` as CreateOptions 0x00000002. The Win32 `CreateFile` documentation states that a write-through request also causes NTFS to flush metadata changes—including a rename operation—that result from processing the request. The Windows adapter applies the native write-through option to the source handle and performs the handle-bound rename through that same handle. This establishes the documented NTFS write-through request for the rename metadata; it does not certify every filesystem provider or storage stack.
 
 ### Research sources
 
-- Linux `fsync(2)`: https://man7.org/linux/man-pages/man2/fsync.2.html — file sync does not necessarily persist the containing directory entry; the directory itself must be synced.
-- Microsoft `FlushFileBuffers`: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers — requires `GENERIC_WRITE`.
-- Microsoft directory handles: https://learn.microsoft.com/en-us/windows/win32/fileio/obtaining-a-handle-to-a-directory — lists documented consumers of directory handles.
-- Microsoft `MoveFileExW`: https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw — replacement and write-through flags.
-- Microsoft file caching: https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching — file metadata is cached and must be flushed or opened write-through.
-- SQLite corruption guidance: https://www.sqlite.org/howtocorrupt.html — a hot journal/WAL must remain paired with its database; moving or deleting it can prevent automatic recovery.
-- SQLite atomic commit: https://sqlite.org/atomiccommit.html — SQLite's crash tests inject partial writes, garbage sectors, and reordered writes, then reopen and verify transaction consistency.
+- Microsoft `NtCreateFile`: https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile
+- Microsoft `CreateFileA` and `FILE_FLAG_WRITE_THROUGH`: https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilea
+- Microsoft file caching: https://learn.microsoft.com/en-us/windows/win32/fileio/file-caching
+- Linux `fsync(2)`: https://man7.org/linux/man-pages/man2/fsync.2.html
+- Linux `renameat2(2)`: https://man7.org/linux/man-pages/man2/renameat2.2.html
 
 ### Verification boundary
 
-Test-first commits `f876c42f215a80340245fb4334af6ab2ba9caa97` and `db2eddd33ff7c76a216c8dfce67565c0506841c3` added the journal publication and Windows fail-closed deletion tests before implementation. Their GitHub Actions attempts were cancelled before test execution because later commits superseded them; therefore no RED result is claimed. Implementation commits: `a51e9589c77795441a56de56670db17ec8ed1756`, `45c5329e0524c736b8c31eda1c833a0326a18ea3`, `cbccd640b8aa154b58abc293ea054613fafa36f5`, `a68bba150a627b143c9cf95ca6a1ed918de742d8`, `1cfd08056d2ecfa1afe31910c38cfde0886b415b`, `673782ca5aa49c0c32bfadb17234a20bdfdb4924`, and `48bc9401ea070bea00cb155fe7ab91c4b72b2f6e`. CI for the latest code revision is not yet verified; the Ubuntu root job is queued and the Windows root job was cancelled in the latest attempt. Do not infer success.
+The latest code revision and all four CI workflow families passed on commit `9ca1f7e6de8ecca00970b3201601ca70f31ddb95`:
+
+- Root CI [42772101619](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101619): Ubuntu and Windows passed.
+- SQLite driver evaluation [42772101510](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101510): 4/4 Ubuntu/Windows × modernc/ncruces jobs passed.
+- Wails platform proof [42772101659](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101659): 2/2 jobs passed, including Linux CLI and WebView/database-reopen smoke plus Windows native CLI/executable smoke.
+- Linux distribution compatibility [42772101557](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101557): 8/8 distro jobs passed.
+
+These results verify the current code/tests on the GitHub runners. They are not process-death recovery tests and are not a hardware-independent power-loss guarantee. Restore remains disabled.
+
 ## Handle-relative filesystem boundary research — 2026-11-08
 
 A second review found that the current move primitive's Lstat preflight followed by a path-based rename is not, by itself, a defense against a hostile concurrent writer replacing the source entry between inspection and mutation. The journal's canonical path validation also does not close that race. The executor must state and enforce its filesystem threat model instead of describing the preflight as no-follow atomicity.
@@ -255,14 +265,13 @@ A second review found that the current move primitive's Lstat preflight followed
 
 This research changes the executor implementation gate; it does not implement an executor and does not authorize Restore activation.
 
-## Linux directory-handle move hardening — 2026-11-08
+## Linux directory-handle move hardening — current verified boundary
 
-The Linux no-replace primitive now opens the common containing directory with `openat2(2)`, requesting `RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS`, then calls `renameat2(2)` with that pinned directory FD and validated leaf names. It no longer resolves the containing directory again through `AT_FDCWD` at the actual rename. Kernels that do not support `openat2` fail closed; there is no path-based fallback.
+The Linux no-replace primitive opens the common containing directory with `openat2(2)`, requesting `RESOLVE_NO_SYMLINKS | RESOLVE_NO_MAGICLINKS`, then calls `renameat2(2)` with that pinned directory FD and validated leaf names. It now also calls `fsync(2)` on the same parent-directory FD after the namespace mutation. Unsupported `openat2`, `RENAME_NOREPLACE`, or directory-sync behavior fails closed.
 
-This closes parent-directory symlink traversal and pins the directory object across the rename. It does **not** bind the source leaf to a previously hashed inode: Linux `renameat2` is name-based. The executor must still enforce a private state directory against untrusted concurrent writers and verify candidate/previous identity immediately before mutation. The move primitive itself is not a complete executor and does not perform directory sync or journal transitions.
+This pins the parent object and persists the changed directory entry according to the filesystem's documented sync contract. It does **not** bind the source leaf to a previously hashed inode: Linux `renameat2` is name-based. The executor must enforce the private state-directory boundary and verify the moved artifact's expected size/SHA-256 through a no-follow handle immediately after every move and before opening SQLite. A mismatch or verification failure preserves the destination and stops. This does not claim to eliminate all same-user concurrent mutation races.
 
-The regression test for a symlinked containing directory was committed first in `b529fae0b3f92ad0e6f3a04f9150df9ca78c3895`. Its CI outcome must be checked separately; do not claim a RED result until the run has actually executed the relevant test.
-
+The current implementation and regression tests are covered by Root CI [42772101619](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101619) on Ubuntu and Windows.
 
 ## Windows handle-bound rename API verification — 2026-11-08
 
@@ -292,29 +301,25 @@ This is API-surface verification and ABI design only. No Windows handle-bound re
 - Microsoft [SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle) — source handle access requirements and provider-dependent support caveat.
 
 
-## Windows handle-bound no-replace move implementation — 2026-11-08
+## Windows handle-bound no-replace move implementation — current verified boundary
 
-The Windows move uses NtSetInformationFile with native FileRenameInformationEx class 65. The source file is now opened relative to the retained destination directory handle using NtCreateFile and OBJECT_ATTRIBUTES.RootDirectory, rather than by re-resolving the source's full path.
+The Windows move uses native `NtSetInformationFile` with `FileRenameInformationEx` class 65. Both source and destination are bound to retained handles:
 
-- Opens the destination directory handle and retains it through source open and rename.
-- Opens the source leaf relative to that handle using NtCreateFile, FILE_OPEN_REPARSE_POINT, FILE_NON_DIRECTORY_FILE and FILE_SYNCHRONOUS_IO_NONALERT, requesting SYNCHRONIZE, DELETE and FILE_READ_ATTRIBUTES.
-- Inspects source and directory handles; rejects reparse points, directories and devices as applicable.
-- Uses native FileRenameInformationEx class 65 with zero flags and the same retained directory handle as RootDirectory. Destination collision maps to os.ErrExist; no replacement or legacy fallback is used.
+- Opens the qualified state directory component-by-component from the volume root; rejects reparse/device/non-directory components and checks ancestor DACLs.
+- Opens the source leaf relative to the retained directory handle using `NtCreateFile`, `FILE_OPEN_REPARSE_POINT`, `FILE_NON_DIRECTORY_FILE`, `FILE_SYNCHRONOUS_IO_NONALERT`, and native `FILE_WRITE_THROUGH` (CreateOptions 0x2).
+- Requests the required source access, rejects reparse points and non-regular files, and verifies the opened source's location against the retained directory handle.
+- Calls `FlushFileBuffers` on the source handle before rename, then issues `NtSetInformationFile(FileRenameInformationEx=65)` on that same handle with the destination directory handle in `RootDirectory` and the replace flag unset.
+- Destination collisions fail; no `os.Rename`, `MoveFileExW`, replacement fallback or legacy path-based fallback is used for database artifact moves.
+
+The Microsoft write-through contract covers NTFS metadata changes such as a rename resulting from processing the request. This is the documented NTFS boundary used by the implementation, not an all-provider or hardware-independent power-loss certification. The volume gate currently permits fixed local NTFS with persistent ACLs only.
 
 ### Verification
 
-- The source-directory substitution test was added first in commit 3f1110029423cdf5893732f086af8d385dd02b8d and produced observed RED in Root CI 42497376480 / Windows job 128782981057.
-- The first implementation attempt failed vet because NtCreateFile's EA-buffer parameter is uintptr, not a pointer; corrected to zero in commit c89d532a3ba04d43c7d2ccbed1675319c6f90ee8.
-- Root CI 42497620421 passed Ubuntu and Windows; Ubuntu race detector passed.
-- SQLite driver evaluation 42497620420 passed 4/4.
-- Wails run 42497620429 was in progress and Linux distro matrix 42497620422 was queued at this update.
+Root CI [42772101619](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101619) passed both platforms. Windows tests cover retained-directory substitution, decoy-tree rejection, no-replace collision, journal relative replacement and the native rename path. The CI result verifies behavior on the Windows runner; it does not simulate sudden power loss.
 
-### Explicit limitations and next step
+### Remaining boundary
 
-The destination directory is still initially opened by full path through CreateFile. FILE_FLAG_OPEN_REPARSE_POINT protects only the final component, not all ancestors. Next, open the canonical state-directory path component-by-component from a trusted volume root, reject every reparse component, and verify private directory permissions/ACL. The future executor must hash and revalidate source identity from the opened handle immediately before mutation, persist intent before every move, sync the required namespace state, reconcile ambiguous results and recover process death.
-
-The native rename class is not assumed to work on every filesystem/provider. Unsupported providers fail closed. No full executor, startup recovery or app-level Restore service exists. Restore remains disabled.
-
+The move helper is still isolated. It is not yet called by a transaction executor, and process-death/restart tests have not been implemented. Linux source-leaf identity remains name-based and requires the post-move verification step described above. Restore remains disabled.
 
 ## Current code revision verification — c89d532a — 2026-11-08
 
@@ -340,41 +345,37 @@ The native rename class is not assumed to work on every filesystem/provider. Uns
 The Windows directory walk now checks the DACL of the trusted volume root and every opened ancestor component, not only the final state directory. Ancestor checks reject NULL DACLs, unsupported ACE layouts and broad write-capable ACEs; they do not require system-owned ancestors to be owned by the current user. The final canonical state directory additionally requires its owner to match TokenUser or the process token's explicit TokenOwner. The implementation is in commits `7f7d7ee773f5656ebbd414a1c9276446e1b48d34` and `781d44be75346ce7a5506fc1bc6b2e7b12ff3e96`; Root CI [42645966152](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42645966152) is pending. Do not treat this additional boundary as verified until both platform jobs complete.
 
 
-## Windows namespace durability gate — 2026-11-09
+## Windows namespace durability gate — resolved for qualified NTFS — 2026-11-10
 
-A further review of the documented user-mode contracts found a blocker that must be resolved before implementing the filesystem executor.
+The earlier blocker is superseded by the current handle-bound write-through implementation and primary Microsoft documentation review.
 
-### What is established
+### Established contract
 
-- Linux `renameat2(RENAME_NOREPLACE)` provides atomic no-replace namespace mutation when the filesystem supports the flag. Linux `fsync(2)` explicitly states that syncing a file does not necessarily persist its containing directory entry; the parent directory must also be synced. The current Linux move primitive performs the no-replace rename but does **not** yet perform the directory `fsync`. Sources: [rename(2)](https://man7.org/linux/man-pages/man2/rename.2.html), [fsync(2)](https://man7.org/linux/man-pages/man2/fsync.2.html).
-- The current Windows adapter uses a retained source handle and rooted destination-directory handle with native `NtSetInformationFile(FileRenameInformationEx=65)`; the replace flag is omitted. This is the required no-replace, handle-bound operation. The published [MS-FSCC FileRenameInformationEx contract](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-fscc/4217551b-d2c0-42cb-9dc1-69a716cf6d0c) defines the rename flags and no-replace behavior, but contains no write-through/durability flag. The [NtSetInformationFile documentation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntsetinformationfile) documents the operation and its status return, not a namespace persistence barrier.
-- [FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers) requires a handle with `GENERIC_WRITE`. Its documented volume-wide form requires administrative privileges. The documentation does not establish a supported non-administrative user-mode sequence for flushing the parent directory entry changed by the handle-bound rename.
-- [MoveFileExW](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-movefileexw) documents `MOVEFILE_WRITE_THROUGH`, but the stated flush guarantee specifically describes a move performed as a copy-and-delete operation. It does not establish the required crash-durable namespace guarantee for the same-volume rename path, and replacing the current retained-handle no-replace operation with a path-based move would reintroduce the source-substitution race this design explicitly prevents.
+- The source is opened relative to the retained state-directory handle with native `NtCreateFile` and `FILE_WRITE_THROUGH` CreateOptions 0x00000002.
+- The source handle is flushed with `FlushFileBuffers` before the rename.
+- The no-replace rename is performed through that same source handle using `NtSetInformationFile(FileRenameInformationEx=65)`; the replacement flag is omitted and the destination is rooted at the retained directory handle.
+- Microsoft documents the native `FILE_WRITE_THROUGH` option and documents that a write-through request causes NTFS to flush metadata changes, including rename operations, resulting from processing the request.
+- The volume gate restricts this path to fixed local NTFS with persistent ACLs. Unsupported filesystem/provider combinations remain fail-closed.
+- Linux performs `fsync` on the pinned parent-directory FD after each successful no-replace namespace mutation.
 
-### Required decision
+### What this does not establish
 
-**The Windows durable namespace barrier is unresolved. The filesystem executor is blocked.** Do not infer that NTFS journaling, a successful native rename return, `FlushFileBuffers` on an ordinary directory handle, or `MOVEFILE_WRITE_THROUGH` automatically supplies the missing contract. Do not weaken the no-replace/handle-binding guarantees or add an overwrite-capable fallback to make the API fit.
+- It is not a hardware-independent power-loss certification. Storage devices, controllers, virtualization layers or filesystems that falsely acknowledge flush/write-through requests remain outside the application's guarantee.
+- It does not eliminate Linux's source-leaf name-selection race. The executor must verify size/SHA-256 from a no-follow handle after every move and before SQLite is opened.
+- It does not implement a filesystem transaction executor, startup recovery, rollback orchestration or process-death tests.
 
-Before executor implementation, establish one of the following with primary documentation and a regression test on the supported Windows target:
+### Required next implementation step
 
-1. A supported user-mode, non-administrative sequence that preserves the retained-handle no-replace rename and durably persists the affected namespace entry; or
-2. A different Windows publication design with equivalent no-overwrite, source-identity, and crash-recovery guarantees.
+Implement the transaction executor as an isolated infrastructure component that consumes a fully staged candidate inside the private state directory. It must:
 
-If neither can be established, Windows Restore must remain unavailable; do not claim the cross-platform Restore safety gate has passed. Linux implementation may proceed independently only if the shared product contract continues to fail closed on Windows and no Restore entry point is exposed.
+1. Acquire the StoreController exclusive lease and drain all shared operations.
+2. Verify the staged candidate and previous database identities from no-follow handles.
+3. Persist each intent phase before its corresponding filesystem mutation.
+4. Use only the no-replace artifact move primitive; verify the moved identity immediately after each move and before any SQLite open.
+5. Retain rollback and quarantine artifacts; never overwrite, guess, or delete ambiguous files.
+6. Reopen and validate the published database; if validation fails, persist rollback intent, quarantine the candidate, restore the verified previous database, and verify the reopened rollback Store.
+7. Fail closed when journal publication, directory sync, move verification, reopen or rollback is uncertain.
+8. Add Linux/Windows failure-injection and abrupt-process-death/restart tests before any startup, GUI or CLI wiring.
 
-### Current code status
+Do not use the legacy path-based `RestoreDatabase` helper from this executor. Do not enable Restore until the complete test matrix passes on both platforms.
 
-- Cross-platform no-follow content identity readers now exist in `restore_identity_linux.go` and `restore_identity_windows.go`. They hash from the opened no-follow file object and compare metadata before/after the read.
-- `moveRestoreFileNoReplaceVerified` now verifies the moved destination's size and SHA-256 through that reader. A mismatch or read failure deliberately preserves the destination and returns an error. It does not open SQLite.
-- Linux now calls `fsync(2)` on the already-pinned parent-directory descriptor immediately after a successful `renameat2(RENAME_NOREPLACE)`. If that sync fails, the move returns an error and leaves the destination for journal/recovery inspection; it does not reopen the directory by path.
-- Windows still has no established, documented namespace durability barrier for the retained-handle no-replace rename. This remains a hard blocker for Windows Restore and for any cross-platform executor.
-- The latest branch head observed during this review is `38ffa21f8b2fef05bc98b80e4ed5c8c1836bd0ff` (`test(sqlite): cover post-move restore identity verification`). The commit-status endpoint returned no checks and the PR-filtered workflow lookup returned no runs for this commit. Therefore the new identity/move tests are **not yet CI-verified** in this review.
-
-Restore remains disabled. No filesystem executor, startup recovery coordinator, or GUI/CLI Restore path may be added until both the identity tests and the platform-specific durability contract are verified.
-
-
-### Linux directory-sync implementation note — 2026-11-09
-
-The Linux move adapter now syncs the parent directory descriptor it already opened with `openat2` after a successful `renameat2(RENAME_NOREPLACE)`. This is deliberately descriptor-bound: no path-based reopen is introduced. A failed `fsync` returns an error after the namespace move may have occurred; callers must leave the journal in its intent phase and inspect the actual artifacts on restart. The destination is not deleted or replaced.
-
-The Linux implementation and regression tests are present but await a real Ubuntu Root CI run. The Windows namespace durability gate remains unresolved. Restore remains disabled.
