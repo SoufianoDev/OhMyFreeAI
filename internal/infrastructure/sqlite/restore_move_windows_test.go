@@ -25,17 +25,7 @@ func TestRenameRestoreHandleNoReplaceUsesWriteThroughOpenedSourceHandle(t *testi
 		t.Fatalf("open qualified restore directory: %v", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
-	guardHandle, directoryPath, err := openRestoreDirectoryWriteThroughGuard(directoryHandle)
-	if err != nil {
-		t.Fatalf("open write-through directory guard: %v", err)
-	}
-	defer func() {
-		if guardHandle != windows.InvalidHandle {
-			_ = windows.CloseHandle(guardHandle)
-		}
-	}()
-
-	sourceHandle, err := openRestoreSourceWriteThrough(directoryPath, filepath.Base(source))
+		sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
 	if err != nil {
 		t.Fatalf("open write-through source handle: %v", err)
 	}
@@ -52,17 +42,13 @@ func TestRenameRestoreHandleNoReplaceUsesWriteThroughOpenedSourceHandle(t *testi
 		t.Fatal(err)
 	}
 
-	if err := renameRestoreHandleNoReplace(sourceHandle, guardHandle, filepath.Base(destination)); err != nil {
+	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination)); err != nil {
 		t.Fatalf("rename opened source handle: %v", err)
 	}
 	if err := windows.CloseHandle(sourceHandle); err != nil {
 		t.Fatal(err)
 	}
 	sourceHandle = windows.InvalidHandle
-	if err := windows.CloseHandle(guardHandle); err != nil {
-		t.Fatal(err)
-	}
-	guardHandle = windows.InvalidHandle
 
 	got, err := os.ReadFile(destination)
 	if err != nil {
@@ -99,12 +85,7 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 		t.Fatalf("open qualified restore directory: %v", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
-	guardHandle, directoryPath, err := openRestoreDirectoryWriteThroughGuard(directoryHandle)
-	if err != nil {
-		t.Fatalf("open write-through directory guard: %v", err)
-	}
-	defer windows.CloseHandle(guardHandle)
-	sourceHandle, err := openRestoreSourceWriteThrough(directoryPath, filepath.Base(source))
+		sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
 	if err != nil {
 		t.Fatalf("open write-through source handle: %v", err)
 	}
@@ -114,7 +95,7 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 		}
 	}()
 
-	if err := renameRestoreHandleNoReplace(sourceHandle, guardHandle, filepath.Base(destination)); !errors.Is(err, os.ErrExist) {
+	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination)); !errors.Is(err, os.ErrExist) {
 		t.Fatalf("handle-bound no-replace rename error = %v, want os.ErrExist", err)
 	}
 	if err := windows.CloseHandle(sourceHandle); err != nil {
@@ -135,38 +116,158 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 	}
 }
 
-func TestOpenRestoreDirectoryWriteThroughGuardPreventsRename(t *testing.T) {
+func TestRenameRestoreHandleNoReplaceStaysBoundToPinnedDirectoryAfterAncestorRename(t *testing.T) {
 	root := t.TempDir()
-	directory := filepath.Join(root, "state")
-	movedDirectory := filepath.Join(root, "state-moved")
-	if err := os.Mkdir(directory, 0o700); err != nil {
+	parent := filepath.Join(root, "parent")
+	directory := filepath.Join(parent, "state")
+	movedParent := filepath.Join(root, "parent-moved")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
-
+	source := filepath.Join(directory, "candidate.db")
+	if err := os.WriteFile(source, []byte("original candidate"), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	directoryHandle, err := openRestoreDirectoryNoReparse(directory)
 	if err != nil {
 		t.Fatalf("open qualified restore directory: %v", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
-	guardHandle, guardedPath, err := openRestoreDirectoryWriteThroughGuard(directoryHandle)
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
 	if err != nil {
-		t.Fatalf("open write-through directory guard: %v", err)
+		t.Fatalf("open write-through source relative to pinned directory: %v", err)
 	}
-	if guardedPath == "" {
-		t.Fatal("directory guard returned an empty path")
+	defer func() {
+		if sourceHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(sourceHandle)
+		}
+	}()
+	if err := os.Rename(parent, movedParent); err != nil {
+		t.Fatalf("rename ancestor of pinned directory: %v", err)
 	}
-	if err := os.Rename(directory, movedDirectory); err == nil {
-		_ = windows.CloseHandle(guardHandle)
-		t.Fatal("directory was renamed while its no-delete-share guard was held")
+	replacementDirectory := filepath.Join(parent, "state")
+	if err := os.MkdirAll(replacementDirectory, 0o700); err != nil {
+		t.Fatalf("create replacement ancestor tree: %v", err)
 	}
-	if err := windows.CloseHandle(guardHandle); err != nil {
-		t.Fatalf("close directory guard: %v", err)
+	decoySource := filepath.Join(replacementDirectory, "candidate.db")
+	if err := os.WriteFile(decoySource, []byte("decoy candidate"), 0o600); err != nil {
+		t.Fatal(err)
 	}
-	if err := os.Rename(directory, movedDirectory); err != nil {
-		t.Fatalf("rename directory after releasing guard: %v", err)
+	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, "published.db"); err != nil {
+		t.Fatalf("rename opened source relative to pinned directory handle: %v", err)
+	}
+	if err := windows.CloseHandle(sourceHandle); err != nil {
+		t.Fatal(err)
+	}
+	sourceHandle = windows.InvalidHandle
+	published := filepath.Join(movedParent, "state", "published.db")
+	got, err := os.ReadFile(published)
+	if err != nil {
+		t.Fatalf("read destination in original pinned directory: %v", err)
+	}
+	if string(got) != "original candidate" {
+		t.Fatalf("published content = %q, want original candidate", got)
+	}
+	got, err = os.ReadFile(decoySource)
+	if err != nil {
+		t.Fatalf("read decoy source: %v", err)
+	}
+	if string(got) != "decoy candidate" {
+		t.Fatalf("decoy source content = %q, want decoy candidate", got)
+	}
+	if _, err := os.Stat(filepath.Join(replacementDirectory, "published.db")); !os.IsNotExist(err) {
+		t.Fatalf("rename escaped pinned directory into replacement tree: %v", err)
 	}
 }
 
+func TestValidateRestoreSourceLocationRejectsAncestorReplacementDecoy(t *testing.T) {
+	root := t.TempDir()
+	parent := filepath.Join(root, "parent")
+	directory := filepath.Join(parent, "state")
+	movedParent := filepath.Join(root, "parent-moved")
+	if err := os.MkdirAll(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	directoryHandle, err := openRestoreDirectoryNoReparse(directory)
+	if err != nil {
+		t.Fatalf("open qualified restore directory: %v", err)
+	}
+	defer windows.CloseHandle(directoryHandle)
+	if err := os.Rename(parent, movedParent); err != nil {
+		t.Fatalf("rename pinned directory ancestor: %v", err)
+	}
+	replacementDirectory := filepath.Join(parent, "state")
+	if err := os.MkdirAll(replacementDirectory, 0o700); err != nil {
+		t.Fatalf("create replacement directory tree: %v", err)
+	}
+	decoy := filepath.Join(replacementDirectory, "candidate.db")
+	if err := os.WriteFile(decoy, []byte("decoy"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	decoyPointer, err := windows.UTF16PtrFromString(decoy)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoyHandle, err := windows.CreateFile(
+		decoyPointer,
+		windows.FILE_READ_ATTRIBUTES,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		nil,
+		windows.OPEN_EXISTING,
+		windows.FILE_FLAG_OPEN_REPARSE_POINT,
+		0,
+	)
+	if err != nil {
+		t.Fatalf("open replacement-path decoy: %v", err)
+	}
+	defer windows.CloseHandle(decoyHandle)
+	if err := validateRestoreSourceLocation(decoyHandle, directoryHandle, "candidate.db"); err == nil {
+		t.Fatal("source location validation accepted a decoy from the replacement ancestor tree")
+	}
+}
+
+func TestRenameRestoreHandleReplaceReplacesOnlyPinnedDirectoryLeaf(t *testing.T) {
+	directory := t.TempDir()
+	source := filepath.Join(directory, "journal.tmp")
+	destination := filepath.Join(directory, "journal.json")
+	if err := os.WriteFile(source, []byte("new journal"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(destination, []byte("old journal"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	directoryHandle, err := openRestoreDirectoryNoReparse(directory)
+	if err != nil {
+		t.Fatalf("open qualified journal directory: %v", err)
+	}
+	defer windows.CloseHandle(directoryHandle)
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
+	if err != nil {
+		t.Fatalf("open write-through journal source: %v", err)
+	}
+	defer func() {
+		if sourceHandle != windows.InvalidHandle {
+			_ = windows.CloseHandle(sourceHandle)
+		}
+	}()
+	if err := renameRestoreHandleReplace(sourceHandle, directoryHandle, filepath.Base(destination)); err != nil {
+		t.Fatalf("replace journal relative to pinned directory: %v", err)
+	}
+	if err := windows.CloseHandle(sourceHandle); err != nil {
+		t.Fatal(err)
+	}
+	sourceHandle = windows.InvalidHandle
+	got, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new journal" {
+		t.Fatalf("published journal = %q, want new journal", got)
+	}
+	if _, err := os.Stat(source); !os.IsNotExist(err) {
+		t.Fatalf("temporary journal still exists or cannot be inspected: %v", err)
+	}
+}
 
 func TestOpenRestoreDirectoryRelativeUsesPinnedParentHandle(t *testing.T) {
 	root := t.TempDir()

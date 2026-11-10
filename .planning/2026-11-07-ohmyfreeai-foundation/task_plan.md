@@ -409,3 +409,14 @@ Resolved so far: Wails v3.0.0 native builds and live WebView bridge/SQLite reope
 Investigate an in-place restore protocol using SQLite's backup API with a pre-existing PERSIST rollback journal, plus a durable transaction marker that can distinguish the old database from the candidate after restart. Candidate/rollback snapshot creation and transaction-state publication still need a proven no-loss protocol. A database-resident marker or preallocated fixed-slot journal may avoid per-phase path renames, but neither is approved yet.
 
 Do not treat this probe as proof of power-loss safety. Keep Restore disabled and do not start the Restore executor, journal integration, startup recovery, UI/CLI work, or merge until the complete platform gates are met.
+
+
+## 2026-11-09 23:55Z — Windows relative rename follow-up
+
+- The previous Win32 class-22 rename encoded an absolute destination path and could re-resolve a renamed ancestor after the directory guard check. That approach is removed.
+- The Windows move and journal-publish paths now use native `NtSetInformationFile` with `FileRenameInformationEx` class 65, the retained destination directory handle in `RootDirectory`, and a simple relative destination leaf.
+- The source is opened from the current path of the pinned directory handle. Its final handle path and the pinned directory handle path are checked again after open; the parent is checked again immediately before rename.
+- The source handle keeps `FILE_FLAG_WRITE_THROUGH`; source buffers are flushed before rename. This follows Microsoft's documented NTFS metadata-flush behavior for write-through requests, without claiming stronger hardware/power-loss guarantees.
+- Regression tests cover an ancestor rename with a replacement tree, rejection of a decoy source handle, and journal replacement using the pinned directory handle.
+- CI on base `0e3e2868e6a74c9fdae698b314c987fe39391ddd` is green: Root CI Ubuntu+Windows; SQLite drivers 4/4; Wails Ubuntu+Windows; Linux distribution matrix 8/8. These results do not cover this new Windows change.
+- **Blocking gate:** run and inspect fresh Root CI on the new commit, especially Windows Go tests. Keep Restore disabled and do not begin executor/journal recovery/UI/CLI integration or merge to main until the platform safety gates are met.

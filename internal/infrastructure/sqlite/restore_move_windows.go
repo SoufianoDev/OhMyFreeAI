@@ -22,19 +22,13 @@ func moveRestoreFileNoReplacePlatform(source, destination string) error {
 	}
 	defer windows.CloseHandle(directoryHandle)
 
-	guardHandle, directoryPath, err := openRestoreDirectoryWriteThroughGuard(directoryHandle)
-	if err != nil {
-		return fmt.Errorf("guard SQLite restore destination directory: %w", err)
-	}
-	defer windows.CloseHandle(guardHandle)
-
-	sourceHandle, err := openRestoreSourceWriteThrough(directoryPath, filepath.Base(source))
+		sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
 	if err != nil {
 		return fmt.Errorf("open SQLite restore source with write-through semantics: %w", err)
 	}
 	defer windows.CloseHandle(sourceHandle)
 
-	return renameRestoreHandleNoReplace(sourceHandle, guardHandle, filepath.Base(destination))
+	return renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination))
 }
 
 func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
@@ -183,65 +177,13 @@ func restoreWindowsPathFromHandle(handle windows.Handle) (string, error) {
 	return filepath.Clean(windows.UTF16ToString(buffer[:written])), nil
 }
 
-// openRestoreDirectoryWriteThroughGuard obtains a second handle to the same
-// directory without FILE_SHARE_DELETE. Holding it prevents the directory
-// anchor from being renamed while Win32 resolves the full target path for the
-// handle-bound rename operation.
-func openRestoreDirectoryWriteThroughGuard(directory windows.Handle) (windows.Handle, string, error) {
-	var expected windows.ByHandleFileInformation
-	if err := windows.GetFileInformationByHandle(directory, &expected); err != nil {
-		return windows.InvalidHandle, "", fmt.Errorf("inspect pinned SQLite restore directory: %w", err)
-	}
-	path, err := restoreWindowsPathFromHandle(directory)
-	if err != nil {
-		return windows.InvalidHandle, "", err
-	}
-	pointer, err := windows.UTF16PtrFromString(path)
-	if err != nil {
-		return windows.InvalidHandle, "", fmt.Errorf("encode pinned SQLite restore directory path: %w", err)
-	}
-	guard, err := windows.CreateFile(
-		pointer,
-		windows.FILE_READ_ATTRIBUTES|windows.FILE_TRAVERSE,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE,
-		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_BACKUP_SEMANTICS|windows.FILE_FLAG_OPEN_REPARSE_POINT,
-		0,
-	)
-	if err != nil {
-		return windows.InvalidHandle, "", fmt.Errorf("open SQLite restore directory rename guard: %w", err)
-	}
-	if err := verifyRestoreDirectoryHandle(guard); err != nil {
-		_ = windows.CloseHandle(guard)
-		return windows.InvalidHandle, "", err
-	}
-	var actual windows.ByHandleFileInformation
-	if err := windows.GetFileInformationByHandle(guard, &actual); err != nil {
-		_ = windows.CloseHandle(guard)
-		return windows.InvalidHandle, "", fmt.Errorf("inspect SQLite restore directory rename guard: %w", err)
-	}
-	if !sameRestoreWindowsFileIdentity(expected, actual) {
-		_ = windows.CloseHandle(guard)
-		return windows.InvalidHandle, "", fmt.Errorf("SQLite restore directory changed while acquiring its rename guard")
-	}
-	guardPath, err := restoreWindowsPathFromHandle(guard)
-	if err != nil {
-		_ = windows.CloseHandle(guard)
-		return windows.InvalidHandle, "", err
-	}
-	return guard, guardPath, nil
-}
-
-func sameRestoreWindowsFileIdentity(left, right windows.ByHandleFileInformation) bool {
-	return left.VolumeSerialNumber == right.VolumeSerialNumber &&
-		left.FileIndexHigh == right.FileIndexHigh &&
-		left.FileIndexLow == right.FileIndexLow
-}
-
-func openRestoreSourceWriteThrough(directoryPath, sourceLeaf string) (windows.Handle, error) {
+func openRestoreSourceWriteThrough(directory windows.Handle, sourceLeaf string) (windows.Handle, error) {
 	if err := validateRestoreMoveLeaf(sourceLeaf); err != nil {
 		return windows.InvalidHandle, err
+	}
+	directoryPath, err := restoreWindowsPathFromHandle(directory)
+	if err != nil {
+		return windows.InvalidHandle, fmt.Errorf("resolve pinned SQLite restore directory: %w", err)
 	}
 	path := filepath.Join(directoryPath, sourceLeaf)
 	pointer, err := windows.UTF16PtrFromString(path)
@@ -269,13 +211,50 @@ func openRestoreSourceWriteThrough(directoryPath, sourceLeaf string) (windows.Ha
 		_ = windows.CloseHandle(source)
 		return windows.InvalidHandle, fmt.Errorf("opened SQLite restore source is not a regular non-reparse file")
 	}
-	// Flush content and file metadata before the namespace operation. The
-	// subsequent rename is issued through this same write-through handle.
+	if err := validateRestoreSourceLocation(source, directory, sourceLeaf); err != nil {
+		_ = windows.CloseHandle(source)
+		return windows.InvalidHandle, err
+	}
+	// Flush source content before the namespace operation. The subsequent
+	// relative rename is issued through this same FILE_FLAG_WRITE_THROUGH handle.
 	if err := windows.FlushFileBuffers(source); err != nil {
 		_ = windows.CloseHandle(source)
 		return windows.InvalidHandle, fmt.Errorf("flush SQLite restore source before rename: %w", err)
 	}
 	return source, nil
+}
+
+// validateRestoreSourceLocation rejects a path-open race where the source was
+// resolved through a replacement ancestor rather than the pinned directory.
+func validateRestoreSourceLocation(source, directory windows.Handle, sourceLeaf string) error {
+	sourcePath, err := restoreWindowsPathFromHandle(source)
+	if err != nil {
+		return fmt.Errorf("resolve opened SQLite restore source: %w", err)
+	}
+	directoryPath, err := restoreWindowsPathFromHandle(directory)
+	if err != nil {
+		return fmt.Errorf("resolve pinned SQLite restore directory: %w", err)
+	}
+	if !equalRestoreMovePath(filepath.Dir(sourcePath), directoryPath) ||
+		!equalRestoreMovePath(filepath.Base(sourcePath), sourceLeaf) {
+		return fmt.Errorf("opened SQLite restore source is not the expected leaf in the pinned directory")
+	}
+	return nil
+}
+
+func validateRestoreSourceParent(source, directory windows.Handle) error {
+	sourcePath, err := restoreWindowsPathFromHandle(source)
+	if err != nil {
+		return fmt.Errorf("resolve opened SQLite restore source: %w", err)
+	}
+	directoryPath, err := restoreWindowsPathFromHandle(directory)
+	if err != nil {
+		return fmt.Errorf("resolve pinned SQLite restore directory: %w", err)
+	}
+	if !equalRestoreMovePath(filepath.Dir(sourcePath), directoryPath) {
+		return fmt.Errorf("opened SQLite restore source is no longer in the pinned destination directory")
+	}
+	return nil
 }
 
 func validateRestoreMoveLeaf(leaf string) error {
@@ -293,10 +272,10 @@ func renameRestoreHandleReplace(source, destinationDirectory windows.Handle, des
 	return renameRestoreHandle(source, destinationDirectory, destinationLeaf, true)
 }
 
-// renameRestoreHandle uses the Win32 handle-information API on the exact
-// source handle opened with FILE_FLAG_WRITE_THROUGH. On qualified local NTFS,
-// Microsoft documents this flag as flushing metadata changes, including rename
-// operations, that result from processing the request.
+// renameRestoreHandle issues FILE_RENAME_INFORMATION_EX through the exact
+// source handle opened with FILE_FLAG_WRITE_THROUGH. RootDirectory anchors the
+// destination to the retained directory object; FileName is a single relative
+// leaf, so no ancestor path is re-resolved during the rename.
 func renameRestoreHandle(source, destinationDirectory windows.Handle, destinationLeaf string, replace bool) error {
 	if err := validateRestoreMoveLeaf(destinationLeaf); err != nil {
 		return err
@@ -308,33 +287,27 @@ func renameRestoreHandle(source, destinationDirectory windows.Handle, destinatio
 	if sourceInfo.FileAttributes&(windows.FILE_ATTRIBUTE_DIRECTORY|windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DEVICE) != 0 {
 		return fmt.Errorf("opened SQLite restore source is not a regular non-reparse file")
 	}
-	var directoryInfo windows.ByHandleFileInformation
-	if err := windows.GetFileInformationByHandle(destinationDirectory, &directoryInfo); err != nil {
-		return fmt.Errorf("inspect opened SQLite restore destination directory: %w", err)
+	if err := verifyRestoreDirectoryHandle(destinationDirectory); err != nil {
+		return fmt.Errorf("validate pinned SQLite restore destination directory: %w", err)
 	}
-	if directoryInfo.FileAttributes&windows.FILE_ATTRIBUTE_DIRECTORY == 0 ||
-		directoryInfo.FileAttributes&(windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DEVICE) != 0 {
-		return fmt.Errorf("opened SQLite restore destination is not a regular directory")
-	}
-	directoryPath, err := restoreWindowsPathFromHandle(destinationDirectory)
-	if err != nil {
+	if err := validateRestoreSourceParent(source, destinationDirectory); err != nil {
 		return err
 	}
-	destinationPath := filepath.Join(directoryPath, destinationLeaf)
-	encodedName, err := windows.UTF16FromString(destinationPath)
+
+	encodedName, err := windows.UTF16FromString(destinationLeaf)
 	if err != nil {
-		return fmt.Errorf("encode SQLite restore destination path: %w", err)
+		return fmt.Errorf("encode SQLite restore destination leaf: %w", err)
 	}
 	encodedName = encodedName[:len(encodedName)-1]
 	nameBytes := len(encodedName) * 2
 	if nameBytes == 0 || uint64(nameBytes) > uint64(^uint32(0)) {
-		return fmt.Errorf("SQLite restore destination path length is invalid")
+		return fmt.Errorf("SQLite restore destination leaf length is invalid")
 	}
 
 	const fixedHeaderSize = 20
 	const minimumInformationSize = 24
-	const fileRenameInformationExClass = 22
-	bufferSize := fixedHeaderSize + nameBytes + 2
+	const fileRenameInformationExClass = 65
+	bufferSize := fixedHeaderSize + nameBytes
 	if bufferSize < minimumInformationSize {
 		bufferSize = minimumInformationSize
 	}
@@ -350,26 +323,24 @@ func renameRestoreHandle(source, destinationDirectory windows.Handle, destinatio
 	}
 	binary.LittleEndian.PutUint32(buffer[0:4], renameFlags)
 	binary.LittleEndian.PutUint32(buffer[4:8], 0)
-	binary.LittleEndian.PutUint64(buffer[8:16], 0)
+	binary.LittleEndian.PutUint64(buffer[8:16], uint64(destinationDirectory))
 	binary.LittleEndian.PutUint32(buffer[16:20], uint32(nameBytes))
 	for i, unit := range encodedName {
 		binary.LittleEndian.PutUint16(buffer[fixedHeaderSize+i*2:fixedHeaderSize+i*2+2], unit)
 	}
 
-	err = windows.SetFileInformationByHandle(
-		source,
-		fileRenameInformationExClass,
-		&buffer[0],
-		uint32(len(buffer)),
-	)
+	var ioStatus windows.IO_STATUS_BLOCK
+	err = windows.NtSetInformationFile(source, &ioStatus, &buffer[0], uint32(len(buffer)), fileRenameInformationExClass)
 	runtime.KeepAlive(buffer)
 	runtime.KeepAlive(source)
 	runtime.KeepAlive(destinationDirectory)
+	runtime.KeepAlive(&ioStatus)
 	if err != nil {
-		if errors.Is(err, windows.ERROR_ALREADY_EXISTS) || errors.Is(err, windows.ERROR_FILE_EXISTS) {
+		var status windows.NTStatus
+		if errors.As(err, &status) && uint32(status) == 0xC0000035 { // STATUS_OBJECT_NAME_COLLISION
 			return fmt.Errorf("%w: %v", os.ErrExist, err)
 		}
-		return fmt.Errorf("SetFileInformationByHandle(FileRenameInfoEx): %w", err)
+		return fmt.Errorf("NtSetInformationFile(FileRenameInformationEx): %w", err)
 	}
 	return nil
 }

@@ -1275,3 +1275,24 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - PERSIST journal mode retains its rollback-journal file and commits by invalidating the journal header instead of deleting the filename. It is not persistent across database reopen, so a restore bootstrap must explicitly set it. The initial creation of the journal file still requires a durable file-creation guarantee; process-death tests do not establish power-loss durability.
 - The Windows JSON journal publisher remains a separate blocker: `restore_journal_publish_windows.go` still uses path-based `MoveFileExW(REPLACE_EXISTING|WRITE_THROUGH)`. The Microsoft contract reviewed earlier does not clearly guarantee same-volume rename namespace persistence.
 - No Restore executor, durable journal integration, startup recovery, UI/CLI Restore, or merge to main was started. Restore remains disabled pending complete Linux and Windows safety gates.
+
+
+## Continuation — Windows pinned-directory relative rename — 2026-11-09 23:55Z
+
+### CI audit on base commit `0e3e2868e6a74c9fdae698b314c987fe39391ddd`
+- Root CI [42706477500](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42706477500): Ubuntu and Windows jobs completed successfully. Both ran Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks; Ubuntu race detection passed. Windows correctly skipped the Linux-only race step.
+- SQLite driver evaluation [42706477451](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42706477451): all four modernc/ncruces × Ubuntu/Windows jobs completed successfully.
+- Wails platform proof [42706477450](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42706477450): Ubuntu and Windows jobs completed successfully; Linux WebView bridge/database reopen and Windows native build/CLI/executable checks passed.
+- Linux distribution compatibility [42706477397](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42706477397): all eight jobs completed successfully, including both legacy GTK3/WebKit and GTK4/WebKit families.
+
+### Windows design correction prepared in this revision
+- Removed the full-path destination rename path and its second directory guard.
+- Source is opened using a path obtained from the pinned directory handle, then its own final path and the directory handle's final path are re-read and checked for exact parent + expected leaf before proceeding.
+- The exact source handle retains `FILE_FLAG_WRITE_THROUGH`; source contents are flushed before the namespace operation.
+- Rename is now issued with native `NtSetInformationFile`, information class 65 (`FileRenameInformationEx`), `RootDirectory` set to the pinned destination directory handle, and a single relative destination leaf. No path-based or overwrite-capable fallback is introduced. No-replace remains the default; journal replacement explicitly opts into replace flags.
+- Added Windows regression coverage for ancestor rename + replacement-tree decoy, rejection of a source handle from the decoy tree, and relative journal-leaf replacement.
+
+### Safety boundary
+- Microsoft documents `RootDirectory` as the handle-relative target root and requires a simple leaf name for that form. The MS-FSCC layout specifies a 20-byte fixed header and minimum 24-byte information buffer; network operations require a zero RootDirectory, so this code remains limited to the already-qualified local NTFS path.
+- Microsoft documents that a `FILE_FLAG_WRITE_THROUGH` request causes NTFS to flush metadata changes, including rename operations, that result from processing the request. The implementation sends the rename request through the same write-through source file object. This is a documented NTFS contract, not a claim of hardware-independent power-loss guarantees.
+- The new Windows implementation is **not yet CI-verified**. Keep Restore disabled until the actual Windows Root CI and all other required platform gates pass. No executor, startup recovery, UI/CLI Restore, or merge to main.
