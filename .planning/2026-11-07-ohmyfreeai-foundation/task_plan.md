@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Latest verified code head: `beab78a04f4ef9ae1421247983d25da66ffc3986` on `foundation/bootstrap` (2026-11-10). Current branch tip is documentation-only commit `052749722a9adf2c629d44500bcfadb6b3d89fee`; no production source changed after the verified code head.
+Latest verified code head: `beab78a04f4ef9ae1421247983d25da66ffc3986` on `foundation/bootstrap` (2026-11-10). The latest branch tip is documentation-only; no production source changed after the verified code head.
 
 All four workflow families for this exact commit are complete and successful:
 
@@ -23,7 +23,7 @@ The Linux parent-directory durability step is implemented: the no-replace move s
 
 After that gate passes, implement the isolated Restore transaction executor around a fully staged candidate. It must use StoreController's exclusive lease, durable intent-before-mutation journaling, no-replace moves, post-move identity verification, rollback/quarantine retention, verified reopen, and fail-closed behavior. Then add failure-injection and abrupt-process-death/restart tests on Linux and Windows. Do not wire startup recovery or GUI/CLI Restore and do not enable Restore before that matrix passes.
 
-**Delivery warning:** `foundation/bootstrap` is 825 commits ahead of `main` (0 behind) at the current 2026-11-10 comparison. Do not merge the branch wholesale. When the first genuinely testable build is ready, prepare a clean, selective delivery commit/release branch containing only required runtime/build files and essential user documentation; keep planning history, experiments and temporary artifacts out of `main`. No merge is authorized by the current CI result.
+**Delivery warning:** `foundation/bootstrap` is 825 commits ahead of `main` (0 behind) at the comparison immediately before this documentation-only update. Do not merge the branch wholesale. When the first genuinely testable build is ready, prepare a clean, selective delivery commit/release branch containing only required runtime/build files and essential user documentation; keep planning history, experiments and temporary artifacts out of `main`. No merge is authorized by the current CI result.
 
 ## Current Phase
 
