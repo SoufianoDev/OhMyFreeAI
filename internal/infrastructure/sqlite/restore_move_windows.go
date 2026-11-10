@@ -181,27 +181,49 @@ func openRestoreSourceWriteThrough(directory windows.Handle, sourceLeaf string) 
 	if err := validateRestoreMoveLeaf(sourceLeaf); err != nil {
 		return windows.InvalidHandle, err
 	}
-	directoryPath, err := restoreWindowsPathFromHandle(directory)
+	objectName, err := windows.NewNTUnicodeString(sourceLeaf)
 	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("resolve pinned SQLite restore directory: %w", err)
+		return windows.InvalidHandle, fmt.Errorf("encode SQLite restore source leaf: %w", err)
 	}
-	path := filepath.Join(directoryPath, sourceLeaf)
-	pointer, err := windows.UTF16PtrFromString(path)
-	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("encode SQLite restore source path: %w", err)
+	objectAttributes := windows.OBJECT_ATTRIBUTES{
+		RootDirectory: directory,
+		ObjectName:    objectName,
+		Attributes:    windows.OBJ_CASE_INSENSITIVE,
 	}
-	source, err := windows.CreateFile(
-		pointer,
-		windows.GENERIC_WRITE|windows.DELETE|windows.FILE_READ_ATTRIBUTES,
-		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+	objectAttributes.Length = uint32(unsafe.Sizeof(objectAttributes))
+
+	// NtCreateFile uses the native FILE_WRITE_THROUGH CreateOptions bit (0x2).
+	// This is distinct from Win32 FILE_FLAG_WRITE_THROUGH (0x80000000). Opening
+	// relative to RootDirectory binds the source lookup to the pinned directory
+	// object instead of resolving a path reconstructed from its current name.
+	const fileWriteThroughCreateOption = 0x00000002
+	createOptions := uint32(windows.FILE_OPEN_REPARSE_POINT |
+		windows.FILE_NON_DIRECTORY_FILE |
+		windows.FILE_SYNCHRONOUS_IO_NONALERT |
+		fileWriteThroughCreateOption)
+	var ioStatus windows.IO_STATUS_BLOCK
+	var source windows.Handle
+	err = windows.NtCreateFile(
+		&source,
+		windows.GENERIC_WRITE|windows.DELETE|windows.FILE_READ_ATTRIBUTES|windows.SYNCHRONIZE,
+		&objectAttributes,
+		&ioStatus,
 		nil,
-		windows.OPEN_EXISTING,
-		windows.FILE_FLAG_OPEN_REPARSE_POINT|windows.FILE_FLAG_WRITE_THROUGH,
+		windows.FILE_ATTRIBUTE_NORMAL,
+		windows.FILE_SHARE_READ|windows.FILE_SHARE_WRITE|windows.FILE_SHARE_DELETE,
+		windows.FILE_OPEN,
+		createOptions,
+		0,
 		0,
 	)
+	runtime.KeepAlive(directory)
+	runtime.KeepAlive(objectName)
+	runtime.KeepAlive(&objectAttributes)
+	runtime.KeepAlive(&ioStatus)
 	if err != nil {
-		return windows.InvalidHandle, fmt.Errorf("open SQLite restore source with FILE_FLAG_WRITE_THROUGH: %w", err)
+		return windows.InvalidHandle, fmt.Errorf("open SQLite restore source relative to pinned directory with FILE_WRITE_THROUGH: %w", err)
 	}
+
 	var info windows.ByHandleFileInformation
 	if err := windows.GetFileInformationByHandle(source, &info); err != nil {
 		_ = windows.CloseHandle(source)
@@ -216,7 +238,7 @@ func openRestoreSourceWriteThrough(directory windows.Handle, sourceLeaf string) 
 		return windows.InvalidHandle, err
 	}
 	// Flush source content before the namespace operation. The subsequent
-	// relative rename is issued through this same FILE_FLAG_WRITE_THROUGH handle.
+	// handle-relative no-replace rename uses this same FILE_WRITE_THROUGH object.
 	if err := windows.FlushFileBuffers(source); err != nil {
 		_ = windows.CloseHandle(source)
 		return windows.InvalidHandle, fmt.Errorf("flush SQLite restore source before rename: %w", err)
