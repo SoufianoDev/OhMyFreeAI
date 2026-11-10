@@ -25,7 +25,7 @@ func TestRenameRestoreHandleNoReplaceUsesWriteThroughOpenedSourceHandle(t *testi
 		t.Fatalf("open qualified restore directory: %v", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
-		sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
 	if err != nil {
 		t.Fatalf("open write-through source handle: %v", err)
 	}
@@ -85,7 +85,7 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 		t.Fatalf("open qualified restore directory: %v", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
-		sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
 	if err != nil {
 		t.Fatalf("open write-through source handle: %v", err)
 	}
@@ -116,12 +116,11 @@ func TestRenameRestoreHandleNoReplaceRejectsDestinationCollision(t *testing.T) {
 	}
 }
 
-func TestRenameRestoreHandleNoReplaceStaysBoundToPinnedDirectoryAfterAncestorRename(t *testing.T) {
+func TestRenameRestoreHandleNoReplaceStaysBoundToPinnedDirectoryAfterDirectoryRename(t *testing.T) {
 	root := t.TempDir()
-	parent := filepath.Join(root, "parent")
-	directory := filepath.Join(parent, "state")
-	movedParent := filepath.Join(root, "parent-moved")
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	directory := filepath.Join(root, "state")
+	movedDirectory := filepath.Join(root, "state-moved")
+	if err := os.Mkdir(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	source := filepath.Join(directory, "candidate.db")
@@ -142,14 +141,13 @@ func TestRenameRestoreHandleNoReplaceStaysBoundToPinnedDirectoryAfterAncestorRen
 			_ = windows.CloseHandle(sourceHandle)
 		}
 	}()
-	if err := os.Rename(parent, movedParent); err != nil {
-		t.Fatalf("rename ancestor of pinned directory: %v", err)
+	if err := os.Rename(directory, movedDirectory); err != nil {
+		t.Fatalf("rename pinned destination directory: %v", err)
 	}
-	replacementDirectory := filepath.Join(parent, "state")
-	if err := os.MkdirAll(replacementDirectory, 0o700); err != nil {
-		t.Fatalf("create replacement ancestor tree: %v", err)
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatalf("create replacement directory at the old path: %v", err)
 	}
-	decoySource := filepath.Join(replacementDirectory, "candidate.db")
+	decoySource := filepath.Join(directory, "candidate.db")
 	if err := os.WriteFile(decoySource, []byte("decoy candidate"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -160,7 +158,7 @@ func TestRenameRestoreHandleNoReplaceStaysBoundToPinnedDirectoryAfterAncestorRen
 		t.Fatal(err)
 	}
 	sourceHandle = windows.InvalidHandle
-	published := filepath.Join(movedParent, "state", "published.db")
+	published := filepath.Join(movedDirectory, "published.db")
 	got, err := os.ReadFile(published)
 	if err != nil {
 		t.Fatalf("read destination in original pinned directory: %v", err)
@@ -175,17 +173,16 @@ func TestRenameRestoreHandleNoReplaceStaysBoundToPinnedDirectoryAfterAncestorRen
 	if string(got) != "decoy candidate" {
 		t.Fatalf("decoy source content = %q, want decoy candidate", got)
 	}
-	if _, err := os.Stat(filepath.Join(replacementDirectory, "published.db")); !os.IsNotExist(err) {
+	if _, err := os.Stat(filepath.Join(directory, "published.db")); !os.IsNotExist(err) {
 		t.Fatalf("rename escaped pinned directory into replacement tree: %v", err)
 	}
 }
 
-func TestValidateRestoreSourceLocationRejectsAncestorReplacementDecoy(t *testing.T) {
+func TestValidateRestoreSourceLocationRejectsReplacementDirectoryDecoy(t *testing.T) {
 	root := t.TempDir()
-	parent := filepath.Join(root, "parent")
-	directory := filepath.Join(parent, "state")
-	movedParent := filepath.Join(root, "parent-moved")
-	if err := os.MkdirAll(directory, 0o700); err != nil {
+	directory := filepath.Join(root, "state")
+	movedDirectory := filepath.Join(root, "state-moved")
+	if err := os.Mkdir(directory, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	directoryHandle, err := openRestoreDirectoryNoReparse(directory)
@@ -193,14 +190,13 @@ func TestValidateRestoreSourceLocationRejectsAncestorReplacementDecoy(t *testing
 		t.Fatalf("open qualified restore directory: %v", err)
 	}
 	defer windows.CloseHandle(directoryHandle)
-	if err := os.Rename(parent, movedParent); err != nil {
-		t.Fatalf("rename pinned directory ancestor: %v", err)
+	if err := os.Rename(directory, movedDirectory); err != nil {
+		t.Fatalf("rename pinned destination directory: %v", err)
 	}
-	replacementDirectory := filepath.Join(parent, "state")
-	if err := os.MkdirAll(replacementDirectory, 0o700); err != nil {
-		t.Fatalf("create replacement directory tree: %v", err)
+	if err := os.Mkdir(directory, 0o700); err != nil {
+		t.Fatalf("create replacement directory: %v", err)
 	}
-	decoy := filepath.Join(replacementDirectory, "candidate.db")
+	decoy := filepath.Join(directory, "candidate.db")
 	if err := os.WriteFile(decoy, []byte("decoy"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -222,7 +218,7 @@ func TestValidateRestoreSourceLocationRejectsAncestorReplacementDecoy(t *testing
 	}
 	defer windows.CloseHandle(decoyHandle)
 	if err := validateRestoreSourceLocation(decoyHandle, directoryHandle, "candidate.db"); err == nil {
-		t.Fatal("source location validation accepted a decoy from the replacement ancestor tree")
+		t.Fatal("source location validation accepted a decoy from the replacement directory")
 	}
 }
 

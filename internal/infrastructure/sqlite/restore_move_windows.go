@@ -22,7 +22,7 @@ func moveRestoreFileNoReplacePlatform(source, destination string) error {
 	}
 	defer windows.CloseHandle(directoryHandle)
 
-		sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
 	if err != nil {
 		return fmt.Errorf("open SQLite restore source with write-through semantics: %w", err)
 	}

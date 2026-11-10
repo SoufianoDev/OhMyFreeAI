@@ -420,3 +420,13 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - Regression tests cover an ancestor rename with a replacement tree, rejection of a decoy source handle, and journal replacement using the pinned directory handle.
 - CI on base `0e3e2868e6a74c9fdae698b314c987fe39391ddd` is green: Root CI Ubuntu+Windows; SQLite drivers 4/4; Wails Ubuntu+Windows; Linux distribution matrix 8/8. These results do not cover this new Windows change.
 - **Blocking gate:** run and inspect fresh Root CI on the new commit, especially Windows Go tests. Keep Restore disabled and do not begin executor/journal recovery/UI/CLI integration or merge to main until the platform safety gates are met.
+
+
+## 2026-11-10 00:12Z — Windows Root CI test correction
+
+- Root CI on `79c3e6f3e5b8e6420bb965a112aba8f4e6664be4` passed Ubuntu but Windows failed in two regression-test setup steps: `os.Rename(parent, movedParent)` returned `Access is denied` while a descendant directory handle was open. The failure occurred before the tests exercised rename-to-target behavior.
+- Rework the regressions to rename the pinned destination directory itself, then create a replacement at its former path. Existing Windows test coverage already verifies that a retained directory handle can continue resolving children from the original directory after that directory is renamed.
+- Verify the rename destination remains attached to the original directory handle and never lands in the replacement tree. Keep a separate decoy-handle rejection test.
+- Correct accidental extra indentation in the Windows source-open declarations.
+- Base commit's other CI: SQLite 4/4, Wails 2/2, Linux distro matrix 8/8. Fresh Root CI is required for this test-only correction.
+- Restore remains disabled; no executor, startup recovery, UI/CLI integration, or merge to main.

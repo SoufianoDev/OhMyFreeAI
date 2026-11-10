@@ -19,7 +19,7 @@ func publishRestoreJournal(source, destination string) error {
 	}
 	defer windows.CloseHandle(directoryHandle)
 
-		sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
+	sourceHandle, err := openRestoreSourceWriteThrough(directoryHandle, filepath.Base(source))
 	if err != nil {
 		return fmt.Errorf("open SQLite restore journal temporary file: %w", err)
 	}
