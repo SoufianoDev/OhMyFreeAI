@@ -4,6 +4,8 @@ package sqlite
 
 import (
 	"crypto/sha256"
+	"errors"
+	"os"
 	"encoding/hex"
 	"fmt"
 	"path/filepath"
@@ -60,6 +62,13 @@ func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, er
 	runtime.KeepAlive(&attributes)
 	runtime.KeepAlive(&ioStatus)
 	if err != nil {
+		var status windows.NTStatus
+		if errors.As(err, &status) {
+			switch uint32(status) {
+			case 0xC000000F, 0xC0000034: // STATUS_NO_SUCH_FILE, STATUS_OBJECT_NAME_NOT_FOUND
+				return identity, fmt.Errorf("open SQLite restore identity leaf: %w (%v)", os.ErrNotExist, err)
+			}
+		}
 		return identity, fmt.Errorf("open SQLite restore identity leaf without following reparse points: %w", err)
 	}
 	defer windows.CloseHandle(handle)
