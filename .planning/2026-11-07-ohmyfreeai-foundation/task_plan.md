@@ -6,20 +6,22 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Latest verified code head: `9ca1f7e6de8ecca00970b3201601ca70f31ddb95` on `foundation/bootstrap` (2026-11-10). The latest commit adjusts Restore test fixtures to use private state directories; its parent `66fc1cea213aa575dd704aa22a922d53f7186b75` added the production private-directory boundary.
+Latest verified code head: `beab78a04f4ef9ae1421247983d25da66ffc3986` on `foundation/bootstrap` (2026-11-10).
 
-All workflow families for that exact code commit completed successfully:
+All four workflow families for this exact commit are complete and successful:
 
-- Root CI [42772101619](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101619): Ubuntu and Windows passed; Ubuntu race detector passed.
-- SQLite driver matrix [42772101510](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101510): modernc/ncruces on Ubuntu/Windows, 4/4 passed.
-- Wails platform proof [42772101659](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101659): 2/2 passed, including Linux native build/CLI/WebView bridge/database reopen and Windows native build/CLI/executable verification.
-- Linux distribution compatibility [42772101557](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42772101557): 8/8 passed.
+- Root CI [42775712875](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712875): 2/2 jobs passed (Ubuntu and Windows); Linux race detector passed.
+- SQLite driver evaluation [42775712758](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712758): 4/4 jobs passed (modernc/ncruces on Ubuntu/Windows).
+- Wails platform proof [42775712787](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712787): 2/2 jobs passed (Ubuntu native build/CLI/WebView bridge/database reopen and Windows native build/CLI/executable verification).
+- Linux distribution compatibility [42775712919](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712919): 8/8 jobs passed, including Ubuntu 22.04 / legacy GTK3-WebKit41. The previously pending Ubuntu 22.04 job is no longer pending; its actual job completed successfully.
 
-The Linux parent-directory durability step is implemented: the no-replace move syncs the already-pinned parent directory FD after rename. The Windows NTFS durability gate is now documented against Microsoft's `NtCreateFile(FILE_WRITE_THROUGH)` and `CreateFile(FILE_FLAG_WRITE_THROUGH)` contracts; the same retained source handle is flushed and used for the native handle-bound no-replace rename. This is a documented NTFS write-through request, not hardware-independent power-loss certification. Cross-platform no-follow identity readers and the post-move SHA-256/size helper are present, but the helper is not yet integrated into a transaction executor.
+The earlier inability to retrieve the live job log was a log-fetch/availability issue, not evidence of a workflow failure. The latest job list now confirms all eight distro jobs completed successfully, and no failure log or code fix is indicated.
+
+The Linux parent-directory durability step is implemented: the no-replace move syncs the already-pinned parent directory FD after rename. The Windows NTFS durability gate is documented against Microsoft's `NtCreateFile(FILE_WRITE_THROUGH)` and `CreateFile(FILE_FLAG_WRITE_THROUGH)` contracts; the same retained source handle is flushed and used for the native handle-bound no-replace rename. This is a documented NTFS write-through request, not hardware-independent power-loss certification. Cross-platform no-follow identity readers and the post-move SHA-256/size helper are present, but the helper is not yet integrated into a transaction executor.
 
 **Next engineering unit:** implement the isolated Restore transaction executor around a fully staged candidate. It must use StoreController's exclusive lease, durable journal intent-before-mutation, no-replace moves, post-move identity verification, rollback/quarantine retention, verified reopen, and fail-closed behavior. Then add failure-injection and abrupt-process-death/restart tests on Linux and Windows. Do not wire startup recovery or GUI/CLI Restore and do not enable Restore before that matrix passes.
 
-**Delivery warning:** GitHub compare currently reports `foundation/bootstrap` as 804 commits ahead of `main` (0 behind). There are no open pull requests. Do not merge the branch wholesale. When the first genuinely testable build is ready, prepare a clean, selective delivery commit/release branch containing only required runtime/build files and essential user documentation; keep planning history, experiments and temporary artifacts out of `main`. No merge is authorized by the current CI result.
+**Delivery warning:** `foundation/bootstrap` is 804 commits ahead of `main` (0 behind) according to the last recorded comparison. Do not merge the branch wholesale. When the first genuinely testable build is ready, prepare a clean, selective delivery commit/release branch containing only required runtime/build files and essential user documentation; keep planning history, experiments and temporary artifacts out of `main`. No merge is authorized by the current CI result.
 
 ## Current Phase
 
