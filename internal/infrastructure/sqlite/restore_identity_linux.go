@@ -4,6 +4,7 @@ package sqlite
 
 import (
 	"crypto/sha256"
+	"errors"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -34,6 +35,9 @@ func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, er
 		Resolve: unix.RESOLVE_BENEATH | unix.RESOLVE_NO_SYMLINKS | unix.RESOLVE_NO_MAGICLINKS,
 	})
 	if err != nil {
+		if errors.Is(err, unix.ENOENT) {
+			return identity, fmt.Errorf("open SQLite restore identity leaf: %w (%v)", os.ErrNotExist, err)
+		}
 		return identity, fmt.Errorf("open SQLite restore identity leaf without following links: %w", err)
 	}
 	file := os.NewFile(uintptr(fd), path)
