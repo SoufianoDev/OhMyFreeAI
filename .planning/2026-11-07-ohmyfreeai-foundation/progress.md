@@ -1351,3 +1351,27 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Updated the plan's remaining Restore work to distinguish the isolated transaction executor, failure/process-death tests, and the later startup coordinator. Startup recovery must not be wired before the executor matrix is green.
 - Confirmed no open pull requests. The branch remains 804 commits ahead of `main` and 0 behind; do not merge it wholesale.
 - Code verification remains tied to `9ca1f7e6de8ecca00970b3201601ca70f31ddb95`, not the documentation-only head. Its Root CI, SQLite matrix, Wails proof and Linux distro matrix are all green as recorded above.
+
+
+## Follow-up session: 2026-11-10T14:08Z — reconcile distro CI and planning state
+
+### Initial repository and workflow check
+- Rechecked the latest branch-triggered Actions runs for `foundation/bootstrap`; the latest code head remained `beab78a04f4ef9ae1421247983d25da66ffc3986`.
+- The latest Root CI run `42775712875` completed successfully: Ubuntu and Windows jobs passed; the Linux race-detector step passed.
+- The latest SQLite driver evaluation run `42775712758` completed successfully: all four modernc/ncruces × Ubuntu/Windows jobs passed.
+- The latest Wails platform proof run `42775712787` completed successfully: both Ubuntu and Windows jobs passed. Ubuntu included the native WebView-to-Go bridge and database-reopen smoke.
+- The latest Linux distribution compatibility run `42775712919` completed successfully: all eight jobs passed. In particular, `Ubuntu 22.04 / legacy-gtk3-webkit41` (job `129693622514`) completed every required build, CLI, and WebView/database-reopen step successfully.
+- The prior report's pending-job/log-fetch issue is resolved by querying the current workflow and job state. The earlier 404 did not establish a test failure; no code defect was evidenced, so no blind retry or speculative code change was made.
+- No workflow was active at the time of this reconciliation.
+
+### Changes made
+- Updated the active task plan's top-level Next Step evidence from stale commit `9ca1f7e` to verified head `beab78a`.
+- Replaced the stale 7/8/pending Ubuntu 22.04 statement with the actual 8/8 successful job results and exact run links.
+- Kept the executor as the next engineering unit. No Restore implementation was started in this reconciliation because the requested issue was the unresolved CI status/reporting discrepancy; the executor remains a separate security-sensitive implementation with substantial cross-platform test requirements.
+- No source code, workflow definitions, Restore safety gates, or `main` branch files were changed.
+
+### Verification boundary
+- Verified workflow/job totals: Root CI 2/2, SQLite 4/4, Wails 2/2, Linux distro 8/8.
+- Verified the Ubuntu 22.04 job's individual steps: setup, container initialization, native dependency installation, checkout, Go/Node setup, pkg-config configuration, pinned Wails CLI installation, actual desktop build, native CLI smoke, and live WebView-to-Go/database-reopen smoke all succeeded.
+- No local test execution is claimed; this session performed a read-only GitHub Actions reconciliation and planning-document update.
+- Restore remains disabled and is not connected to startup recovery, GUI, or CLI.
