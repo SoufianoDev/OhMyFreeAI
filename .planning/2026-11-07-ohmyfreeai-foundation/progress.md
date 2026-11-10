@@ -1343,3 +1343,11 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 ### Remaining safety boundary
 - Restore remains disabled. Passing Go tests and CI does not prove crash/power-loss durability across hardware, storage controllers, or filesystems.
 - Do not start Restore Executor, durable journal integration, startup recovery, UI/CLI Restore, or merge to `main` until all required safety gates are separately demonstrated.
+
+
+## 2026-11-10 07:14Z — planning reconciliation follow-up
+
+- Rechecked the docs-only commit `dd3a3185ef4b2b9cb1a5ea9654a7a85551f6aed3`. It changed only `task_plan.md` and `RESTORE_RECOVERY_EXECUTOR.md`; the workflow API returned zero runs for that SHA. This is expected: the core CI path filters do not include `docs/**` or `.planning/**`. No code changed in that commit.
+- Updated the plan's remaining Restore work to distinguish the isolated transaction executor, failure/process-death tests, and the later startup coordinator. Startup recovery must not be wired before the executor matrix is green.
+- Confirmed no open pull requests. The branch remains 804 commits ahead of `main` and 0 behind; do not merge it wholesale.
+- Code verification remains tied to `9ca1f7e6de8ecca00970b3201601ca70f31ddb95`, not the documentation-only head. Its Root CI, SQLite matrix, Wails proof and Linux distro matrix are all green as recorded above.
