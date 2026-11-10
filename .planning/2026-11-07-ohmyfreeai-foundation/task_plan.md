@@ -23,7 +23,7 @@ The Linux parent-directory durability step is implemented: the no-replace move s
 
 After that gate passes, implement the isolated Restore transaction executor around a fully staged candidate. It must use StoreController's exclusive lease, durable intent-before-mutation journaling, no-replace moves, post-move identity verification, rollback/quarantine retention, verified reopen, and fail-closed behavior. Then add failure-injection and abrupt-process-death/restart tests on Linux and Windows. Do not wire startup recovery or GUI/CLI Restore and do not enable Restore before that matrix passes.
 
-**Delivery warning:** `foundation/bootstrap` is 813 commits ahead of `main` (0 behind) according to the latest comparison. Do not merge the branch wholesale. When the first genuinely testable build is ready, prepare a clean, selective delivery commit/release branch containing only required runtime/build files and essential user documentation; keep planning history, experiments and temporary artifacts out of `main`. No merge is authorized by the current CI result.
+**Delivery warning:** `foundation/bootstrap` is 824 commits ahead of `main` (0 behind) at the 2026-11-10 15:45Z comparison. Do not merge the branch wholesale. When the first genuinely testable build is ready, prepare a clean, selective delivery commit/release branch containing only required runtime/build files and essential user documentation; keep planning history, experiments and temporary artifacts out of `main`. No merge is authorized by the current CI result.
 
 ## Current Phase
 
