@@ -83,9 +83,7 @@ func TestBuildRestoreCandidateReturnsVerifiedPrivateArtifact(t *testing.T) {
 		t.Fatalf("read source configuration after candidate build: %v", err)
 	}
 	if !reflect.DeepEqual(actualSourceConfig, expected) {
-		t.Fatalf("source database changed during candidate build:
- got: %#v
-want: %#v", actualSourceConfig, expected)
+		t.Fatalf("source database changed during candidate build:\n got: %#v\nwant: %#v", actualSourceConfig, expected)
 	}
 }
 

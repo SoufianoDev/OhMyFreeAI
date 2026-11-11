@@ -6,46 +6,39 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Current branch head: `c464d7b767db049de15c5724b13bcb3dc5685bad` on `foundation/bootstrap`. The latest production-code commit is `430196b80b3342b7e9d300d6894759e853d5e97a`; `c464d7b` adds regression coverage only.
+Current branch head: `b4c845e23f6864e712572c101f4b21dd9221fcec` on `foundation/bootstrap`. The latest production-code change introduces a staging-only Restore candidate builder. The latest exact-head CI state is:
 
-### Retained journal lifecycle
+- Root CI [42978165926](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42978165926): 0/2 jobs passed. Ubuntu and Windows both stopped at `go vet ./...` because two new test diagnostics contain literal newlines inside double-quoted Go strings: `internal/infrastructure/backup/archive_test.go:486` and `internal/infrastructure/sqlite/restore_candidate_test.go:86`. The Go test/build steps were skipped after vet failed. Job logs confirm this is a source syntax error, not runner instability.
+- SQLite driver evaluation [42978165940](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42978165940): 4/4 passed.
+- Wails v3 platform proof [42978165989](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42978165989): 2/2 passed.
+- Linux distribution compatibility [42978166212](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42978166212): 8/8 passed, including Ubuntu 22.04 and Debian 12 legacy GTK3/WebKit41.
 
-Commit [430196b](https://github.com/SoufianoDev/OhMyFreeAI/commit/430196b80b3342b7e9d300d6894759e853d5e97a) replaced the single-record lifecycle with a bounded retained ledger:
+There were no active jobs when this plan was updated. Correct the three affected diagnostic strings in the two test files to use escaped newlines, then rerun the full four-workflow matrix on the resulting exact commit. Do not treat the three passing workflow families as a substitute for Root CI.
 
-- Ledger envelope version 1 stores immutable version-3 transaction records.
-- A maximum of 256 records and 1 MiB is enforced; the writer fails closed at either limit.
-- Only one non-terminal transaction may exist at a time. New transactions must begin at `prepared`.
-- Transaction IDs and staging/rollback/quarantine artifact paths cannot be reused across retained records; every record targets the same canonical database path.
-- Terminal `committed` and `rolled-back` records remain in the ledger. `RemoveRestoreJournal` does not delete history and returns the retained-history error.
-- A legacy single-record v3 journal is accepted and migrated to the ledger on its next successful write.
-- Reads return the sole active transaction, or the latest terminal record when idle.
+### Staging-only Restore candidate builder
 
-Test commit [c464d7b](https://github.com/SoufianoDev/OhMyFreeAI/commit/c464d7b767db049de15c5724b13bcb3dc5685bad) adds Linux/Windows regression coverage for completing two sequential transactions without losing the first terminal record, selecting the second active/latest record correctly, refusing history deletion, and preserving an orphan temporary journal file from a simulated crash before publication. This verifies sequential rollover and one pre-publication crash fixture; it is **not** the full process-death/failure-injection matrix.
+Commit [b4c845e](https://github.com/SoufianoDev/OhMyFreeAI/commit/b4c845e23f6864e712572c101f4b21dd9221fcec) adds:
 
-### CI verification for exact head `c464d7b`
+- `backup.Manager.BuildRestoreCandidate`: validates the `.omfaibackup` extension, extracts the archive into an isolated temporary source directory, and delegates candidate construction without opening or mutating the live Store.
+- `sqlite.BuildRestoreCandidate`: creates a unique artifact in the canonical private state directory, copies the verified snapshot through SQLite's online backup API, applies migrations, verifies database integrity, validates the loaded configuration, checkpoints and closes the candidate, removes only empty SQLite sidecars, syncs the candidate file, and measures its size/SHA-256 identity.
+- If construction fails after artifact creation, the candidate path is returned and the artifact is preserved for inspection. On success, the caller must durably record its identity before moving it to the journal's recorded staging path with the verified no-replace primitive.
 
-All four workflow families completed successfully, with 16/16 jobs passing and no active jobs:
-
-- Root CI [42975743863](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743863): 2/2 (Ubuntu and Windows). Both checked out `c464d7b`; Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks passed. Ubuntu `go test -race ./...` passed; Windows correctly skipped the Linux-only race step.
-- SQLite driver evaluation [42975743844](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743844): 4/4 (modernc and ncruces on Ubuntu and Windows).
-- Wails v3 platform proof [42975743834](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743834): 2/2. Ubuntu native build, CLI smoke, WebView-to-Go bridge and database reopen passed; Windows native build, CLI smoke and executable verification passed.
-- Linux distribution compatibility [42975743861](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743861): 8/8, including Ubuntu 22.04, Debian 12/13, Ubuntu 24.04, Fedora GTK3/GTK4, Arch and openSUSE.
-
-The earlier Windows NTFS write-through boundary remains limited to fixed local NTFS and is not a hardware-independent power-loss guarantee. The journal ledger has a deliberate 256-record cap and no automatic pruning or archive mechanism; do not silently rotate or delete evidence to bypass that cap.
+This is candidate preparation only. It does not acquire the StoreController exclusive lease, write a transaction journal, move/publish files, execute rollback, reopen the live Store, or provide crash recovery. It is not connected to GUI/CLI and does not enable Restore.
 
 ### Next engineering unit
 
-Start with a staging-only candidate builder, then implement the isolated filesystem transaction executor:
+Implement the isolated StoreController-backed transaction executor:
 
-1. Extract a verified `.omfaibackup` into a transaction-specific candidate without touching the live database; apply migrations, validate integrity/foreign keys/migration history/configuration, checkpoint, close and measure its content identity.
-2. Acquire the StoreController exclusive lease; checkpoint/close the current Store and verify its identity before recording the transaction's previous-database metadata.
-3. Persist every intent phase before its corresponding mutation. Move target to rollback and candidate to target only through the no-replace primitive; verify each destination's size and SHA-256 from a no-follow handle before opening SQLite.
-4. Reopen and validate the candidate. On failure, persist rollback intent, quarantine the candidate, restore the verified previous database, reopen and validate it, then record `rolled-back`.
-5. Add deterministic failure injection around every journal publication, move, sync, reopen and rollback boundary, followed by abrupt-process-death/restart tests on Linux and Windows.
+1. Acquire the exclusive Store lease, drain shared operations, checkpoint/close the active Store, and verify the previous database identity before recording transaction metadata.
+2. Persist each journal intent before its corresponding namespace mutation.
+3. Move the previous target and candidate only through the platform no-replace primitive; after each move, verify size and SHA-256 through a no-follow handle before opening SQLite, then complete the documented durability barrier.
+4. Reopen and validate the candidate (integrity, foreign keys, migration history, configuration and required repositories). Publish the new Store through the controller only after a durable commit decision.
+5. On failure after publication starts, persist rollback intent, quarantine the verified candidate at its already-recorded path, restore the verified previous database without replacement, reopen and validate it, then record `rolled-back`. If any state is ambiguous, preserve all artifacts and keep the controller unavailable.
+6. Add deterministic failure injection around journal publication, moves, file/directory sync, reopen and rollback, followed by abrupt-process-death/restart tests on Linux and Windows.
 
-The current `backup.Manager.Restore` / `sqlite.RestoreDatabase` path is the legacy path-based implementation. Do not use it from the new executor or expose it through GUI/CLI. Do not add startup recovery, GUI/CLI Restore, or enable Restore until the full matrix passes.
+The legacy `backup.Manager.Restore` / `sqlite.RestoreDatabase` path remains path-based and must not be used by the new executor or exposed through GUI/CLI. Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete safety matrix passes.
 
-**Delivery warning:** `foundation/bootstrap` is 832 commits ahead of `main` and 0 behind. No open PR exists. Do not merge this branch wholesale; prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready.
+**Delivery warning:** `foundation/bootstrap` is 834 commits ahead of `main` and 0 behind. No open PR exists. Do not merge this branch wholesale; prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready.
 
 ## Current Phase
 

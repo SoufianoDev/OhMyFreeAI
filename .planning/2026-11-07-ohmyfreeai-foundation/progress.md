@@ -1500,3 +1500,23 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Restore remains disabled and is not wired to startup, GUI or CLI. The legacy `backup.Manager.Restore` still routes through path-based `sqlite.RestoreDatabase`; the new executor must not call or expose that path.
 - Branch comparison against `main`: 832 ahead, 0 behind. No open PR; no merge attempted.
 - Next: add a staging-only candidate builder that validates and closes the candidate without touching the live Store, then implement the isolated StoreController-backed executor and its deterministic Linux/Windows failure-injection/process-death matrix.
+
+
+## 2026-11-11 07:20Z — isolated Restore candidate builder and Root CI syntax failure
+
+### Repository and architecture review
+- Rechecked `foundation/bootstrap` at `b4c845e23f6864e712572c101f4b21dd9221fcec`; the branch ref still pointed to this exact head before the repair.
+- Reviewed the current task plan, progress history, Restore lifecycle and executor design, StoreController lease semantics, retained journal ledger, recovery planner, no-replace adapters and identity readers.
+- Confirmed the new candidate-builder change is limited to `internal/infrastructure/backup/archive.go`, `archive_test.go`, `internal/infrastructure/sqlite/restore.go` and `restore_candidate_test.go`. It adds no GUI/CLI/startup wiring and does not enable Restore.
+
+### Exact-head CI diagnosis
+- Root CI [42978165926](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42978165926) failed on both Ubuntu and Windows in `go vet ./...`. The job logs identify the same two Go parser errors: an unterminated string at `archive_test.go:486` and another at `restore_candidate_test.go:86`. Subsequent test/build steps were skipped. This is a real source syntax defect in the newly added tests.
+- SQLite driver evaluation [42978165940](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42978165940) passed 4/4.
+- Wails platform proof [42978165989](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42978165989) passed 2/2.
+- Linux distribution compatibility [42978166212](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42978166212) passed 8/8 after all eight jobs completed. No workflow remained active before the repair commit.
+
+### Repair and verification boundary
+- Corrected the two affected test files by expressing multiline diagnostic messages with escaped newline sequences. The archive test contains two affected messages; the SQLite candidate test contains one.
+- Updated the active task plan and Restore lifecycle architecture to record the implemented staging-only candidate builder and to keep the filesystem transaction executor as the next engineering unit.
+- This commit contains the source-test repair and documentation updates. Exact-head CI for this repair is pending; no test or workflow success is claimed here.
+- Restore remains disabled and unexposed. No transaction executor, rollback orchestration, startup recovery, GUI/CLI Restore, or merge to `main` was added.

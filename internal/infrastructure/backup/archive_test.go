@@ -483,9 +483,7 @@ func TestManagerBuildRestoreCandidateDoesNotTouchLiveDatabase(t *testing.T) {
 		t.Fatalf("close built candidate: %v", closeErr)
 	}
 	if !reflect.DeepEqual(candidateConfig, sourceConfig) {
-		t.Fatalf("candidate configuration mismatch:
- got: %#v
-want: %#v", candidateConfig, sourceConfig)
+		t.Fatalf("candidate configuration mismatch:\n got: %#v\nwant: %#v", candidateConfig, sourceConfig)
 	}
 
 	actualLiveConfig, err := liveStore.Load(ctx)
@@ -493,8 +491,6 @@ want: %#v", candidateConfig, sourceConfig)
 		t.Fatalf("load live configuration after candidate build: %v", err)
 	}
 	if !reflect.DeepEqual(actualLiveConfig, liveConfig) {
-		t.Fatalf("live database changed during candidate build:
- got: %#v
-want: %#v", actualLiveConfig, liveConfig)
+		t.Fatalf("live database changed during candidate build:\n got: %#v\nwant: %#v", actualLiveConfig, liveConfig)
 	}
 }

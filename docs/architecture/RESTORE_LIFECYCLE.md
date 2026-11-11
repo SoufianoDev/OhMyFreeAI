@@ -9,9 +9,10 @@ The repository now contains:
 - Strict durable restore journal v3 transaction records in a retained ledger envelope v1. It records candidate and previous-database SHA-256/size identities, a fixed candidate-quarantine path, canonical state-directory-confined paths, and explicit intent/completion phases. The ledger permits one active transaction, retains terminal records, migrates legacy single-record v3 journals on write, and is bounded to 256 records / 1 MiB.
 - An identity-aware, pure `PlanRestoreRecovery` planner. It receives verified identities for target, staging, rollback and quarantine. Mismatches, unreadable/unverified files, and contradictory states fail closed with an empty plan.
 - A platform-specific no-replace move primitive. Linux pins the directory with `openat2` and uses `renameat2(RENAME_NOREPLACE)`. Windows uses retained directory/source handles and native `NtSetInformationFile(FileRenameInformationEx)` semantics without a replace flag. The Windows operation is provider-dependent and currently qualified only by the repository's CI environment; do not infer support for ReFS, SMB, removable media, or other providers.
+- A staging-only candidate builder: `backup.Manager.BuildRestoreCandidate` validates and extracts the archive into an isolated temporary source directory; `sqlite.BuildRestoreCandidate` creates a private same-filesystem candidate, applies migrations, verifies SQLite integrity and configuration, checkpoints/closes it, syncs the file, and returns its measured size/SHA-256 identity. It does not mutate the live Store or execute journaled moves. Failed candidate artifacts are returned and preserved for inspection.
 
 Still missing:
-- A filesystem executor that inspects file identities from safely opened handles and executes the planner.
+- A filesystem transaction executor that consumes the verified candidate, inspects file identities from safely opened handles, acquires the StoreController exclusive lease, and executes the planner.
 - Durable journal phase orchestration around every filesystem mutation.
 - A startup recovery coordinator that runs before the canonical Store is opened.
 - A shared application-level restore transaction used by both CLI and GUI.
