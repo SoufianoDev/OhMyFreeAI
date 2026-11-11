@@ -90,6 +90,99 @@ func TestBuildRestoreCandidateReturnsVerifiedPrivateArtifact(t *testing.T) {
 	}
 }
 
+
+func TestBuildRestoreCandidateAtPathUsesExclusiveJournalSelectedPath(t *testing.T) {
+	ctx := context.Background()
+	sourcePath, sourceStore, _ := createRestoreCandidateSnapshot(t)
+	defer sourceStore.Close()
+
+	root := restoreTestDir(t)
+	stagingPath := filepath.Join(root, ".restore-stage-transaction.sqlite")
+	candidate, err := BuildRestoreCandidateAtPath(ctx, sourcePath, root, stagingPath, migrations.Files, ".")
+	if err != nil {
+		t.Fatalf("build candidate at journal-selected path: %v", err)
+	}
+	if candidate.Path != stagingPath {
+		t.Fatalf("candidate path = %q, want exact journal-selected path %q", candidate.Path, stagingPath)
+	}
+	actual, err := readRestoreContentIdentityPlatform(stagingPath)
+	if err != nil {
+		t.Fatalf("read staged candidate identity: %v", err)
+	}
+	if !actual.matches(candidate.Identity.SHA256, candidate.Identity.Size) {
+		t.Fatalf("staged identity = %#v, returned identity = %#v", actual, candidate.Identity)
+	}
+	if err := ensureNoSQLiteSidecars(stagingPath); err != nil {
+		t.Fatalf("staged candidate retained SQLite sidecars: %v", err)
+	}
+}
+
+func TestBuildRestoreCandidateAtPathNeverReplacesExistingArtifact(t *testing.T) {
+	ctx := context.Background()
+	sourcePath, sourceStore, _ := createRestoreCandidateSnapshot(t)
+	defer sourceStore.Close()
+
+	root := restoreTestDir(t)
+	stagingPath := filepath.Join(root, ".restore-stage-collision.sqlite")
+	sentinel := []byte("preserve pre-existing evidence")
+	if err := os.WriteFile(stagingPath, sentinel, 0o600); err != nil {
+		t.Fatalf("create existing staging evidence: %v", err)
+	}
+	candidate, err := BuildRestoreCandidateAtPath(ctx, sourcePath, root, stagingPath, migrations.Files, ".")
+	if err == nil {
+		t.Fatal("candidate builder unexpectedly replaced an existing artifact")
+	}
+	if candidate.Path != "" {
+		t.Fatalf("candidate path = %q after O_EXCL collision, want empty", candidate.Path)
+	}
+	actual, readErr := os.ReadFile(stagingPath)
+	if readErr != nil {
+		t.Fatalf("read preserved staging evidence: %v", readErr)
+	}
+	if string(actual) != string(sentinel) {
+		t.Fatalf("existing staging evidence changed: %q", actual)
+	}
+}
+
+func TestBuildRestoreCandidateAtPathPreservesPartialArtifactOnFailure(t *testing.T) {
+	ctx := context.Background()
+	sourcePath, sourceStore, _ := createRestoreCandidateSnapshot(t)
+	defer sourceStore.Close()
+
+	root := restoreTestDir(t)
+	stagingPath := filepath.Join(root, ".restore-stage-failed.sqlite")
+	candidate, err := BuildRestoreCandidateAtPath(ctx, sourcePath, root, stagingPath, fstest.MapFS{}, ".")
+	if !errors.Is(err, ErrMigrationVersionTooNew) {
+		t.Fatalf("candidate build error = %v, want ErrMigrationVersionTooNew", err)
+	}
+	if candidate.Path != stagingPath {
+		t.Fatalf("preserved candidate path = %q, want %q", candidate.Path, stagingPath)
+	}
+	info, statErr := os.Stat(stagingPath)
+	if statErr != nil {
+		t.Fatalf("partial candidate artifact was removed: %v", statErr)
+	}
+	if info.Size() == 0 {
+		t.Fatal("partial candidate artifact is unexpectedly empty")
+	}
+}
+
+func TestBuildRestoreCandidateAtPathRejectsPathsOutsideStateDirectory(t *testing.T) {
+	ctx := context.Background()
+	sourcePath, sourceStore, _ := createRestoreCandidateSnapshot(t)
+	defer sourceStore.Close()
+
+	root := restoreTestDir(t)
+	outside := restoreTestDir(t)
+	candidate, err := BuildRestoreCandidateAtPath(ctx, sourcePath, root, filepath.Join(outside, "candidate.sqlite"), migrations.Files, ".")
+	if !errors.Is(err, ErrRestoreJournalInvalid) {
+		t.Fatalf("outside candidate path error = %v, want ErrRestoreJournalInvalid", err)
+	}
+	if candidate.Path != "" {
+		t.Fatalf("outside candidate path was accepted: %#v", candidate)
+	}
+}
+
 func TestBuildRestoreCandidatePreservesArtifactOnMigrationFailure(t *testing.T) {
 	ctx := context.Background()
 	sourcePath, sourceStore, _ := createRestoreCandidateSnapshot(t)

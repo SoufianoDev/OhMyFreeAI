@@ -88,6 +88,56 @@ func BuildRestoreCandidate(ctx context.Context, sourcePath, stateDirectory strin
 	return candidate, nil
 }
 
+
+// BuildRestoreCandidateAtPath creates a verified candidate at a caller-selected
+// path inside the private state directory. The destination is created with
+// O_EXCL, so an existing file is never truncated or replaced. The path is
+// suitable for a journal-recorded staging location. If construction fails
+// after creation, the partial artifact is returned and deliberately preserved.
+func BuildRestoreCandidateAtPath(ctx context.Context, sourcePath, stateDirectory, candidatePath string, migrationFS fs.FS, migrationDir string) (RestoreCandidate, error) {
+	var candidate RestoreCandidate
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return candidate, err
+	}
+	if migrationFS == nil {
+		return candidate, ErrInvalidMigration
+	}
+
+	root, err := canonicalStateDirectory(stateDirectory)
+	if err != nil {
+		return candidate, err
+	}
+	canonicalCandidate, err := canonicalStatePath(root, candidatePath)
+	if err != nil {
+		return candidate, err
+	}
+	if !samePath(filepath.Dir(canonicalCandidate), root) {
+		return candidate, fmt.Errorf("%w: candidate must be a direct child of the private state directory", ErrRestoreJournalInvalid)
+	}
+
+	file, err := os.OpenFile(canonicalCandidate, os.O_CREATE|os.O_EXCL|os.O_RDWR, 0o600)
+	if err != nil {
+		return candidate, fmt.Errorf("create journal-selected SQLite restore candidate without replacement: %w", err)
+	}
+	candidate.Path = canonicalCandidate
+	if err := file.Close(); err != nil {
+		return restoreCandidateFailure(candidate, "close journal-selected SQLite restore candidate", err)
+	}
+	if err := buildRestoreCandidateAtPath(ctx, sourcePath, canonicalCandidate, migrationFS, migrationDir); err != nil {
+		return restoreCandidateFailure(candidate, "build journal-selected SQLite restore candidate", err)
+	}
+
+	identity, err := readRestoreContentIdentityPlatform(canonicalCandidate)
+	if err != nil {
+		return restoreCandidateFailure(candidate, "measure journal-selected SQLite restore candidate identity", err)
+	}
+	candidate.Identity = identity
+	return candidate, nil
+}
+
 func restoreCandidateFailure(candidate RestoreCandidate, operation string, cause error) (RestoreCandidate, error) {
 	if candidate.Path == "" {
 		return candidate, fmt.Errorf("%s: %w", operation, cause)

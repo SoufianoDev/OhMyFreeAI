@@ -468,9 +468,13 @@ func TestManagerBuildRestoreCandidateDoesNotTouchLiveDatabase(t *testing.T) {
 		t.Fatalf("create source archive: %v", err)
 	}
 
-	candidate, manifest, err := manager.BuildRestoreCandidate(ctx, archivePath, stateDirectory)
+	candidatePath := filepath.Join(stateDirectory, ".restore-stage-manager-test.sqlite")
+	candidate, manifest, err := manager.BuildRestoreCandidateAtPath(ctx, archivePath, stateDirectory, candidatePath)
 	if err != nil {
 		t.Fatalf("build restore candidate: %v", err)
+	}
+	if candidate.Path != candidatePath {
+		t.Fatalf("candidate path = %q, want exact journal-selected path %q", candidate.Path, candidatePath)
 	}
 	if candidate.Path == "" || candidate.Identity.Size == 0 || candidate.Identity.SHA256 == "" {
 		t.Fatalf("candidate identity is incomplete: %#v", candidate)
