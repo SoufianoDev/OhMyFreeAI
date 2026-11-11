@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Current branch head at this review: `eedeac445cc9259b743c3d87c5d1cce7f2ead1aa` on `foundation/bootstrap`.
+Current branch head at this review: documentation-only commit `d4a8e60d476e47f3210bcc51476674f096709e82` on `foundation/bootstrap`; last behavior-changing code commit: `eedeac445cc9259b743c3d87c5d1cce7f2ead1aa`.
 
 ### CI evidence
 
@@ -14,14 +14,14 @@ The specifically requested Root CI run [42419106009](https://github.com/Soufiano
 
 A later regression run [42984745263](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42984745263), for `4075baf66c1a552c70acb23ef5fd725cd8f15d04`, had Ubuntu pass and Windows fail during Go tests. The failure was limited to three new test assertions comparing path strings byte-for-byte: Windows returned the long path under `C:\\Users\\runneradmin`, while the expected test string used the equivalent 8.3 alias `C:\\Users\\RUNNER~1`. The tests were corrected to use the repository's canonical path-equivalence helpers in commit [eedeac4](https://github.com/SoufianoDev/OhMyFreeAI/commit/eedeac445cc9259b743c3d87c5d1cce7f2ead1aa); production code was not changed by that correction.
 
-All workflow families on the exact current head `eedeac4` completed successfully:
+All workflow families on the last behavior-changing code head `eedeac4` completed successfully:
 
 - Root CI [42985836167](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836167): 2/2 jobs, Ubuntu and Windows. Both passed vet, tests and build; Ubuntu also passed race detection.
 - SQLite driver evaluation [42985836284](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836284): 4/4 jobs (modernc and ncruces on Ubuntu and Windows).
 - Wails v3 platform proof [42985836260](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836260): 2/2 jobs (Ubuntu and Windows).
 - Linux distribution compatibility [42985836201](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836201): 8/8 jobs (Debian 12/13, Ubuntu 22.04/24.04, Fedora GTK3/GTK4, Arch and openSUSE).
 
-Total: 16/16 jobs passed on the exact branch head. These are CI results, not power-loss certification.
+Total: 16/16 jobs passed on the exact code head `eedeac4`. The newer `d4a8e60` head changes planning/progress documentation only, so no production CI rerun was triggered. These are CI results, not power-loss certification.
 
 ### StoreController integration review
 
@@ -75,7 +75,7 @@ The current JSON ledger remains bounded to 256 records / 1 MiB; automatic prunin
 
 Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete journal, executor, rollback and process-death matrix passes on both platforms.
 
-**Delivery warning:** `foundation/bootstrap` is 838 commits ahead of `main` and 0 behind. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
+**Delivery warning:** `foundation/bootstrap` is 842 commits ahead of `main` and 0 behind. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
 
 ## Current Phase
 
