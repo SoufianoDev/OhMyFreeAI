@@ -1553,3 +1553,26 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Restore remains disabled and unexposed. No executor, startup recovery, GUI/CLI Restore, or merge to `main` was started. No production code changed in this run.
 - Compare against `main`: 838 commits ahead, 0 behind. No merge or force-push was attempted.
 - No local tests are claimed; all verification cited above is from inspected GitHub Actions jobs and logs.
+
+
+
+## 2026-11-11 21:35Z — SQLite PERSIST journal alternative research
+
+### Repository and CI audit
+- Confirmed the current `foundation/bootstrap` source file `internal/infrastructure/sqlite/restore.go` has the same blob as commit [eedeac4](https://github.com/SoufianoDev/OhMyFreeAI/commit/eedeac445cc9259b743c3d87c5d1cce7f2ead1aa). The last verified behavior-changing code commit remains `eedeac4`; the current Restore executor is still absent.
+- Re-inspected the four workflow families associated with `eedeac4`: Root CI [42985836167](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836167) 2/2; SQLite drivers [42985836284](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836284) 4/4; Wails [42985836260](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836260) 2/2; Linux distributions [42985836201](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836201) 8/8. All 16 jobs completed successfully.
+- Root job steps/logs confirm vet, Go tests/build, Linux race detector, Python compile/tests, frontend syntax and architecture checks. Wails logs confirm native builds and CLI smoke on both platforms plus live WebView bridge/database reopen on Linux. Windows skipped only the Linux-only race step and Linux-only WebView smoke.
+
+### New journal-storage candidate — research only, not approved
+- Reviewed SQLite's primary [journal_mode documentation](https://sqlite.org/pragma.html#pragma_journal_mode), [atomic commit design](https://sqlite.org/atomiccommit.html), [WAL documentation](https://sqlite.org/wal.html), [corruption guidance](https://www.sqlite.org/howtocorrupt.html), [Online Backup API](https://www.sqlite.org/c3ref/backup_finish.html), and the current SQLite Windows VFS source `src/os_win.c`.
+- SQLite `PERSIST` mode does not delete the rollback journal after each transaction; it overwrites the journal header with zeroes. This could avoid per-phase JSON-file replacement for an independent restore-state database.
+- Important constraint: `PERSIST` is connection-scoped and is not retained after close/reopen. Only WAL mode is documented as persistent across reopen. A dedicated restore-journal connection must explicitly set and verify `PRAGMA journal_mode=PERSIST` before every transaction on every new connection; do not assume it remains set.
+- The Windows SQLite VFS `winSync` flushes the specified file handle with `FlushFileBuffers`. The inspected `winOpen` path does not request `FILE_FLAG_WRITE_THROUGH`, and the VFS source does not provide a parent-directory sync equivalent to Linux directory-FD `fsync`. Therefore PERSIST alone does not solve durable creation of the database or its initial `-journal` directory entries.
+- Candidate design to test: a separate, pre-provisioned `restore-journal.sqlite` containing retained transaction/event records, using rollback-journal PERSIST and `synchronous=FULL`; create and durably publish the DB and its persistent rollback-journal sidecar before any restore transaction can begin. Linux must sync the containing directory. Windows provisioning must use the already-qualified handle-bound NTFS write-through creation path, then SQLite can reuse the existing sidecar for subsequent commits. If either file is missing or fails validation when a restore is requested, fail closed before touching the live Store.
+- Keep this separate from the application database being restored. The main database and its WAL/SHM lifecycle must not be confused with the restore-control database.
+- A local exploratory Python 3.13 / SQLite 3.46.1 probe confirmed that the PERSIST journal file remains after commits while PERSIST is active, and that a reopened connection reports DELETE until PERSIST is explicitly re-enabled. This is a behavior probe only; it is not a Go-driver, Windows, process-death, or power-loss test.
+- This direction is not approved for implementation yet. Required next evidence: test both modernc and ncruces, prove journal-sidecar pre-provisioning and missing-sidecar fail-closed behavior on Linux/Windows, exercise abrupt process termination at each journal transaction boundary, and inspect SQLite recovery before the next restore phase. No inference from process-death tests to power-loss certification.
+
+### Decision and safety
+- Do not replace the current JSON ledger yet. Do not begin the filesystem executor until the journal publication contract is settled.
+- No production code changed in this review. Restore remains disabled and unexposed; no startup recovery, GUI/CLI Restore, or merge to `main`.
