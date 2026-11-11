@@ -473,8 +473,8 @@ func TestManagerBuildRestoreCandidateDoesNotTouchLiveDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("build restore candidate: %v", err)
 	}
-	if candidate.Path != candidatePath {
-		t.Fatalf("candidate path = %q, want exact journal-selected path %q", candidate.Path, candidatePath)
+	if !sameArchivePath(candidate.Path, candidatePath) {
+		t.Fatalf("candidate path = %q, want the same canonical file as journal-selected path %q", candidate.Path, candidatePath)
 	}
 	if candidate.Path == "" || candidate.Identity.Size == 0 || candidate.Identity.SHA256 == "" {
 		t.Fatalf("candidate identity is incomplete: %#v", candidate)

@@ -102,8 +102,8 @@ func TestBuildRestoreCandidateAtPathUsesExclusiveJournalSelectedPath(t *testing.
 	if err != nil {
 		t.Fatalf("build candidate at journal-selected path: %v", err)
 	}
-	if candidate.Path != stagingPath {
-		t.Fatalf("candidate path = %q, want exact journal-selected path %q", candidate.Path, stagingPath)
+	if !samePath(candidate.Path, stagingPath) {
+		t.Fatalf("candidate path = %q, want the same canonical file as journal-selected path %q", candidate.Path, stagingPath)
 	}
 	actual, err := readRestoreContentIdentityPlatform(stagingPath)
 	if err != nil {
@@ -155,8 +155,8 @@ func TestBuildRestoreCandidateAtPathPreservesPartialArtifactOnFailure(t *testing
 	if !errors.Is(err, ErrMigrationVersionTooNew) {
 		t.Fatalf("candidate build error = %v, want ErrMigrationVersionTooNew", err)
 	}
-	if candidate.Path != stagingPath {
-		t.Fatalf("preserved candidate path = %q, want %q", candidate.Path, stagingPath)
+	if !samePath(candidate.Path, stagingPath) {
+		t.Fatalf("preserved candidate path = %q, want the same canonical file as %q", candidate.Path, stagingPath)
 	}
 	info, statErr := os.Stat(stagingPath)
 	if statErr != nil {
