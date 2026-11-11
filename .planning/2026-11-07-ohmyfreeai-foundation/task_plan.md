@@ -38,9 +38,30 @@ The coordinated Store lifecycle stage is complete and present in the current tre
 
 The prerequisite is therefore satisfied; the durable journal and staging-only candidate builder now present in the branch were added after this lifecycle integration. Neither is connected to startup, GUI or CLI Restore.
 
-### Next engineering unit — isolated transaction executor
+### Immediate gate — qualify the restore-journal storage protocol
 
-Implement the StoreController-backed filesystem transaction executor as an infrastructure-only component:
+Do not start the filesystem transaction executor until the durability and recovery contract for every journal phase update is settled.
+
+The current JSON ledger writes a temporary file and publishes it by platform-specific replacement. A researched alternative is a separate, pre-provisioned SQLite restore-control database using rollback-journal `PERSIST` mode and `synchronous=FULL`. This is a candidate only; it is not approved for implementation.
+
+Important constraints established by the current research:
+
+- SQLite `PERSIST` leaves its rollback-journal file in place and zeroes the header at commit, but unlike WAL it is not persistent across close/reopen. Every new restore-control connection must explicitly set and verify `PRAGMA journal_mode=PERSIST` before writing.
+- The Windows SQLite VFS flushes the selected file handle with `FlushFileBuffers`; it does not provide the Linux-style parent-directory `fsync`. The DB file and persistent rollback-journal sidecar therefore need a separately qualified, durable pre-provisioning step before a restore can start.
+- A separate restore-control DB must not be the application DB being replaced. Missing, malformed, unopenable or unverified control artifacts must fail closed before the live Store is touched.
+- Process-death recovery tests are necessary but are not power-loss certification.
+
+Required investigation and tests:
+
+1. Add isolated tests for `PERSIST` mode, mode re-application after reopen, persistent sidecar reuse, and fail-closed behavior when the DB or sidecar is missing.
+2. Run the tests against both modernc and ncruces on Linux and Windows; do not infer one driver's behavior from the other.
+3. Prove DB and sidecar pre-provisioning with the existing Linux directory-sync and Windows fixed-local-NTFS handle-bound write-through contracts. No path-based or overwrite-capable fallback is allowed.
+4. Exercise abrupt process termination during every journal transaction boundary and verify that SQLite recovers to exactly the last committed ledger state while retaining transaction history.
+5. Compare this design against the current JSON ledger. Adopt it only if the complete evidence is stronger and the format can be migrated without losing or guessing existing records. Otherwise retain the current ledger and continue closing its publication contract.
+
+### Subsequent engineering unit — isolated transaction executor
+
+After the journal protocol is qualified, implement the StoreController-backed filesystem transaction executor as an infrastructure-only component:
 
 1. Acquire the exclusive lease, drain shared work, checkpoint/close the active Store, and establish the previous database's no-follow size/SHA-256 identity.
 2. Validate the already journal-selected staging, rollback and quarantine paths. Build or consume the staged candidate without touching the live Store; persist the candidate identity before any publication move.
@@ -50,9 +71,9 @@ Implement the StoreController-backed filesystem transaction executor as an infra
 6. If publication/reopen fails, persist rollback intent, quarantine the candidate at its pre-recorded path, restore the verified previous database without replacement, reopen and validate it, and record `rolled-back`. Preserve every artifact and leave the controller unavailable if any step is ambiguous.
 7. Add deterministic failure injection and abrupt-process-death/restart coverage on Linux and Windows before startup recovery or application-level Restore wiring.
 
-The journal ledger is deliberately retained and bounded to 256 records / 1 MiB; automatic pruning/deletion remains unsupported. Linux source-leaf selection is still name-based at the final rename call, so post-move identity verification is mandatory and does not eliminate every same-user race. Windows write-through behavior is qualified only for fixed local NTFS and is not hardware-independent power-loss certification.
+The current JSON ledger remains bounded to 256 records / 1 MiB; automatic pruning/deletion is unsupported. Linux source-leaf selection is still name-based at the final rename call, so post-move identity verification is mandatory and does not eliminate every same-user race. Windows write-through behavior is qualified only for fixed local NTFS and is not hardware-independent power-loss certification.
 
-Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete executor, rollback and process-death matrix passes on both platforms.
+Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete journal, executor, rollback and process-death matrix passes on both platforms.
 
 **Delivery warning:** `foundation/bootstrap` is 838 commits ahead of `main` and 0 behind. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
 
