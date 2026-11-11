@@ -1520,3 +1520,36 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Updated the active task plan and Restore lifecycle architecture to record the implemented staging-only candidate builder and to keep the filesystem transaction executor as the next engineering unit.
 - This commit contains the source-test repair and documentation updates. Exact-head CI for this repair is pending; no test or workflow success is claimed here.
 - Restore remains disabled and unexposed. No transaction executor, rollback orchestration, startup recovery, GUI/CLI Restore, or merge to `main` was added.
+
+
+## 2026-11-11 14:39Z — requested CI audit and StoreController gate reconciliation
+
+### Requested workflow
+
+- Inspected Root CI run [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`.
+- The run was already completed, not queued or running. Its two jobs passed: `Validate (ubuntu-latest)` and `Validate (windows-latest)`. Each completed Go vet, Go tests/build, Python compile/tests, frontend JavaScript syntax and architecture-boundary checks. No failure logs required repair for this requested run.
+
+### Current branch and subsequent CI
+
+- Current branch head before planning updates: `eedeac445cc9259b743c3d87c5d1cce7f2ead1aa`.
+- Audited the intervening Root CI failure [42984745263](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42984745263) on commit `4075baf`. Ubuntu passed. Windows failed three candidate-path test assertions because Windows returned a long path while the expected value used the equivalent 8.3 short-path alias. The logs locate the failures in backup and SQLite candidate tests; production behavior was not shown to fail.
+- Commit [eedeac4](https://github.com/SoufianoDev/OhMyFreeAI/commit/eedeac445cc9259b743c3d87c5d1cce7f2ead1aa) changed those assertions to compare canonical path equivalence with `sameArchivePath` / `samePath`. This is a test-only correction.
+- Verified all workflows on exact head `eedeac4`: Root CI [42985836167] 2/2; SQLite driver matrix [42985836284] 4/4; Wails platform proof [42985836260] 2/2; Linux distribution matrix [42985836201] 8/8. All 16 jobs succeeded. Root Ubuntu passed the race detector; Windows skipped only the Linux-only race step.
+- Wails jobs verified the native application build and platform CLI/executable checks; Ubuntu also passed the live WebView-to-Go bridge and database-reopen smoke test. The Linux distro matrix passed all eight configured distributions.
+
+### StoreController review
+
+- Re-read `store_controller.go`, all 16 StoreController tests, Wails `main.go.tmpl` and `app_service.go.tmpl`, the configuration service and backup controller tests.
+- Confirmed the Wails composition root owns one StoreController for the application lifetime and closes it after `app.Run` using a bounded context.
+- Confirmed AppService and config use the controller; config Load/Save run under shared leases. Wails and CLI backup export use `CreateWithStoreController`, whose shared lease remains held through archive verification and publication.
+- Confirmed exclusive leases drain readers, waiting writers prevent reader starvation, shutdown waits for active operations, cancellation does not invalidate a live Store, stale/closed Stores are not re-exposed, and failed destructive replacement fails closed unless a verified replacement Store is supplied.
+- The backup-specific test holds the publication barrier and proves controller Close times out while export is active, then succeeds after publication completes. Current-head Linux and Windows CI passed these tests.
+
+### Next gate and safety
+
+- The StoreController integration gate is already complete; it was not reimplemented in this run.
+- The branch already contains the low-level retained Restore journal ledger, recovery planner, platform no-replace move and no-follow identity primitives, plus the staging-only candidate builder. The candidate builder uses an exclusive destination create, returns the measured content identity, and preserves partial artifacts on failure.
+- The next engineering unit remains the isolated StoreController-backed transaction executor with intent-before-mutation journal updates, immediate post-move no-follow identity checks, verified reopen, rollback/quarantine retention and deterministic Linux/Windows process-death tests.
+- Restore remains disabled and unexposed. No executor, startup recovery, GUI/CLI Restore, or merge to `main` was started. No production code changed in this run.
+- Compare against `main`: 838 commits ahead, 0 behind. No merge or force-push was attempted.
+- No local tests are claimed; all verification cited above is from inspected GitHub Actions jobs and logs.
