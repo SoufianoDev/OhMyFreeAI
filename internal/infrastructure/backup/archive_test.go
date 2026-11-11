@@ -410,3 +410,91 @@ func TestExtractArchiveHonorsCancellation(t *testing.T) {
 		t.Fatalf("expected context cancellation, got %v", err)
 	}
 }
+
+
+func TestManagerBuildRestoreCandidateDoesNotTouchLiveDatabase(t *testing.T) {
+	ctx := context.Background()
+	stateDirectory := filepath.Join(t.TempDir(), "state")
+	if err := os.Mkdir(stateDirectory, 0o700); err != nil {
+		t.Fatalf("create private state directory: %v", err)
+	}
+
+	liveStore, err := sqlite.Open(ctx, filepath.Join(stateDirectory, "state.db"))
+	if err != nil {
+		t.Fatalf("open live SQLite store: %v", err)
+	}
+	defer liveStore.Close()
+	if err := liveStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate live SQLite store: %v", err)
+	}
+	liveConfig := appconfig.Defaults()
+	liveConfig.Gateway.Port = 18101
+	if err := liveStore.Save(ctx, liveConfig); err != nil {
+		t.Fatalf("save live configuration: %v", err)
+	}
+
+	sourceStore, err := sqlite.Open(ctx, filepath.Join(t.TempDir(), "source.db"))
+	if err != nil {
+		t.Fatalf("open source SQLite store: %v", err)
+	}
+	defer sourceStore.Close()
+	if err := sourceStore.Migrate(ctx, migrations.Files, "."); err != nil {
+		t.Fatalf("migrate source SQLite store: %v", err)
+	}
+	sourceConfig := appconfig.Defaults()
+	sourceConfig.Gateway.Port = 18102
+	if err := sourceStore.Save(ctx, sourceConfig); err != nil {
+		t.Fatalf("save source configuration: %v", err)
+	}
+
+	manager := Manager{ApplicationVersion: "0.1.0", Migrations: migrations.Files, MigrationDir: "."}
+	archivePath := filepath.Join(t.TempDir(), "source.omfaibackup")
+	if err := manager.Create(ctx, sourceStore, archivePath); err != nil {
+		t.Fatalf("create source archive: %v", err)
+	}
+
+	candidate, manifest, err := manager.BuildRestoreCandidate(ctx, archivePath, stateDirectory)
+	if err != nil {
+		t.Fatalf("build restore candidate: %v", err)
+	}
+	if candidate.Path == "" || candidate.Identity.Size == 0 || candidate.Identity.SHA256 == "" {
+		t.Fatalf("candidate identity is incomplete: %#v", candidate)
+	}
+	if !sameArchivePath(filepath.Dir(candidate.Path), stateDirectory) {
+		t.Fatalf("candidate path %q is not inside state directory %q", candidate.Path, stateDirectory)
+	}
+	if sameArchivePath(candidate.Path, liveStore.DatabasePath()) {
+		t.Fatal("candidate builder reused the live database path")
+	}
+	if len(manifest.Files) != 1 || manifest.Files[0].Path != databaseName {
+		t.Fatalf("unexpected source manifest: %#v", manifest)
+	}
+
+	candidateStore, err := sqlite.OpenExisting(ctx, candidate.Path)
+	if err != nil {
+		t.Fatalf("open built candidate: %v", err)
+	}
+	candidateConfig, err := candidateStore.Load(ctx)
+	closeErr := candidateStore.Close()
+	if err != nil {
+		t.Fatalf("load built candidate configuration: %v", err)
+	}
+	if closeErr != nil {
+		t.Fatalf("close built candidate: %v", closeErr)
+	}
+	if !reflect.DeepEqual(candidateConfig, sourceConfig) {
+		t.Fatalf("candidate configuration mismatch:
+ got: %#v
+want: %#v", candidateConfig, sourceConfig)
+	}
+
+	actualLiveConfig, err := liveStore.Load(ctx)
+	if err != nil {
+		t.Fatalf("load live configuration after candidate build: %v", err)
+	}
+	if !reflect.DeepEqual(actualLiveConfig, liveConfig) {
+		t.Fatalf("live database changed during candidate build:
+ got: %#v
+want: %#v", actualLiveConfig, liveConfig)
+	}
+}

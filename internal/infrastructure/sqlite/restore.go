@@ -25,6 +25,175 @@ type onlineRestoreConnection interface {
 	NewRestore(sourceURI string) (*moderncsqlite.Backup, error)
 }
 
+type RestoreCandidate struct {
+	Path     string
+	Identity RestoreContentIdentity
+}
+
+// BuildRestoreCandidate creates a fully migrated and verified candidate in
+// the private state directory without changing the canonical database. The
+// returned file is a build artifact: the transaction executor must first
+// persist its identity in the journal, then move it to the journal's recorded
+// staging path with moveRestoreFileNoReplaceVerified. If an error occurs after
+// file creation, Path is returned and the artifact is deliberately preserved.
+func BuildRestoreCandidate(ctx context.Context, sourcePath, stateDirectory string, migrationFS fs.FS, migrationDir string) (RestoreCandidate, error) {
+	var candidate RestoreCandidate
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return candidate, err
+	}
+	if migrationFS == nil {
+		return candidate, ErrInvalidMigration
+	}
+
+	root, err := canonicalStateDirectory(stateDirectory)
+	if err != nil {
+		return candidate, err
+	}
+	absoluteSource, err := filepath.Abs(sourcePath)
+	if err != nil {
+		return candidate, fmt.Errorf("resolve SQLite restore candidate source: %w", err)
+	}
+	absoluteSource = filepath.Clean(absoluteSource)
+	sourceInfo, err := os.Lstat(absoluteSource)
+	if err != nil {
+		return candidate, fmt.Errorf("inspect SQLite restore candidate source: %w", err)
+	}
+	if !sourceInfo.Mode().IsRegular() {
+		return candidate, ErrRestoreSourceInvalid
+	}
+	if err := verifyBackupDatabase(ctx, absoluteSource); err != nil {
+		return candidate, fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
+	}
+
+	temporaryFile, err := os.CreateTemp(root, ".ohmyfreeai-restore-candidate-build-*.sqlite")
+	if err != nil {
+		return candidate, fmt.Errorf("create SQLite restore candidate: %w", err)
+	}
+	candidate.Path = temporaryFile.Name()
+	if err := temporaryFile.Close(); err != nil {
+		return restoreCandidateFailure(candidate, "close SQLite restore candidate", err)
+	}
+	if err := buildRestoreCandidateAtPath(ctx, absoluteSource, candidate.Path, migrationFS, migrationDir); err != nil {
+		return restoreCandidateFailure(candidate, "build SQLite restore candidate", err)
+	}
+
+	identity, err := readRestoreContentIdentityPlatform(candidate.Path)
+	if err != nil {
+		return restoreCandidateFailure(candidate, "measure SQLite restore candidate identity", err)
+	}
+	candidate.Identity = identity
+	return candidate, nil
+}
+
+func restoreCandidateFailure(candidate RestoreCandidate, operation string, cause error) (RestoreCandidate, error) {
+	if candidate.Path == "" {
+		return candidate, fmt.Errorf("%s: %w", operation, cause)
+	}
+	return candidate, fmt.Errorf("%s; candidate preserved at %s: %w", operation, candidate.Path, cause)
+}
+
+// buildRestoreCandidateAtPath fills a caller-created empty regular file. It
+// never removes the candidate or its sidecars on failure.
+func buildRestoreCandidateAtPath(ctx context.Context, sourcePath, candidatePath string, migrationFS fs.FS, migrationDir string) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if migrationFS == nil {
+		return ErrInvalidMigration
+	}
+
+	absoluteSource, err := filepath.Abs(sourcePath)
+	if err != nil {
+		return fmt.Errorf("resolve SQLite restore source: %w", err)
+	}
+	absoluteCandidate, err := filepath.Abs(candidatePath)
+	if err != nil {
+		return fmt.Errorf("resolve SQLite restore candidate path: %w", err)
+	}
+	absoluteSource = filepath.Clean(absoluteSource)
+	absoluteCandidate = filepath.Clean(absoluteCandidate)
+	if samePath(absoluteSource, absoluteCandidate) {
+		return ErrInvalidDatabasePath
+	}
+
+	sourceInfo, err := os.Lstat(absoluteSource)
+	if err != nil {
+		return fmt.Errorf("inspect SQLite restore source: %w", err)
+	}
+	if !sourceInfo.Mode().IsRegular() {
+		return ErrRestoreSourceInvalid
+	}
+	if err := verifyBackupDatabase(ctx, absoluteSource); err != nil {
+		return fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
+	}
+
+	candidateInfo, err := os.Lstat(absoluteCandidate)
+	if err != nil {
+		return fmt.Errorf("inspect empty SQLite restore candidate: %w", err)
+	}
+	if !candidateInfo.Mode().IsRegular() || candidateInfo.Size() != 0 {
+		return fmt.Errorf("SQLite restore candidate must be an empty regular file")
+	}
+	if err := ensureNoSQLiteSidecars(absoluteCandidate); err != nil {
+		return err
+	}
+
+	candidateStore, err := OpenExisting(ctx, absoluteCandidate)
+	if err != nil {
+		return fmt.Errorf("open SQLite restore candidate: %w", err)
+	}
+	storeClosed := false
+	defer func() {
+		if !storeClosed {
+			_ = candidateStore.Close()
+		}
+	}()
+
+	if err := candidateStore.restoreFromPath(ctx, absoluteSource); err != nil {
+		return err
+	}
+	if migrationDir == "" {
+		migrationDir = "."
+	}
+	if err := candidateStore.Migrate(ctx, migrationFS, migrationDir); err != nil {
+		return fmt.Errorf("migrate SQLite restore candidate: %w", err)
+	}
+	if err := verifyBackupDatabase(ctx, absoluteCandidate); err != nil {
+		return fmt.Errorf("verify SQLite restore candidate: %w", err)
+	}
+	configuration, err := candidateStore.Load(ctx)
+	if err != nil {
+		return fmt.Errorf("load SQLite restore candidate configuration: %w", err)
+	}
+	if err := configuration.Validate(); err != nil {
+		return fmt.Errorf("validate SQLite restore candidate configuration: %w", err)
+	}
+	if err := checkpointStore(ctx, candidateStore); err != nil {
+		return err
+	}
+	closeErr := candidateStore.Close()
+	storeClosed = true
+	if closeErr != nil {
+		return fmt.Errorf("close SQLite restore candidate: %w", closeErr)
+	}
+	if err := removeEmptySQLiteSidecars(absoluteCandidate); err != nil {
+		return err
+	}
+	if err := syncSQLiteFile(absoluteCandidate); err != nil {
+		return err
+	}
+	if err := ensureNoSQLiteSidecars(absoluteCandidate); err != nil {
+		return err
+	}
+	return nil
+}
+
 // RestoreDatabase restores a verified SQLite snapshot into targetPath using
 // SQLite's online backup API. The target must be closed by the caller. If a
 // target database already exists, it is retained beside the new database as
@@ -86,41 +255,7 @@ func RestoreDatabase(ctx context.Context, sourcePath, targetPath string, migrati
 		}
 	}()
 
-	temporaryStore, err := OpenExisting(ctx, temporaryPath)
-	if err != nil {
-		return "", fmt.Errorf("open temporary SQLite restore database: %w", err)
-	}
-	storeClosed := false
-	defer func() {
-		if !storeClosed {
-			_ = temporaryStore.Close()
-		}
-	}()
-
-	if err := temporaryStore.restoreFromPath(ctx, absoluteSource); err != nil {
-		return "", err
-	}
-	if migrationDir == "" {
-		migrationDir = "."
-	}
-	if err := temporaryStore.Migrate(ctx, migrationFS, migrationDir); err != nil {
-		return "", fmt.Errorf("migrate restored SQLite database: %w", err)
-	}
-	if err := verifyBackupDatabase(ctx, temporaryPath); err != nil {
-		return "", fmt.Errorf("verify restored SQLite database: %w", err)
-	}
-	if err := checkpointStore(ctx, temporaryStore); err != nil {
-		return "", err
-	}
-	if err := temporaryStore.Close(); err != nil {
-		storeClosed = true
-		return "", fmt.Errorf("close restored SQLite database: %w", err)
-	}
-	storeClosed = true
-	if err := removeEmptySQLiteSidecars(temporaryPath); err != nil {
-		return "", err
-	}
-	if err := syncSQLiteFile(temporaryPath); err != nil {
+	if err := buildRestoreCandidateAtPath(ctx, absoluteSource, temporaryPath, migrationFS, migrationDir); err != nil {
 		return "", err
 	}
 

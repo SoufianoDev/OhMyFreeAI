@@ -254,6 +254,49 @@ func (m Manager) Inspect(ctx context.Context, archivePath string) (Manifest, err
 	return manifest, nil
 }
 
+
+ // BuildRestoreCandidate verifies an archive and builds a migrated candidate
+ // in the private state directory. It never opens or mutates the live Store.
+ // The caller must journal the candidate identity before moving the returned
+ // build artifact to the transaction's recorded staging path.
+func (m Manager) BuildRestoreCandidate(ctx context.Context, archivePath, stateDirectory string) (sqlite.RestoreCandidate, Manifest, error) {
+	var empty sqlite.RestoreCandidate
+	var emptyManifest Manifest
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if m.Migrations == nil {
+		return empty, emptyManifest, ErrBackupManagerConfig
+	}
+	if err := validateArchiveExtension(archivePath); err != nil {
+		return empty, emptyManifest, err
+	}
+	absoluteArchive, err := filepath.Abs(archivePath)
+	if err != nil {
+		return empty, emptyManifest, fmt.Errorf("resolve backup archive: %w", err)
+	}
+	if err := ctx.Err(); err != nil {
+		return empty, emptyManifest, err
+	}
+
+	sourceDirectory, err := os.MkdirTemp("", ".ohmyfreeai-restore-candidate-source-*")
+	if err != nil {
+		return empty, emptyManifest, fmt.Errorf("create isolated restore source directory: %w", err)
+	}
+	defer os.RemoveAll(sourceDirectory)
+
+	snapshotPath := filepath.Join(sourceDirectory, databaseName)
+	manifest, err := extractArchive(ctx, absoluteArchive, snapshotPath)
+	if err != nil {
+		return empty, emptyManifest, err
+	}
+	candidate, err := sqlite.BuildRestoreCandidate(ctx, snapshotPath, stateDirectory, m.Migrations, m.MigrationDir)
+	if err != nil {
+		return candidate, manifest, err
+	}
+	return candidate, manifest, nil
+}
+
 func (m Manager) Restore(ctx context.Context, archivePath, targetDatabasePath string) (string, error) {
 	if m.Migrations == nil {
 		return "", ErrBackupManagerConfig
