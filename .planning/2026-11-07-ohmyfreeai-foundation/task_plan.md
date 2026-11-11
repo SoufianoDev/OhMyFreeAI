@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Current branch head at this review: documentation-only commit `d4a8e60d476e47f3210bcc51476674f096709e82` on `foundation/bootstrap`; last behavior-changing code commit: `eedeac445cc9259b743c3d87c5d1cce7f2ead1aa`.
+Last behavior-changing code commit: `eedeac445cc9259b743c3d87c5d1cce7f2ead1aa`. Subsequent commits in this review update planning/progress documentation only; they do not change production code.
 
 ### CI evidence
 
@@ -75,7 +75,7 @@ The current JSON ledger remains bounded to 256 records / 1 MiB; automatic prunin
 
 Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete journal, executor, rollback and process-death matrix passes on both platforms.
 
-**Delivery warning:** `foundation/bootstrap` is 842 commits ahead of `main` and 0 behind. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
+**Delivery warning:** `foundation/bootstrap` is substantially ahead of `main`. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
 
 ## Current Phase
 
