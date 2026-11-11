@@ -77,8 +77,9 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	}
 
 	ledger, readErr := readRestoreJournalLedger(root)
+	initialPublication := errors.Is(readErr, os.ErrNotExist)
 	switch {
-	case errors.Is(readErr, os.ErrNotExist):
+	case initialPublication:
 		ledger = restoreJournalLedger{Version: restoreJournalLedgerVersion}
 	case readErr != nil:
 		// A malformed, unreadable, or non-regular existing journal is evidence
@@ -131,12 +132,8 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 		return fmt.Errorf("create temporary SQLite restore journal: %w", err)
 	}
 	temporaryPath := temporary.Name()
-	published := false
-	defer func() {
-		if !published {
-			_ = os.Remove(temporaryPath)
-		}
-	}()
+	// Keep an unpublished journal snapshot when any later step fails. It is
+	// evidence for diagnosis/recovery, not disposable scratch space.
 	if err := temporary.Chmod(0o600); err != nil {
 		_ = temporary.Close()
 		return fmt.Errorf("restrict SQLite restore journal permissions: %w", err)
@@ -152,10 +149,25 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	if err := temporary.Close(); err != nil {
 		return fmt.Errorf("close SQLite restore journal: %w", err)
 	}
-	if err := publishRestoreJournal(temporaryPath, journalPath); err != nil {
-		return fmt.Errorf("publish SQLite restore journal ledger: %w", err)
+	var publishErr error
+	if initialPublication {
+		publishErr = publishRestoreJournalNoReplace(temporaryPath, journalPath)
+	} else {
+		publishErr = publishRestoreJournal(temporaryPath, journalPath)
 	}
-	published = true
+	if publishErr != nil {
+		return fmt.Errorf("publish SQLite restore journal ledger; temporary artifact preserved at %s: %w", temporaryPath, publishErr)
+	}
+	return nil
+}
+
+// publishRestoreJournalNoReplace is used only for the first ledger publication.
+// It reuses the platform-qualified no-replace move and its directory durability
+// barrier, so a ledger created after the initial absence check cannot be lost.
+func publishRestoreJournalNoReplace(source, destination string) error {
+	if err := moveRestoreFileNoReplace(source, destination); err != nil {
+		return fmt.Errorf("publish SQLite restore journal without replacement: %w", err)
+	}
 	return nil
 }
 

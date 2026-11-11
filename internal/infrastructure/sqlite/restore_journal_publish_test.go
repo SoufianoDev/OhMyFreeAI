@@ -4,6 +4,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -33,7 +34,39 @@ func TestPublishRestoreJournalReplacesExistingFile(t *testing.T) {
 	}
 }
 
+func TestPublishRestoreJournalNoReplaceCreatesMissingFile(t *testing.T) {
+	skipUnlessRestoreNoReplaceSupported(t)
+	root := restoreTestDir(t)
+	source := filepath.Join(root, ".restore-journal-next.tmp")
+	destination := filepath.Join(root, restoreJournalFileName)
+	if err := os.WriteFile(source, []byte("initial journal"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := publishRestoreJournalNoReplace(source, destination); err != nil {
+		t.Fatalf("publishRestoreJournalNoReplace() error = %v", err)
+	}
+	if _, err := os.Lstat(source); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("temporary journal still exists or cannot be inspected: %v", err)
+	}
+	got, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "initial journal" {
+		t.Fatalf("published journal = %q, want %q", got, "initial journal")
+	}
+}
+
+func skipUnlessRestoreNoReplaceSupported(t *testing.T) {
+	t.Helper()
+	if runtime.GOOS != "linux" && runtime.GOOS != "windows" {
+		t.Skip("atomic no-replace Restore moves are qualified only on Linux and Windows")
+	}
+}
+
 func TestPublishRestoreJournalNoReplacePreservesExistingFile(t *testing.T) {
+	skipUnlessRestoreNoReplaceSupported(t)
 	root := restoreTestDir(t)
 	source := filepath.Join(root, ".restore-journal-next.tmp")
 	destination := filepath.Join(root, restoreJournalFileName)
