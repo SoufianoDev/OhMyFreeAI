@@ -6,7 +6,7 @@ Archive restore is **disabled and not exposed** in the GUI or CLI.
 
 The repository now contains:
 - An application-lifetime `sqlite.StoreController` with shared/exclusive leases. Configuration persistence and GUI/CLI backup export use shared leases; an exclusive operation drains active readers and prevents new ones.
-- A strict durable restore journal, schema version 3. It records candidate and previous-database SHA-256/size identities, a fixed candidate-quarantine path, canonical state-directory-confined paths, and explicit intent/completion phases.
+- Strict durable restore journal v3 transaction records in a retained ledger envelope v1. It records candidate and previous-database SHA-256/size identities, a fixed candidate-quarantine path, canonical state-directory-confined paths, and explicit intent/completion phases. The ledger permits one active transaction, retains terminal records, migrates legacy single-record v3 journals on write, and is bounded to 256 records / 1 MiB.
 - An identity-aware, pure `PlanRestoreRecovery` planner. It receives verified identities for target, staging, rollback and quarantine. Mismatches, unreadable/unverified files, and contradictory states fail closed with an empty plan.
 - A platform-specific no-replace move primitive. Linux pins the directory with `openat2` and uses `renameat2(RENAME_NOREPLACE)`. Windows uses retained directory/source handles and native `NtSetInformationFile(FileRenameInformationEx)` semantics without a replace flag. The Windows operation is provider-dependent and currently qualified only by the repository's CI environment; do not infer support for ReFS, SMB, removable media, or other providers.
 
@@ -18,6 +18,12 @@ Still missing:
 - Process-death, race, failure-injection and filesystem-provider qualification for the complete transaction.
 
 The detailed implementation gate is [Restore Recovery Executor](RESTORE_RECOVERY_EXECUTOR.md). The executor design is authoritative for platform-specific no-replace and race constraints. Do not implement a weaker `os.Rename` fallback.
+
+## Retained journal storage lifecycle
+
+The journal file is a bounded ledger, not a single replaceable transaction record. Terminal records remain available as evidence; starting a later restore appends a new `prepared` record after all previous records are terminal. The writer rejects a second active transaction, duplicate transaction IDs, reused artifact paths, malformed existing ledgers, and history beyond 256 records or 1 MiB. A legacy single-record v3 journal is accepted and migrated on the next successful write.
+
+Journal deletion and automatic pruning are intentionally unsupported. The cap is a fail-closed safety limit; a verified manual export/archive or compaction design is still required before enabling Restore for indefinite long-term use. A temporary file left before atomic publication is not authoritative and is preserved for review. This ledger storage behavior does not itself execute recovery or prove the full process-death matrix.
 
 ## Ownership boundary
 
@@ -34,7 +40,7 @@ The detailed implementation gate is [Restore Recovery Executor](RESTORE_RECOVERY
 2. Resolve the canonical private application state directory and validate all transaction paths.
 3. Acquire the exclusive Store lease; drain existing operations and reject new ones.
 4. Checkpoint WAL, close the active Store, and verify that target `-wal`, `-shm`, and `-journal` sidecars are absent.
-5. Create a v3 journal with a cryptographically random transaction ID, fixed staging/rollback/quarantine paths, archive identity, and explicit previous-database metadata.
+5. Append a `prepared` v3 transaction record to the retained ledger with a cryptographically random transaction ID, unique staging/rollback/quarantine paths, archive identity, and explicit previous-database metadata. Preserve all terminal records and allow only one active transaction.
 6. Build the candidate in same-filesystem staging. Verify SQLite integrity, foreign keys, migration history, schema compatibility, configuration validity, and candidate content identity before publication.
 7. Persist each intent phase before its filesystem mutation. Use the qualified atomic no-replace adapter; verify the moved file identity and required durability barrier before recording the completion phase.
 8. Open the published candidate with `sqlite.OpenExisting`, repeat integrity/foreign-key/migration checks, load and validate configuration, and verify required repositories.
@@ -72,7 +78,7 @@ A crash between an intent write and its filesystem operation, or between the ope
 Recovery must run before opening the canonical Store:
 
 1. Resolve and validate the canonical state directory.
-2. Read and strictly validate the bounded v3 journal. Reject v2 and unknown fields.
+2. Read and strictly validate the bounded ledger v1 and its v3 records. Select the sole active transaction; if all records are terminal, no transaction recovery is pending. Reject v2, unknown fields, duplicate IDs, path reuse and multiple active records.
 3. Inspect target, staging, rollback and quarantine without following symlinks/reparse points. Verify SHA-256 and size from the opened file objects.
 4. Pass verified identities to `PlanRestoreRecovery`.
 5. Execute one idempotent no-replace step at a time, persisting intent/completion phases around each namespace transition.
@@ -138,3 +144,15 @@ The qualification policy is intentionally NTFS-only. ReFS, SMB, removable media,
 Root CI [42643886765](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42643886765) passed on commit `8cb7b7fd3d987fbb2e2fb0484ad67e2e3733baf5` on both Ubuntu and Windows. The Windows Go test suite now verifies the owner check against TokenUser or the token's explicit TokenOwner; it also exercises broad-writable ACE rejection, private directory validation, and fixed-local-NTFS/persistent-ACL qualification. Ubuntu Go tests and race detector also passed. Wails run [42642834036](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42642834036) passed on Ubuntu and Windows.
 
 This is CI-runner qualification only. It does not certify ReFS, SMB, mapped drives, removable media, other filesystem providers, arbitrary Windows installations, or power-loss durability. Restore remains disabled because the filesystem executor, durable mutation orchestration, startup recovery, complete failure-injection matrix, and abrupt-process-restart tests are still missing.
+
+
+## Latest retained-ledger verification — 2026-11-11
+
+The retained-ledger sequential rollover tests are in commit [c464d7b](https://github.com/SoufianoDev/OhMyFreeAI/commit/c464d7b767db049de15c5724b13bcb3dc5685bad). All workflows for that exact head passed:
+
+- [Root CI](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743863): 2/2 Ubuntu/Windows.
+- [SQLite driver evaluation](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743844): 4/4.
+- [Wails platform proof](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743834): 2/2.
+- [Linux distribution compatibility](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743861): 8/8.
+
+This verifies the journal-ledger tests and current build matrix, not the absent transaction executor, power-loss behavior, or full process-death/restart matrix. Restore remains disabled.

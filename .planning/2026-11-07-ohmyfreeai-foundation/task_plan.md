@@ -6,28 +6,46 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Latest behavior-changing code commit: `45b9ac80d701c888a2c1eb07f8ed0f297aa7307b` on `foundation/bootstrap`. It hardens the Linux no-follow content-identity reader against a raced-in FIFO: the leaf is opened with `O_NONBLOCK` so the subsequent `fstat` can reject a non-regular entry without hanging. A Linux regression test covers the FIFO case.
+Current branch head: `c464d7b767db049de15c5724b13bcb3dc5685bad` on `foundation/bootstrap`. The latest production-code commit is `430196b80b3342b7e9d300d6894759e853d5e97a`; `c464d7b` adds regression coverage only.
 
-All four workflow families for that exact commit completed successfully:
+### Retained journal lifecycle
 
-- Root CI [42913865169](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42913865169): Ubuntu and Windows 2/2 SUCCESS. Both checked out the exact commit. Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks passed; Ubuntu race detection passed. Windows skipped the Linux-only race step as expected.
-- SQLite driver evaluation [42913865376](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42913865376): 4/4 SUCCESS (modernc and ncruces on Ubuntu and Windows).
-- Wails v3 platform proof [42913865308](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42913865308): attempt 2 passed 2/2. The first attempt failed only because the Ubuntu runner's Xvfb did not allocate a display within the script's 10-second startup window; rerunning the failed job on the same commit succeeded without a code change. The Linux job passed CLI smoke, two WebView-to-Go calls on each of two launches, and database reopen; Windows native build, CLI dispatch and executable verification passed.
-- Linux distribution compatibility [42913865277](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42913865277): 8/8 SUCCESS, including Ubuntu 22.04 legacy GTK3/WebKit41, Debian 12/13, Ubuntu 24.04, Fedora 44 GTK3/GTK4, Arch and openSUSE.
+Commit [430196b](https://github.com/SoufianoDev/OhMyFreeAI/commit/430196b80b3342b7e9d300d6894759e853d5e97a) replaced the single-record lifecycle with a bounded retained ledger:
 
-The no-follow identity readers and `moveRestoreFileNoReplaceVerified` are implemented and covered by the Root Go test suite. The verified move checks the destination's size and SHA-256 through a no-follow handle immediately after the no-replace move and leaves the destination in place on mismatch. This helper is still not called by a transaction executor because that executor does not exist yet.
+- Ledger envelope version 1 stores immutable version-3 transaction records.
+- A maximum of 256 records and 1 MiB is enforced; the writer fails closed at either limit.
+- Only one non-terminal transaction may exist at a time. New transactions must begin at `prepared`.
+- Transaction IDs and staging/rollback/quarantine artifact paths cannot be reused across retained records; every record targets the same canonical database path.
+- Terminal `committed` and `rolled-back` records remain in the ledger. `RemoveRestoreJournal` does not delete history and returns the retained-history error.
+- A legacy single-record v3 journal is accepted and migrated to the ledger on its next successful write.
+- Reads return the sole active transaction, or the latest terminal record when idle.
 
-### Windows namespace durability — documented NTFS gate closed
+Test commit [c464d7b](https://github.com/SoufianoDev/OhMyFreeAI/commit/c464d7b767db049de15c5724b13bcb3dc5685bad) adds Linux/Windows regression coverage for completing two sequential transactions without losing the first terminal record, selecting the second active/latest record correctly, refusing history deletion, and preserving an orphan temporary journal file from a simulated crash before publication. This verifies sequential rollover and one pre-publication crash fixture; it is **not** the full process-death/failure-injection matrix.
 
-A fresh primary-source review found that Microsoft Learn's [CreateFileW documentation](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew) explicitly says a write-through request causes NTFS to flush metadata changes, including a rename. The native [NtCreateFile documentation](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile) defines the native `FILE_WRITE_THROUGH` CreateOptions bit (0x00000002). The current Windows implementation opens the source relative to the retained directory handle with that native option, flushes the same source handle, and passes that exact handle to `NtSetInformationFile(FileRenameInformationEx=65)`; the destination remains relative to the retained directory handle and no-replace is preserved when the replace flag is omitted. This resolves the documented NTFS namespace-metadata barrier for the current fixed-local-NTFS policy. It is not a hardware-independent power-loss guarantee and does not qualify ReFS, SMB, removable media or other providers. See the updated executor architecture document.
+### CI verification for exact head `c464d7b`
 
-### Remaining journal blocker
+All four workflow families completed successfully, with 16/16 jobs passing and no active jobs:
 
-The journal still has one fixed filename and immutable transaction metadata. `RemoveRestoreJournal` intentionally fails closed on Windows, so a terminal journal cannot be retired and a later transaction cannot safely start. Design and implement a retained multi-transaction journal lifecycle (for example, per-transaction immutable names with crash-safe discovery, or a rigorously framed append-only log). Preserve terminal and malformed evidence; do not delete or overwrite it. Add Linux/Windows tests for multiple terminal transactions, one-active-transaction enforcement, interrupted publication and process-death discovery.
+- Root CI [42975743863](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743863): 2/2 (Ubuntu and Windows). Both checked out `c464d7b`; Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks passed. Ubuntu `go test -race ./...` passed; Windows correctly skipped the Linux-only race step.
+- SQLite driver evaluation [42975743844](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743844): 4/4 (modernc and ncruces on Ubuntu and Windows).
+- Wails v3 platform proof [42975743834](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743834): 2/2. Ubuntu native build, CLI smoke, WebView-to-Go bridge and database reopen passed; Windows native build, CLI smoke and executable verification passed.
+- Linux distribution compatibility [42975743861](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743861): 8/8, including Ubuntu 22.04, Debian 12/13, Ubuntu 24.04, Fedora GTK3/GTK4, Arch and openSUSE.
 
-Only after that lifecycle is proven should the isolated StoreController-backed transaction executor be implemented with intent-before-mutation journaling, no-replace moves, post-move identity checks, rollback/quarantine retention and verified reopen. Then add failure-injection and abrupt-process-death/restart tests on Linux and Windows. Do not wire startup recovery or GUI/CLI Restore and do not enable Restore before the complete matrix passes.
+The earlier Windows NTFS write-through boundary remains limited to fixed local NTFS and is not a hardware-independent power-loss guarantee. The journal ledger has a deliberate 256-record cap and no automatic pruning or archive mechanism; do not silently rotate or delete evidence to bypass that cap.
 
-**Delivery warning:** `foundation/bootstrap` contains extensive planning and historical work and is far ahead of `main`. Do not merge the branch wholesale. When the first genuinely testable build is ready, prepare a selective delivery containing only required runtime/build files and essential user documentation. Keep planning history, experiments and temporary artifacts out of `main`.
+### Next engineering unit
+
+Start with a staging-only candidate builder, then implement the isolated filesystem transaction executor:
+
+1. Extract a verified `.omfaibackup` into a transaction-specific candidate without touching the live database; apply migrations, validate integrity/foreign keys/migration history/configuration, checkpoint, close and measure its content identity.
+2. Acquire the StoreController exclusive lease; checkpoint/close the current Store and verify its identity before recording the transaction's previous-database metadata.
+3. Persist every intent phase before its corresponding mutation. Move target to rollback and candidate to target only through the no-replace primitive; verify each destination's size and SHA-256 from a no-follow handle before opening SQLite.
+4. Reopen and validate the candidate. On failure, persist rollback intent, quarantine the candidate, restore the verified previous database, reopen and validate it, then record `rolled-back`.
+5. Add deterministic failure injection around every journal publication, move, sync, reopen and rollback boundary, followed by abrupt-process-death/restart tests on Linux and Windows.
+
+The current `backup.Manager.Restore` / `sqlite.RestoreDatabase` path is the legacy path-based implementation. Do not use it from the new executor or expose it through GUI/CLI. Do not add startup recovery, GUI/CLI Restore, or enable Restore until the full matrix passes.
+
+**Delivery warning:** `foundation/bootstrap` is 832 commits ahead of `main` and 0 behind. No open PR exists. Do not merge this branch wholesale; prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready.
 
 ## Current Phase
 
@@ -102,6 +120,10 @@ Phase 4
   - [x] Run the Go race detector in Linux CI; the Windows workflow skips the race step
   - [ ] Add failure-injection coverage across Restore publication, reopen, journal commit and rollback
   - [x] Add strict durable Restore journal v3 storage with bounded decoding, path confinement and paired content identities (low-level only)
+  - [x] Add retained journal ledger v1 with bounded history, one-active-transaction enforcement, legacy v3 migration and terminal-record retention
+  - [x] Add Linux/Windows sequential-transaction and orphan-temporary-journal regression tests
+  - [ ] Add a staging-only archive candidate builder that never mutates the live database
+
   - [x] Record explicit previous-database state and paired candidate/previous content identities in journal v3
   - [x] Add an identity-aware pure recovery planner, intent-phase truth tables and fail-closed ambiguity tests
   - [x] Add Linux/Windows no-replace move primitives; common behavioral tests now run on both platforms
@@ -150,8 +172,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Current status snapshot (2026-11-10): the StoreController lifecycle work, Wails/config integration, GUI/CLI backup leases, strict journal v3, identity-aware planner, Linux/Windows no-replace primitives, private state-directory qualification, post-move identity helper, Linux parent-directory fsync and Windows NTFS write-through rename boundary are implemented at the low-level layer. The latest verified code commit `beab78a04f4ef9ae1421247983d25da66ffc3986` passed Root CI [42775712875](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712875) (2/2), SQLite [42775712758](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712758) (4/4), Wails [42775712787](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712787) (2/2), and Linux distributions [42775712919](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42775712919) (8/8, including Ubuntu 22.04). The transaction executor, automatic rollback/reopen orchestration, process-death recovery, startup coordinator and Restore UI/CLI remain unimplemented; Restore stays disabled. Real-host WebKit sandbox validation, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review remain open. Remote inference remains policy-gated.
-
+Current status snapshot (2026-11-11): StoreController lifecycle, Wails/config integration, GUI/CLI backup leases, strict Restore journal v3 records, retained journal ledger v1, identity-aware recovery planner, Linux/Windows no-replace primitives, private state-directory qualification, no-follow content identity readers, post-move SHA-256/size verification, Linux parent-directory fsync and the fixed-local-NTFS Windows write-through rename boundary are implemented at the low-level layer. Production-code head `430196b80b3342b7e9d300d6894759e853d5e97a` and test head `c464d7b767db049de15c5724b13bcb3dc5685bad` passed Root CI (2/2), SQLite (4/4), Wails (2/2) and Linux distribution compatibility (8/8). The retained ledger supports sequential terminal transactions, one active transaction, legacy v3 migration and evidence retention, but the full crash/failure-injection matrix is not complete. The staging-only candidate builder, filesystem transaction executor, automatic rollback/reopen orchestration, process-death recovery, startup coordinator and Restore UI/CLI remain unimplemented; Restore stays disabled. Real-host WebKit sandbox validation, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review remain open. Remote inference remains policy-gated.
 ## Decisions Made
 
 | Decision | Rationale |

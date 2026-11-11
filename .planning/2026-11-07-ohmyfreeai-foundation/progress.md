@@ -1472,3 +1472,31 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - The no-follow identity reader and verified no-replace move helper are tested, but no transaction executor invokes them yet.
 - The journal lifecycle, filesystem executor, durable intent/mutation orchestration, rollback/quarantine execution, startup recovery coordinator and process-death/restart matrix remain incomplete.
 - Restore remains disabled. No GUI/CLI Restore, startup recovery wiring or merge to `main` was added.
+
+
+## 2026-11-11 06:55Z — retained Restore journal rollover regression coverage
+
+### Repository and plan review
+- Rechecked `foundation/bootstrap` at `c464d7b767db049de15c5724b13bcb3dc5685bad`; its parent production-code head is `430196b80b3342b7e9d300d6894759e853d5e97a`.
+- Reviewed the active task plan, progress history, Restore lifecycle, executor constraints, StoreController, journal v3 writer/reader, ledger validation, recovery planner, no-replace move adapters and identity readers.
+- Confirmed there were no active workflows before the test change. The four workflow families for production commit `430196b` had all passed 2/2, 4/4, 2/2 and 8/8.
+- Found that the new ledger implementation had tests for rejecting a second active transaction and malformed multi-active records, but lacked a positive sequential rollover test proving that a second transaction can start after the first reaches a terminal phase.
+
+### Change
+- Added `TestRestoreJournalLedgerRetainsSequentialTerminalTransactions`: complete one transaction, append a second, verify the second becomes active, complete it, verify both terminal records remain ordered and retained, and verify the removal API cannot delete them.
+- Added `TestRestoreJournalLedgerIgnoresAndPreservesUnpublishedTemporaryFile`: simulate an orphan temporary journal from a crash before publication; the reader continues to use the last published ledger and leaves the orphan evidence untouched.
+- Commit: [c464d7b767db049de15c5724b13bcb3dc5685bad](https://github.com/SoufianoDev/OhMyFreeAI/commit/c464d7b767db049de15c5724b13bcb3dc5685bad). Compare against `430196b` confirms only `internal/infrastructure/sqlite/restore_journal_ledger_test.go` changed (+96 lines); no production source or `main` files changed.
+
+### Exact-head CI verification
+- Root CI [42975743863](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743863): Ubuntu and Windows 2/2 SUCCESS. Both job logs confirm checkout of `c464d7b`. `go test ./...` passed on both platforms; Ubuntu `go test -race ./...` passed. Go vet/build, Python compile/tests, frontend syntax and architecture checks passed. Windows skipped only the Linux-only race step.
+- SQLite driver evaluation [42975743844](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743844): 4/4 SUCCESS (modernc/ncruces × Ubuntu/Windows).
+- Wails platform proof [42975743834](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743834): 2/2 SUCCESS. Ubuntu native build, CLI smoke, live WebView-to-Go bridge and database reopen passed; Windows native build, CLI dispatch and executable verification passed.
+- Linux distribution compatibility [42975743861](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743861): 8/8 SUCCESS, including Ubuntu 22.04 and Debian 12 legacy GTK3/WebKit41.
+- All 16 jobs completed successfully. No local test execution is claimed; verification is from the exact-head GitHub Actions runs.
+
+### Safety and next step
+- The retained ledger resolves the previous single-terminal-journal rollover blocker without deleting history. It is bounded to 256 records / 1 MiB and intentionally fails closed at the limit; no automatic pruning/archive path exists.
+- The orphan-temp fixture covers the pre-publication crash shape only. It does not establish the full journal publication, process-death, move, rollback or restart matrix.
+- Restore remains disabled and is not wired to startup, GUI or CLI. The legacy `backup.Manager.Restore` still routes through path-based `sqlite.RestoreDatabase`; the new executor must not call or expose that path.
+- Branch comparison against `main`: 832 ahead, 0 behind. No open PR; no merge attempted.
+- Next: add a staging-only candidate builder that validates and closes the candidate without touching the live Store, then implement the isolated StoreController-backed executor and its deterministic Linux/Windows failure-injection/process-death matrix.

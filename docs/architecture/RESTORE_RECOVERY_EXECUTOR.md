@@ -11,7 +11,7 @@ The executor must never infer ownership merely because a path appears in a journ
 
 ## Required journal/state-machine changes
 
-The current phases describe completed transitions. A crash between a filesystem mutation and the following journal update can leave a state that is intentionally rejected as ambiguous. Before automatic recovery is implemented, introduce durable intent phases so recovery can reason about both sides of each interrupted operation.
+The version-3 state machine already includes durable intent phases for preserving the previous database, publishing the candidate, and restoring the previous database. The pure planner has explicit truth tables for these phases. The future executor must still persist each intent before its mutation, persist completion only after the no-replace move and durability barrier succeed, and exercise both sides of every crash window.
 
 At minimum, model these transitions explicitly:
 
@@ -76,13 +76,13 @@ Every intent phase must have an exhaustive truth table for target, staging, roll
 
 Implemented as low-level primitives only:
 
-- Strict durable journal v3 with intent phases, canonical path confinement, candidate-quarantine metadata, and paired candidate/previous content identities.
+- Strict durable journal v3 transaction records in a bounded retained ledger v1, with intent phases, canonical path confinement, candidate-quarantine metadata, and paired candidate/previous content identities. The ledger allows one active transaction, retains terminal history, migrates legacy single-record v3 files on the next successful write, and is capped at 256 records / 1 MiB.
 - Identity-aware pure recovery planner for completed phases and all three intent phases: preserving-previous, publishing, and restoring-previous. Contradictory states return an empty plan and an ambiguity error.
 - Linux no-replace move: `openat2` pins the private containing directory, `renameat2(RENAME_NOREPLACE)` performs the move, and the same pinned parent directory FD is synced with `fsync` before success is reported.
 - Windows no-replace move: the state-directory path is opened component-by-component from the volume root; the source leaf is opened relative to the retained directory handle with native `FILE_WRITE_THROUGH`; `FlushFileBuffers` is called before the same source handle is renamed using `NtSetInformationFile(FileRenameInformationEx=65)` with the replace flag omitted.
 - Windows owner/DACL and volume qualification: fixed local NTFS with persistent ACLs only. ReFS, SMB, removable and unknown volumes fail closed.
 - Linux and Windows no-follow content identity readers, plus `moveRestoreFileNoReplaceVerified`, which checks the moved destination's size and SHA-256 through a no-follow handle and preserves it on mismatch.
-- Platform-specific journal publication: Linux syncs the containing directory after same-directory publication; Windows uses the same handle-bound native write-through rename path for journal replacement. Durable journal deletion remains unsupported on Windows.
+- Platform-specific journal publication: Linux syncs the containing directory after same-directory ledger publication; Windows uses the handle-bound native write-through replacement rename path for the ledger. Journal deletion is intentionally unsupported on both platforms; terminal records are retained instead.
 - StoreController shared/exclusive leases and lower-level SQLite backup/staging primitives.
 
 Not implemented:
@@ -96,10 +96,26 @@ Threat and durability boundaries:
 
 - Linux still selects the source leaf by name at the final `renameat2` call. The private state directory blocks untrusted cross-user namespace writers, while post-move no-follow size/SHA-256 verification detects a substituted artifact before SQLite is opened. This is not a claim that every same-user concurrent mutation race is eliminated.
 - Windows is qualified only for fixed local NTFS with persistent ACLs. The documented write-through metadata-flush request is used on the exact source handle processed by the handle-bound rename. This is not a hardware-independent power-loss guarantee; storage devices/controllers may not honor flush requests correctly.
-- Windows journal removal remains unsupported. Do not delete or replace a terminal journal in a way that loses its rollback/quarantine references.
+- Automatic journal deletion is unsupported on both platforms. Do not delete, prune or replace retained terminal records in a way that loses rollback/quarantine evidence.
 - The exported legacy `RestoreDatabase` helper remains a separate path-based implementation. Do not call it from the journal executor or expose it through GUI/CLI.
 
 Restore remains disabled. Do not add startup recovery, GUI/CLI Restore, or application-level Restore service until the executor's identity, no-replace, journal, rollback, process-death and restart tests pass on Linux and Windows.
+
+## Retained journal ledger lifecycle — implemented 2026-11-10
+
+`restore-journal.json` now contains a bounded ledger envelope (ledger version 1) of version-3 transaction records:
+
+- The serialized ledger is limited to 1 MiB and 256 transaction records. The writer fails closed when either limit is reached; it does not prune old records.
+- Exactly one non-terminal transaction is permitted. A new transaction must start at `prepared`; a second active transaction is rejected.
+- Transaction IDs are unique. All records must target the same canonical database path, and staging/rollback/quarantine artifact paths cannot be reused across retained transactions.
+- `committed` and `rolled-back` records are retained. A later transaction is appended after all earlier records are terminal. `ReadRestoreJournal` returns the sole active record, or the latest terminal record when idle.
+- The previous single-record v3 format remains readable and is migrated to the ledger envelope on its next successful write.
+- `RemoveRestoreJournal` validates terminal state but deliberately does not delete the ledger; it returns the retained-history error. There is no automatic journal pruning or deletion on either platform.
+- A temporary ledger file left by a crash before publication is not treated as committed state and is not deleted by the reader. The last successfully published ledger remains authoritative.
+
+Regression tests now cover two sequential terminal transactions, active-record selection, retention after a removal attempt, legacy v3 migration, path reuse rejection, and an orphan temporary file. These tests do not simulate every process-death point or prove the full transaction recovery protocol.
+
+The 256-record / 1 MiB cap is an explicit fail-closed limit, not a completed retention policy. A safe manual export/archive or future ledger compaction protocol must be designed and verified before enabling Restore for long-term use. Never bypass the cap by deleting evidence.
 
 ## Version-3 journal contract (implementation gate)
 
@@ -376,7 +392,7 @@ A targeted follow-up reviewed Microsoft's [NtFlushBuffersFileEx](https://learn.m
 
 Linux continues to use `fsync` on the pinned parent-directory FD after successful no-replace namespace mutations. Its source-leaf selection race remains separate: the executor must verify size/SHA-256 from a no-follow handle after every move and before SQLite is opened.
 
-This gate is independent of the still-blocking Windows terminal-journal rollover problem. The filesystem transaction executor, startup recovery, rollback orchestration and process-death tests remain unimplemented.
+The retained ledger lifecycle now permits sequential transactions without deleting terminal evidence. The filesystem transaction executor, startup recovery, rollback orchestration and process-death/failure-injection tests remain unimplemented.
 
 ### Required next implementation step
 
@@ -403,5 +419,5 @@ Microsoft Learn's [CreateFileW documentation](https://learn.microsoft.com/en-us/
 
 Together these documented contracts support the NTFS write-through metadata barrier for the handle-bound rename used by this implementation. The existing volume policy remains fixed local NTFS with persistent ACLs only. This does not establish hardware-independent power-loss safety: storage devices/controllers must honor flush requests. It does not qualify ReFS, SMB, removable media or other filesystem providers.
 
-This closes the documented Windows namespace-metadata prerequisite for both artifact moves and the current journal replacement operation. It does **not** close the independent journal lifecycle problem: the single fixed journal cannot be retired on Windows, so a terminal transaction blocks the next one. A retained multi-transaction journal format with crash-safe discovery is still required before implementing the filesystem executor.
+This closes the documented Windows namespace-metadata prerequisite for both artifact moves and the current journal-ledger replacement operation under the fixed-local-NTFS policy. The retained ledger removes the need to delete a terminal journal before starting another transaction. It does **not** complete process-death recovery or the filesystem executor; the 256-record / 1 MiB cap also remains a fail-closed retention limit.
 
