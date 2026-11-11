@@ -548,7 +548,27 @@ func sameArchivePath(left, right string) bool {
 	left = filepath.Clean(left)
 	right = filepath.Clean(right)
 	if runtime.GOOS == "windows" {
-		return strings.EqualFold(left, right)
+		if strings.EqualFold(left, right) {
+			return true
+		}
+	} else if left == right {
+		return true
 	}
-	return left == right
+
+	// Resolve existing file identity as well as path spelling. Windows may
+	// return a long path for a created file while the caller supplied its
+	// 8.3 parent-directory alias.
+	leftInfo, leftErr := os.Stat(left)
+	rightInfo, rightErr := os.Stat(right)
+	if leftErr == nil && rightErr == nil && os.SameFile(leftInfo, rightInfo) {
+		return true
+	}
+	if runtime.GOOS == "windows" && strings.EqualFold(filepath.Base(left), filepath.Base(right)) {
+		leftParent, leftParentErr := os.Stat(filepath.Dir(left))
+		rightParent, rightParentErr := os.Stat(filepath.Dir(right))
+		if leftParentErr == nil && rightParentErr == nil && os.SameFile(leftParent, rightParent) {
+			return true
+		}
+	}
+	return false
 }

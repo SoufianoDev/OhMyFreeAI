@@ -63,11 +63,14 @@ func TestBuildRestoreCandidateReturnsVerifiedPrivateArtifact(t *testing.T) {
 	if !actualIdentity.matches(candidate.Identity.SHA256, candidate.Identity.Size) {
 		t.Fatalf("candidate identity changed: got %#v, want %#v", actualIdentity, candidate.Identity)
 	}
-	if err := verifyBackupDatabase(ctx, candidate.Path); err != nil {
-		t.Fatalf("verify built candidate database: %v", err)
-	}
+	// Check the builder's closed-artifact contract before opening the file again.
+	// A read-only SQLite verification connection may itself create WAL/SHM
+	// sidecars for a WAL-mode database, even though the builder left none.
 	if err := ensureNoSQLiteSidecars(candidate.Path); err != nil {
 		t.Fatalf("candidate retained SQLite sidecars: %v", err)
+	}
+	if err := verifyBackupDatabase(ctx, candidate.Path); err != nil {
+		t.Fatalf("verify built candidate database: %v", err)
 	}
 	if runtime.GOOS != "windows" {
 		info, err := os.Stat(candidate.Path)
@@ -127,5 +130,20 @@ func TestBuildRestoreCandidateHonorsCanceledContextBeforeCreatingArtifact(t *tes
 	}
 	if len(entries) != 0 {
 		t.Fatalf("canceled build left artifacts: %#v", entries)
+	}
+}
+
+func TestSamePathDetectsHardLinkedFiles(t *testing.T) {
+	directory := t.TempDir()
+	original := filepath.Join(directory, "original.sqlite")
+	alias := filepath.Join(directory, "alias.sqlite")
+	if err := os.WriteFile(original, []byte("same file identity"), 0o600); err != nil {
+		t.Fatalf("write original file: %v", err)
+	}
+	if err := os.Link(original, alias); err != nil {
+		t.Skipf("hard links are unavailable on this filesystem: %v", err)
+	}
+	if !samePath(original, alias) {
+		t.Fatal("samePath did not recognize two names for the same file")
 	}
 }

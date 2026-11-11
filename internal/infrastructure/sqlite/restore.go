@@ -439,9 +439,27 @@ func samePath(left, right string) bool {
 	left = filepath.Clean(left)
 	right = filepath.Clean(right)
 	if runtime.GOOS == "windows" {
-		return strings.EqualFold(left, right)
+		if strings.EqualFold(left, right) {
+			return true
+		}
+	} else if left == right {
+		return true
 	}
-	return left == right
+
+	// String comparison alone misses hard links and Windows 8.3 aliases.
+	leftInfo, leftErr := os.Stat(left)
+	rightInfo, rightErr := os.Stat(right)
+	if leftErr == nil && rightErr == nil && os.SameFile(leftInfo, rightInfo) {
+		return true
+	}
+	if runtime.GOOS == "windows" && strings.EqualFold(filepath.Base(left), filepath.Base(right)) {
+		leftParent, leftParentErr := os.Stat(filepath.Dir(left))
+		rightParent, rightParentErr := os.Stat(filepath.Dir(right))
+		if leftParentErr == nil && rightParentErr == nil && os.SameFile(leftParent, rightParent) {
+			return true
+		}
+	}
+	return false
 }
 
 

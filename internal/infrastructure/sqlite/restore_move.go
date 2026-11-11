@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -74,8 +73,5 @@ func validateRestoreMovePaths(source, destination string) error {
 }
 
 func equalRestoreMovePath(left, right string) bool {
-	if runtime.GOOS == "windows" {
-		return strings.EqualFold(left, right)
-	}
-	return left == right
+	return samePath(left, right)
 }

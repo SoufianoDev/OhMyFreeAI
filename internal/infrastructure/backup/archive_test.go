@@ -412,6 +412,21 @@ func TestExtractArchiveHonorsCancellation(t *testing.T) {
 }
 
 
+func TestSameArchivePathDetectsHardLinkedFiles(t *testing.T) {
+	directory := t.TempDir()
+	original := filepath.Join(directory, "original.omfaibackup")
+	alias := filepath.Join(directory, "alias.omfaibackup")
+	if err := os.WriteFile(original, []byte("same archive identity"), 0o600); err != nil {
+		t.Fatalf("write original archive: %v", err)
+	}
+	if err := os.Link(original, alias); err != nil {
+		t.Skipf("hard links are unavailable on this filesystem: %v", err)
+	}
+	if !sameArchivePath(original, alias) {
+		t.Fatal("sameArchivePath did not recognize two names for the same file")
+	}
+}
+
 func TestManagerBuildRestoreCandidateDoesNotTouchLiveDatabase(t *testing.T) {
 	ctx := context.Background()
 	stateDirectory := filepath.Join(t.TempDir(), "state")

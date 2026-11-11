@@ -211,17 +211,19 @@ func canonicalStateDirectory(path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve SQLite state directory: %w", err)
 	}
-	info, err := os.Stat(resolved)
+	canonical, err := canonicalRestoreDirectoryPathPlatform(filepath.Clean(resolved))
+	if err != nil {
+		return "", fmt.Errorf("%w: canonicalize SQLite state directory: %w", ErrRestoreJournalInvalid, err)
+	}
+	info, err := os.Stat(canonical)
 	if err != nil || !info.IsDir() {
 		return "", fmt.Errorf("%w: state directory is not a directory", ErrRestoreJournalInvalid)
 	}
-	canonical := filepath.Clean(resolved)
 	if err := validateRestoreStateDirectoryPlatform(canonical); err != nil {
 		return "", fmt.Errorf("%w: state directory security validation failed: %w", ErrRestoreJournalInvalid, err)
 	}
-	// Persist the resolved spelling consistently. Windows may expose the same
-	// directory through both a long path and an 8.3 alias; mixing those forms
-	// across journal writes and reads breaks exact round-trip comparisons.
+	// Persist one normalized spelling. Windows can expose the same directory
+	// through both a long path and an 8.3 alias.
 	return canonical, nil
 }
 
@@ -324,9 +326,17 @@ func canonicalStatePath(root, path string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("%w: resolve state directory: %v", ErrRestoreJournalInvalid, err)
 	}
+	resolvedRoot, err = canonicalRestoreDirectoryPathPlatform(filepath.Clean(resolvedRoot))
+	if err != nil {
+		return "", fmt.Errorf("%w: canonicalize state directory: %v", ErrRestoreJournalInvalid, err)
+	}
 	parent, err := filepath.EvalSymlinks(filepath.Dir(absolute))
 	if err != nil {
 		return "", fmt.Errorf("%w: resolve transaction path parent: %v", ErrRestoreJournalInvalid, err)
+	}
+	parent, err = canonicalRestoreDirectoryPathPlatform(filepath.Clean(parent))
+	if err != nil {
+		return "", fmt.Errorf("%w: canonicalize transaction path parent: %v", ErrRestoreJournalInvalid, err)
 	}
 	resolvedCandidate := filepath.Join(parent, filepath.Base(absolute))
 	if info, statErr := os.Lstat(absolute); statErr == nil {

@@ -41,3 +41,7 @@ func verifyRestoreDirectoryPrivateFD(directoryFD int) error {
 	}
 	return nil
 }
+
+func canonicalRestoreDirectoryPathPlatform(path string) (string, error) {
+	return path, nil
+}
