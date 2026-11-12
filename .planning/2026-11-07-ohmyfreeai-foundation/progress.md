@@ -1605,3 +1605,30 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Next: prototype the no-follow fail-closed preflight/open-existing boundary and durable DB/sidecar pre-provisioning, then compare PERSIST against JSON including concurrent-process serialization and recovery. Do not start the transaction executor until the journal protocol is explicitly selected and qualified.
 - Restore remains disabled and is not connected to startup recovery, GUI or CLI. No main changes, merge, startup recovery or executor implementation occurred.
 - No local test execution is claimed; the reported results are from the exact-head GitHub Actions job logs.
+
+## 2026-11-12 14:31Z — StoreController gate recheck and existing-only journal DB probe
+
+### Requested CI and StoreController gate
+- Rechecked the specifically requested Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee` through GitHub job details. Ubuntu and Windows both completed successfully (2/2).
+- Re-reviewed the current `StoreController`, its 16 tests, Wails composition root, AppService, configuration adapter and backup integration. The gate is already complete: Wails creates one application-lifetime controller and closes it with a bounded shutdown context; AppService and config use the controller; controller Load/Save hold shared leases; Wails/CLI backup export uses `CreateWithStoreController`; `archive_controller_test.go` verifies Close waits for archive publication and that a timed-out close does not discard the active Store. No StoreController production code needed to be repeated or changed.
+- The 16 controller tests cover reader/writer drain and priority, cancellation, replacement publication, stale/unavailable Store behavior, panic cleanup, concurrent stress, config round-trip, and config Load/Save drain. The separate backup test covers the publication barrier.
+
+### Isolated SQLite existing-only open probe
+- Added `TestSQLiteExistingOnlyOpenRequiresExistingDatabase` in `tests/sqlite-driver-eval/restore_journal_persist_test.go`. It verifies a missing control DB is rejected without being created and an existing DB can be opened without CREATE.
+- The probe passes for modernc v1.62.0 on Ubuntu/Windows and ncruces v0.37.0 on Ubuntu. On Windows, the pinned ncruces VFS mishandles an absolute `file:///C:/...` URI, so the evaluation uses its direct `OpenFlags(OPEN_READWRITE)` API for the same existing-only guarantee. This is a driver-specific Windows URI-path limitation; do not claim that ncruces `database/sql` URI mode=rw was verified on Windows.
+- The existing `TestSQLiteSilentlyRecreatesMissingRestoreControlArtifacts` also passes in all four driver/OS combinations. It demonstrates that existing-only opening of the main database does not protect a missing PERSIST sidecar: SQLite can recreate that sidecar on a later write. The DB and sidecar therefore need separate no-follow preflight and identity revalidation before any restore journal write.
+- This probe does not establish race-free preflight, durable initial DB/sidecar provisioning, cross-process serialization, or power-loss safety. PERSIST remains an evaluation candidate; the retained JSON ledger remains production.
+
+### CI and corrections
+- Latest test-only commit: [5f679e5](https://github.com/SoufianoDev/OhMyFreeAI/commit/5f679e5645a4893e22b5fc6ff1e2e6e9900e70cc).
+- Root CI [43237308026](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43237308026): Ubuntu and Windows SUCCESS (2/2). Logs confirm Go vet/tests/build and the Ubuntu race detector.
+- SQLite driver evaluation [43237307833](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43237307833): modernc/ncruces × Ubuntu/Windows SUCCESS (4/4). Job logs explicitly show the new existing-only probe and the PERSIST/process-death tests passing.
+- Earlier evaluation attempts failed and were corrected rather than hidden: the first test commit missed imports; the next exposed the ncruces Windows absolute-URI path issue; the relative-URI attempt had a fixture-scope error and was rejected by the pinned SQLite URI/VFS behavior. The final test uses the supported native existing-only API on ncruces Windows and passed the full matrix.
+- The task also rechecked Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009): 2/2 success on the requested historical commit.
+- Latest production-code head remains `1cde3c316fbf11271fe427c9c03e6ea67c380f47`; no production Restore code changed in this run. Wails and Linux-distro workflows were not triggered by evaluation-only changes; their latest exact production-code runs remain the successful `1cde3c` evidence recorded above.
+- Current code/test head `5f679e5` compared 861 commits ahead of `main`, 0 behind. The only later commit in this run is the planning update. No `main` changes, merge or force-push.
+
+### Next gate
+- Continue the journal qualification, not the filesystem executor: design and test no-follow preflight/open-existing for both the control DB and its PERSIST sidecar, verify identities around SQLite open before any write, and prove durable pre-provisioning on Linux and fixed-local NTFS.
+- The current JSON ledger read-modify-publish path has no explicit cross-process lock acquisition in `WriteRestoreJournal`. Resolve and test this serialization contract as part of the PERSIST-versus-JSON comparison before selecting the journal protocol.
+- Do not start the transaction executor, startup recovery, GUI/CLI Restore or any Restore wiring until the journal protocol and Linux/Windows safety gates are explicitly qualified. Restore remains disabled.
