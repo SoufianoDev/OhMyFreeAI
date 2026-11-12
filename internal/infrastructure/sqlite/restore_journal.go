@@ -126,6 +126,9 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 		return fmt.Errorf("%w: journal ledger exceeds size limit", ErrRestoreJournalInvalid)
 	}
 
+	digest := sha256.Sum256(data)
+	expectedIdentity := RestoreContentIdentity{Size: uint64(len(data)), SHA256: hex.EncodeToString(digest[:])}
+
 	journalPath := filepath.Join(root, restoreJournalFileName)
 	temporary, err := os.CreateTemp(root, ".restore-journal-*.tmp")
 	if err != nil {
@@ -151,21 +154,19 @@ func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
 	}
 	var publishErr error
 	if initialPublication {
-		publishErr = publishRestoreJournalNoReplace(temporaryPath, journalPath)
+		publishErr = publishRestoreJournalNoReplace(temporaryPath, journalPath, expectedIdentity)
 	} else {
 		publishErr = publishRestoreJournal(temporaryPath, journalPath)
 	}
 	if publishErr != nil {
-		return fmt.Errorf("publish SQLite restore journal ledger; temporary artifact preserved at %s: %w", temporaryPath, publishErr)
+		return fmt.Errorf("publish SQLite restore journal ledger from %s to %s: %w", temporaryPath, journalPath, publishErr)
 	}
 	return nil
 }
 
-// publishRestoreJournalNoReplace is used only for the first ledger publication.
-// It reuses the platform-qualified no-replace move and its directory durability
-// barrier, so a ledger created after the initial absence check cannot be lost.
-func publishRestoreJournalNoReplace(source, destination string) error {
-	if err := moveRestoreFileNoReplace(source, destination); err != nil {
+// publishRestoreJournalNoReplace verifies the initial ledger from a no-follow handle.
+func publishRestoreJournalNoReplace(source, destination string, expected RestoreContentIdentity) error {
+	if err := moveRestoreFileNoReplaceVerified(source, destination, expected); err != nil {
 		return fmt.Errorf("publish SQLite restore journal without replacement: %w", err)
 	}
 	return nil
