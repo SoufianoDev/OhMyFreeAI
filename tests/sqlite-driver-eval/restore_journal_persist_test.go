@@ -3,7 +3,9 @@ package eval
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"io"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -241,8 +243,6 @@ func requireZeroJournalHeader(t *testing.T, path string) {
 	}
 }
 
-
-
 func TestSQLiteModeRWRequiresExistingDatabaseButDoesNotProtectPersistSidecar(t *testing.T) {
 	driver := selectedDriver(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -296,7 +296,7 @@ func TestSQLiteModeRWRequiresExistingDatabaseButDoesNotProtectPersistSidecar(t *
 	}
 
 	journalPath := dbPath + "-journal"
-	originalJournal := requirePersistentJournalFile(t, journalPath)
+	requirePersistentJournalFile(t, journalPath)
 	requireZeroJournalHeader(t, journalPath)
 	if err := os.Remove(journalPath); err != nil {
 		t.Fatalf("remove PERSIST sidecar to simulate incomplete provisioning: %v", err)
@@ -334,11 +334,8 @@ func TestSQLiteModeRWRequiresExistingDatabaseButDoesNotProtectPersistSidecar(t *
 		t.Fatalf("close mode=rw database: %v", err)
 	}
 
-	recreatedJournal := requirePersistentJournalFile(t, journalPath)
+	requirePersistentJournalFile(t, journalPath)
 	requireZeroJournalHeader(t, journalPath)
-	if originalJournal == nil || recreatedJournal == nil {
-		t.Fatal("PERSIST sidecar identity inspection returned no file information")
-	}
 }
 
 func restoreControlSQLiteURI(t *testing.T, path string) string {
