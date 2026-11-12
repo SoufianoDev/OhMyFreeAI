@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Latest verified code/test head: `01913ec7fdbf63134739a21136f82540f1e66493` on `foundation/bootstrap` (2026-11-12). It adds isolated SQLite journal-evaluation tests only. The latest production-code head is `1cde3c316fbf11271fe427c9c03e6ea67c380f47`. Subsequent commits in this session update planning/progress/architecture documents only; no production or test source changes followed `01913ec`.
+Latest verified code/test head: `5f679e5645a4893e22b5fc6ff1e2e6e9900e70cc` on `foundation/bootstrap` (2026-11-12). It adds an isolated existing-only database-open probe only. The latest production-code head remains `1cde3c316fbf11271fe427c9c03e6ea67c380f47`; no production Restore code changed in this run.
 
 ### Current CI evidence
 
@@ -19,11 +19,18 @@ The latest production-code head `1cde3c` passed all four workflow families:
 
 A subsequent Root CI regression on `590a67d` failed on both platforms in `go vet`: `restore_journal_publish_test.go` called `publishRestoreJournalNoReplace` with an expected identity before the implementation signature accepted it. Commit `1cde3c` corrected the helper to accept the expected identity and call `moveRestoreFileNoReplaceVerified`. The exact code head then passed Root CI and all other workflow families above.
 
-The current test-only head `01913ec` passed:
+The previous test-only head `01913ec` passed:
 - Root CI [43170647066](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43170647066): 2/2. Ubuntu passed Go vet/tests, race detector, build, Python tests, frontend syntax and architecture checks; Windows passed the corresponding checks and skipped only the Linux-only race detector.
 - SQLite driver evaluation [43170647220](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43170647220): 4/4. All new PERSIST lifecycle and abrupt-process-death tests passed for modernc and ncruces on Ubuntu and Windows.
 
 Wails and Linux-distro workflows were not triggered by the test-only changes under `tests/sqlite-driver-eval`; their latest exact production-code evidence remains the successful `1cde3c` runs above. Do not describe the 16/16 result as having run on `01913ec`.
+
+The latest test-only head `5f679e5` passed:
+- Root CI [43237308026](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43237308026): 2/2 Ubuntu/Windows. Ubuntu logs confirm vet, Go tests, race detector and build; Windows logs confirm vet, Go tests and build.
+- SQLite driver evaluation [43237307833](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43237307833): 4/4 modernc/ncruces × Ubuntu/Windows. Logs confirm the existing-only open probe, PERSIST lifecycle, missing-artifact behavior and abrupt-process-death recovery all passed.
+- The explicitly requested historical Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee` is complete: Ubuntu and Windows both succeeded (2/2).
+
+The test-only path needed three corrections before the final green head: missing Go imports, the ncruces Windows VFS rejecting an absolute drive-letter URI, and a relative-URI/test-fixture mismatch. The final test uses URI `mode=rw` for modernc on both platforms and ncruces on Linux; ncruces v0.37.0 on Windows uses its direct `OpenFlags(OPEN_READWRITE)` API because its pinned Windows VFS mishandles the absolute URI path. Do not present that driver-specific Windows path as a successful ncruces `database/sql` URI test.
 
 ### StoreController integration review
 
@@ -54,6 +61,9 @@ The isolated evaluation module now verifies modernc v1.62.0 and ncruces v0.37.0 
 - The sidecar remains present after close/reopen. `journal_mode` reverts to DELETE on a new connection, so every connection must explicitly set and verify PERSIST before writing. Reapplying PERSIST and committing another transaction reuses the same sidecar file identity on all four driver/OS combinations.
 - A subprocess test writes an uncommitted transaction large enough to spill pages, confirms a live rollback-journal header, then exits via `os.Exit` without SQLite cleanup. Reopening recovers exactly the committed baseline, excludes all uncommitted rows, and passes `PRAGMA integrity_check` on all four combinations.
 - Normal SQLite open/use silently creates a missing database file and recreates a missing PERSIST sidecar. SQLite itself therefore does **not** provide the required fail-closed behavior. A production candidate must no-follow preflight both pre-provisioned artifacts and open existing files only before any restore phase can be written.
+- The new `TestSQLiteExistingOnlyOpenRequiresExistingDatabase` probe passes in all four driver/OS combinations. It proves that the main DB can be opened without CREATE (URI `mode=rw` where the pinned driver/VFS supports the URI, and native `OPEN_READWRITE` for ncruces on Windows) and that a missing main DB is not created.
+- The existing `TestSQLiteSilentlyRecreatesMissingRestoreControlArtifacts` still passes in all four combinations: a missing PERSIST sidecar is recreated when a later journaled write occurs. Existing-only main-database open is therefore insufficient. The sidecar needs its own no-follow preflight and identity revalidation before any journal write.
+- This probe does not establish a race-free DB/sidecar preflight, durable pre-provisioning, concurrent-process serialization, or power-loss safety. PERSIST remains unapproved.
 
 This evidence is process-death and driver-behavior evidence only. It is not power-loss certification and does not prove durable initial DB/sidecar provisioning.
 
@@ -80,7 +90,7 @@ The current JSON ledger remains bounded to 256 records / 1 MiB; automatic prunin
 
 Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete journal, executor, rollback and process-death matrix passes on both platforms.
 
-**Delivery warning:** at the verified code/test head `01913ec`, `foundation/bootstrap` was 851 commits ahead of `main` and 0 behind. Subsequent commits in this session are documentation-only. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
+**Delivery warning:** at the verified code/test head `5f679e5`, `foundation/bootstrap` is 861 commits ahead of `main` and 0 behind. The commits since `1cde3c` are confined to isolated SQLite driver-evaluation tests and planning records; no production Restore implementation was added. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
 
 ## Current Phase
 
@@ -210,7 +220,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Current status snapshot (2026-11-12): branch head `01913ec7fdbf63134739a21136f82540f1e66493` contains test-only PERSIST lifecycle and process-death evaluation additions; latest production-code head is `1cde3c316fbf11271fe427c9c03e6ea67c380f47`. The production-code head passed Root CI 2/2, SQLite 4/4, Wails 2/2 and Linux distribution compatibility 8/8. The current test-only head passed Root CI 2/2 and SQLite 4/4. Both modernc and ncruces pass the isolated PERSIST lifecycle and abrupt-process-death tests on Ubuntu and Windows. SQLite silently recreates missing database/sidecar artifacts, so a fail-closed no-follow preflight and durable pre-provisioning boundary remain mandatory before this candidate can be approved. The retained JSON ledger remains production. The staging-only candidate builder, filesystem transaction executor, automatic rollback/reopen orchestration, full process-death recovery matrix, startup coordinator and Restore UI/CLI remain incomplete; Restore stays disabled. At code/test head `01913ec`, the branch comparison was 851 commits ahead of main and 0 behind; subsequent commits are planning/architecture documentation only. No merge is authorized. Real-host WebKit sandbox validation, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review remain open. Remote inference remains policy-gated.
+Current status snapshot (2026-11-12): branch head `5f679e5645a4893e22b5fc6ff1e2e6e9900e70cc` contains the isolated existing-only database-open probe; latest production-code head remains `1cde3c316fbf11271fe427c9c03e6ea67c380f47`. The production-code head passed Root CI 2/2, SQLite 4/4, Wails 2/2 and Linux distribution compatibility 8/8. The latest test-only head passed Root CI 2/2 and SQLite 4/4. Both modernc and ncruces pass the PERSIST lifecycle and abrupt-process-death tests on Ubuntu and Windows; the new existing-only DB-open probe also passes 4/4, with ncruces Windows using its native `OPEN_READWRITE` API because of its URI-path limitation. SQLite still recreates a missing PERSIST sidecar on write, so a fail-closed no-follow preflight and durable pre-provisioning boundary remain mandatory. The retained JSON ledger remains production. Code inspection also found no explicit cross-process lock around the JSON ledger read-modify-publish path; this serialization contract must be qualified before the executor. The staging-only candidate builder, filesystem transaction executor, automatic rollback/reopen orchestration, full process-death recovery matrix, startup coordinator and Restore UI/CLI remain incomplete; Restore stays disabled. The branch comparison is 861 commits ahead of main and 0 behind. No merge is authorized. Real-host WebKit sandbox validation, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review remain open. Remote inference remains policy-gated.
 ## Decisions Made
 
 | Decision | Rationale |
@@ -539,4 +549,4 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - Linux no-replace move now fsyncs the pinned parent-directory FD after rename. Windows source open uses native FILE_WRITE_THROUGH, FlushFileBuffers, and the same retained handle for NtSetInformationFile(FileRenameInformationEx=65) with no replacement. **Superseded by the 2026-11-10 15:45Z documentation re-review:** the cited Microsoft contracts do not explicitly establish durability of the parent-directory namespace entry for this rename, so the Windows namespace-durability gate remains unresolved.
 - No transaction executor, automatic startup recovery, process-death test matrix, or GUI/CLI Restore path exists. Restore remains disabled.
 - GitHub compare reports 804 commits ahead and 0 behind main; no open PR exists. Do not merge the branch wholesale. The first real testable delivery must be curated selectively.
-- Next: implement the isolated StoreController-backed transaction executor with intent-before-mutation journaling, no-replace moves, post-move identity verification, rollback/quarantine retention, verified reopen and Linux/Windows process-death tests.
+- Next: qualify the no-follow preflight/open-existing boundary for both the control DB and its PERSIST sidecar, prove durable provisioning, and settle cross-process serialization for both PERSIST and the retained JSON ledger. Select the journal protocol only after this comparison; do not start the filesystem executor until the protocol is explicitly selected and qualified.
