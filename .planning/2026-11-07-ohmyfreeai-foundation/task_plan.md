@@ -6,22 +6,24 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Last behavior-changing code commit: `eedeac445cc9259b743c3d87c5d1cce7f2ead1aa`. Subsequent commits in this review update planning/progress documentation only; they do not change production code.
+Latest branch head: `01913ec7fdbf63134739a21136f82540f1e66493` on `foundation/bootstrap` (2026-11-12). This head adds isolated SQLite journal-evaluation tests only. The latest production-code head is `1cde3c316fbf11271fe427c9c03e6ea67c380f47`.
 
-### CI evidence
+### Current CI evidence
 
-The specifically requested Root CI run [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009), for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`, is **completed successfully**. Its Ubuntu and Windows jobs both passed Go vet, Go tests/build, Python tooling/tests, frontend syntax and architecture checks.
+The latest production-code head `1cde3c` passed all four workflow families:
 
-A later regression run [42984745263](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42984745263), for `4075baf66c1a552c70acb23ef5fd725cd8f15d04`, had Ubuntu pass and Windows fail during Go tests. The failure was limited to three new test assertions comparing path strings byte-for-byte: Windows returned the long path under `C:\\Users\\runneradmin`, while the expected test string used the equivalent 8.3 alias `C:\\Users\\RUNNER~1`. The tests were corrected to use the repository's canonical path-equivalence helpers in commit [eedeac4](https://github.com/SoufianoDev/OhMyFreeAI/commit/eedeac445cc9259b743c3d87c5d1cce7f2ead1aa); production code was not changed by that correction.
+- Root CI [43168230481](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43168230481): 2/2 Ubuntu/Windows.
+- SQLite driver evaluation [43168230549](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43168230549): 4/4 modernc/ncruces × Ubuntu/Windows.
+- Wails platform proof [43168230458](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43168230458): 2/2 Ubuntu/Windows; Ubuntu native CLI, WebView-to-Go bridge and two-launch database-reopen smoke passed.
+- Linux distribution compatibility [43168230439](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43168230439): 8/8, including Ubuntu 22.04 legacy GTK3/WebKit41.
 
-All workflow families on the last behavior-changing code head `eedeac4` completed successfully:
+A subsequent Root CI regression on `590a67d` failed on both platforms in `go vet`: `restore_journal_publish_test.go` called `publishRestoreJournalNoReplace` with an expected identity before the implementation signature accepted it. Commit `1cde3c` corrected the helper to accept the expected identity and call `moveRestoreFileNoReplaceVerified`. The exact code head then passed Root CI and all other workflow families above.
 
-- Root CI [42985836167](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836167): 2/2 jobs, Ubuntu and Windows. Both passed vet, tests and build; Ubuntu also passed race detection.
-- SQLite driver evaluation [42985836284](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836284): 4/4 jobs (modernc and ncruces on Ubuntu and Windows).
-- Wails v3 platform proof [42985836260](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836260): 2/2 jobs (Ubuntu and Windows).
-- Linux distribution compatibility [42985836201](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42985836201): 8/8 jobs (Debian 12/13, Ubuntu 22.04/24.04, Fedora GTK3/GTK4, Arch and openSUSE).
+The current test-only head `01913ec` passed:
+- Root CI [43170647066](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43170647066): 2/2. Ubuntu passed Go vet/tests, race detector, build, Python tests, frontend syntax and architecture checks; Windows passed the corresponding checks and skipped only the Linux-only race detector.
+- SQLite driver evaluation [43170647220](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43170647220): 4/4. All new PERSIST lifecycle and abrupt-process-death tests passed for modernc and ncruces on Ubuntu and Windows.
 
-Total: 16/16 jobs passed on the exact code head `eedeac4`. The newer `d4a8e60` head changes planning/progress documentation only, so no production CI rerun was triggered. These are CI results, not power-loss certification.
+Wails and Linux-distro workflows were not triggered by the test-only changes under `tests/sqlite-driver-eval`; their latest exact production-code evidence remains the successful `1cde3c` runs above. Do not describe the 16/16 result as having run on `01913ec`.
 
 ### StoreController integration review
 
@@ -34,34 +36,37 @@ The coordinated Store lifecycle stage is complete and present in the current tre
 - Exclusive operations drain active readers and block new readers while a writer waits; cancellation does not strand the controller.
 - Close drains active operations and rejects later operations. Failed exclusive replacement publishes only a supplied verified replacement; unknown state fails closed.
 - The StoreController suite contains 16 tests, including concurrency/stress, cancellation, replacement, panic, config Load/Save drain and shutdown behavior. Backup has a separate archive-publication drain test.
-- Current-head Root CI and Wails CI passed on both Linux and Windows.
 
-The prerequisite is therefore satisfied; the durable journal and staging-only candidate builder now present in the branch were added after this lifecycle integration. Neither is connected to startup, GUI or CLI Restore.
+The prerequisite is satisfied. The retained journal ledger, recovery planner, no-replace moves, no-follow identity verification and staging-only candidate builder remain infrastructure-only. None is connected to startup, GUI or CLI Restore.
 
-### Immediate gate — qualify the restore-journal storage protocol
+### Immediate gate — settle journal storage before the executor
 
 Do not start the filesystem transaction executor until the durability and recovery contract for every journal phase update is settled.
 
-The current JSON ledger writes a temporary file and publishes it by platform-specific replacement. A researched alternative is a separate, pre-provisioned SQLite restore-control database using rollback-journal `PERSIST` mode and `synchronous=FULL`. This is a candidate only; it is not approved for implementation.
+The current production journal remains the retained JSON ledger. It is bounded to 256 records / 1 MiB, retains terminal history, rejects malformed or concurrent active transaction state, and uses platform-specific atomic publication. Initial publication now uses a no-replace move followed by no-follow size/SHA-256 verification. Subsequent ledger updates use same-directory atomic replacement with a Linux parent-directory sync or the Windows handle-bound NTFS write-through rename path. The PERSIST alternative below remains an evaluation candidate only; it has not replaced the JSON ledger.
 
-Important constraints established by the current research:
+### SQLite PERSIST candidate — driver and process-death evidence
 
-- SQLite `PERSIST` leaves its rollback-journal file in place and zeroes the header at commit, but unlike WAL it is not persistent across close/reopen. Every new restore-control connection must explicitly set and verify `PRAGMA journal_mode=PERSIST` before writing.
-- The Windows SQLite VFS flushes the selected file handle with `FlushFileBuffers`; it does not provide the Linux-style parent-directory `fsync`. The DB file and persistent rollback-journal sidecar therefore need a separately qualified, durable pre-provisioning step before a restore can start.
-- A separate restore-control DB must not be the application DB being replaced. Missing, malformed, unopenable or unverified control artifacts must fail closed before the live Store is touched.
-- Process-death recovery tests are necessary but are not power-loss certification.
+The isolated evaluation module now verifies modernc v1.62.0 and ncruces v0.37.0 independently on Ubuntu 24.04 and Windows:
 
-Required investigation and tests:
+- Both drivers accept `PRAGMA journal_mode=PERSIST` and `PRAGMA synchronous=FULL`.
+- A committed transaction leaves a regular rollback-journal sidecar with a zeroed header.
+- The sidecar remains present after close/reopen. `journal_mode` reverts to DELETE on a new connection, so every connection must explicitly set and verify PERSIST before writing. Reapplying PERSIST and committing another transaction reuses the same sidecar file identity on all four driver/OS combinations.
+- A subprocess test writes an uncommitted transaction large enough to spill pages, confirms a live rollback-journal header, then exits via `os.Exit` without SQLite cleanup. Reopening recovers exactly the committed baseline, excludes all uncommitted rows, and passes `PRAGMA integrity_check` on all four combinations.
+- Normal SQLite open/use silently creates a missing database file and recreates a missing PERSIST sidecar. SQLite itself therefore does **not** provide the required fail-closed behavior. A production candidate must no-follow preflight both pre-provisioned artifacts and open existing files only before any restore phase can be written.
 
-1. Add isolated tests for `PERSIST` mode, mode re-application after reopen, persistent sidecar reuse, and fail-closed behavior when the DB or sidecar is missing.
-2. Run the tests against both modernc and ncruces on Linux and Windows; do not infer one driver's behavior from the other.
-3. Prove DB and sidecar pre-provisioning with the existing Linux directory-sync and Windows fixed-local-NTFS handle-bound write-through contracts. No path-based or overwrite-capable fallback is allowed.
-4. Exercise abrupt process termination during every journal transaction boundary and verify that SQLite recovers to exactly the last committed ledger state while retaining transaction history.
-5. Compare this design against the current JSON ledger. Adopt it only if the complete evidence is stronger and the format can be migrated without losing or guessing existing records. Otherwise retain the current ledger and continue closing its publication contract.
+This evidence is process-death and driver-behavior evidence only. It is not power-loss certification and does not prove durable initial DB/sidecar provisioning.
+
+### Remaining journal qualification work
+
+1. Prototype a fail-closed preflight/open-existing boundary for the separate restore-control database. Missing, malformed, symlink/reparse, non-regular, or identity-unverified DB/sidecar artifacts must stop before the live Store is touched.
+2. Prove durable pre-provisioning of both DB and PERSIST sidecar using the existing Linux directory-FD sync contract and the Windows fixed-local-NTFS handle-bound write-through contract. SQLite's own file creation is not sufficient evidence for the Windows directory-entry barrier.
+3. Extend process-death tests to the relevant commit and reopen boundaries, preserving transaction history. Do not infer power-loss safety from process termination.
+4. Compare the complete PERSIST design against the retained JSON ledger, including concurrent-process serialization, recovery, migration and operational complexity. Adopt PERSIST only if evidence is strictly stronger and migration is lossless. Otherwise explicitly retain JSON and finish qualifying its update/locking protocol.
 
 ### Subsequent engineering unit — isolated transaction executor
 
-After the journal protocol is qualified, implement the StoreController-backed filesystem transaction executor as an infrastructure-only component:
+Only after the journal protocol is explicitly selected and qualified, implement the StoreController-backed filesystem transaction executor as an infrastructure-only component:
 
 1. Acquire the exclusive lease, drain shared work, checkpoint/close the active Store, and establish the previous database's no-follow size/SHA-256 identity.
 2. Validate the already journal-selected staging, rollback and quarantine paths. Build or consume the staged candidate without touching the live Store; persist the candidate identity before any publication move.
@@ -75,7 +80,7 @@ The current JSON ledger remains bounded to 256 records / 1 MiB; automatic prunin
 
 Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete journal, executor, rollback and process-death matrix passes on both platforms.
 
-**Delivery warning:** `foundation/bootstrap` is substantially ahead of `main`. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
+**Delivery warning:** `foundation/bootstrap` is 851 commits ahead of `main` and 0 behind. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
 
 ## Current Phase
 
