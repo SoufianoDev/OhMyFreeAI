@@ -1632,3 +1632,28 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Continue the journal qualification, not the filesystem executor: design and test no-follow preflight/open-existing for both the control DB and its PERSIST sidecar, verify identities around SQLite open before any write, and prove durable pre-provisioning on Linux and fixed-local NTFS.
 - The current JSON ledger read-modify-publish path has no explicit cross-process lock acquisition in `WriteRestoreJournal`. Resolve and test this serialization contract as part of the PERSIST-versus-JSON comparison before selecting the journal protocol.
 - Do not start the transaction executor, startup recovery, GUI/CLI Restore or any Restore wiring until the journal protocol and Linux/Windows safety gates are explicitly qualified. Restore remains disabled.
+
+## 2026-11-12 14:36Z — historical CI, StoreController gate, and journal boundary review
+
+### CI verification
+- Rechecked the explicitly requested historical Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee`: Ubuntu and Windows jobs completed successfully (2/2); all setup, vet, Go test/build, Python, frontend syntax, and architecture steps succeeded.
+- Rechecked Root CI [43237308026](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43237308026) on test-only head `5f679e5`: Ubuntu and Windows succeeded (2/2). Ubuntu logs show vet, Go tests, race detector and build; Windows logs show vet, Go tests and build.
+- Rechecked SQLite driver evaluation [43237307833](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43237307833): modernc/ncruces × Ubuntu/Windows succeeded (4/4). Retrieved logs explicitly show the PERSIST lifecycle, abrupt-process-death recovery, missing-sidecar recreation and existing-only main DB probe passing in every combination.
+- Rechecked the production-code head `1cde3c` separately: Wails [43168230458](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43168230458) succeeded 2/2; Linux distribution compatibility [43168230439](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43168230439) succeeded 8/8. These Wails/distro runs are not evidence for test-only head `5f679e5`.
+- The branch has two commits after `5f679e5` according to compare; both changed only `.planning/.../progress.md` and `.planning/.../task_plan.md`. No production/test changes were observed after the verified test head.
+
+### StoreController gate re-review
+- Counted and inspected all 16 `TestStoreController*` tests. They cover exclusive drain, writer preference, canceled waits, nil Store rejection, replacement publication, close/drain, fail-closed replacement, panic handling, concurrent lease stress, config round-trip and config Load/Save drain.
+- Rechecked Wails composition root and AppService: one application-lifetime controller is created and closed through the controller; AppService retains the controller; configuration uses the controller-backed `ports.ConfigRepository`.
+- Rechecked backup `CreateWithStoreController`: the shared lease encloses the complete archive creation/publication path. This integration stage is complete; no code was duplicated or changed.
+
+### Journal qualification finding
+- SQLite's official `sqlite3_open_v2` documentation describes `SQLITE_OPEN_NOFOLLOW` as a restriction on the database filename and `mode=rw` as existing-database read/write without CREATE: https://sqlite.org/c3ref/open.html. Neither contract documents a no-follow guarantee for the separate PERSIST rollback-journal sidecar.
+- The exact-head evaluation logs confirm `TestSQLiteSilentlyRecreatesMissingRestoreControlArtifacts` passes on modernc and ncruces on both platforms: SQLite recreates a missing PERSIST sidecar on a later write. Main database existing-only open is therefore not enough.
+- The retained JSON ledger has a separate unresolved issue: `WriteRestoreJournal` performs a read-modify-publish sequence without explicit cross-process serialization. This must be fixed and tested before choosing JSON as the final protocol.
+- Windows journal namespace durability remains unresolved; do not infer power-loss safety from CI or process-death tests.
+
+### Outcome and next gate
+- No production code changed and no local test execution is claimed. Evidence above comes from GitHub Actions job status and retrieved job logs.
+- Continue with an isolated, test-first comparison: (1) establish whether either pinned SQLite driver can enforce no-follow for both main DB and journal sidecar through a supported VFS/open boundary; (2) design cross-process serialization for the JSON ledger and test it with separate processes on Linux and Windows; (3) settle the Windows namespace-durability contract. Select the journal protocol only after these gates pass.
+- Do not start the filesystem transaction executor, startup recovery, GUI/CLI Restore, or main merge. Restore remains disabled.
