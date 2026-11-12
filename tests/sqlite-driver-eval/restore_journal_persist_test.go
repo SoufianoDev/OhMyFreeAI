@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -98,7 +97,17 @@ func TestSQLiteSilentlyRecreatesMissingRestoreControlArtifacts(t *testing.T) {
 	// database/sql drivers create a missing file-backed database on first use.
 	// A restore-control adapter must therefore preflight its provisioned DB
 	// without following links and must not rely on sql.Open/Ping to fail closed.
-	missingDBPath := filepath.Join(t.TempDir(), "missing-control.db")
+	testDirectory, err := os.MkdirTemp(".", ".restore-control-mode-rw-*")
+	if err != nil {
+		t.Fatalf("create same-volume restore-control test directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(testDirectory); err != nil {
+			t.Errorf("remove restore-control test directory: %v", err)
+		}
+	})
+
+	missingDBPath := filepath.Join(testDirectory, "missing-control.db")
 	missingDB, err := sql.Open(driver, missingDBPath)
 	if err != nil {
 		t.Fatalf("open missing database handle: %v", err)
@@ -264,7 +273,7 @@ func TestSQLiteModeRWRequiresExistingDatabaseButDoesNotProtectPersistSidecar(t *
 		t.Fatalf("mode=rw created a missing database: lstat error = %v", err)
 	}
 
-	dbPath := filepath.Join(t.TempDir(), "mode-rw-control.db")
+	dbPath := filepath.Join(testDirectory, "mode-rw-control.db")
 	db, err := sql.Open(driver, dbPath)
 	if err != nil {
 		t.Fatalf("open restore-control database for provisioning: %v", err)
@@ -344,11 +353,15 @@ func restoreControlSQLiteURI(t *testing.T, path string) string {
 	if err != nil {
 		t.Fatalf("resolve SQLite URI path: %v", err)
 	}
-	slashPath := filepath.ToSlash(absolute)
-	if runtime.GOOS == "windows" {
-		slashPath = "/" + slashPath
+	workingDirectory, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("resolve SQLite URI base directory: %v", err)
 	}
-	uri := url.URL{Scheme: "file", Path: slashPath}
+	relative, err := filepath.Rel(workingDirectory, absolute)
+	if err != nil {
+		t.Fatalf("make SQLite URI path relative to the working directory: %v", err)
+	}
+	uri := url.URL{Scheme: "file", Path: filepath.ToSlash(relative)}
 	query := url.Values{}
 	query.Set("mode", "rw")
 	uri.RawQuery = query.Encode()
