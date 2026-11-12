@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Latest branch head: `01913ec7fdbf63134739a21136f82540f1e66493` on `foundation/bootstrap` (2026-11-12). This head adds isolated SQLite journal-evaluation tests only. The latest production-code head is `1cde3c316fbf11271fe427c9c03e6ea67c380f47`.
+Latest verified code/test head: `01913ec7fdbf63134739a21136f82540f1e66493` on `foundation/bootstrap` (2026-11-12). It adds isolated SQLite journal-evaluation tests only. The latest production-code head is `1cde3c316fbf11271fe427c9c03e6ea67c380f47`. Subsequent commits in this session update planning/progress/architecture documents only; no production or test source changes followed `01913ec`.
 
 ### Current CI evidence
 
@@ -80,7 +80,7 @@ The current JSON ledger remains bounded to 256 records / 1 MiB; automatic prunin
 
 Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete journal, executor, rollback and process-death matrix passes on both platforms.
 
-**Delivery warning:** `foundation/bootstrap` is 851 commits ahead of `main` and 0 behind. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
+**Delivery warning:** at the verified code/test head `01913ec`, `foundation/bootstrap` was 851 commits ahead of `main` and 0 behind. Subsequent commits in this session are documentation-only. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
 
 ## Current Phase
 
@@ -210,7 +210,7 @@ Phase 4
 3. Which parts of the historical Colab prototype are reproducible and safe to preserve?
 4. Which Wails/Go/Colab combinations can be verified without introducing paid dependencies?
 
-Current status snapshot (2026-11-12): branch head `01913ec7fdbf63134739a21136f82540f1e66493` contains test-only PERSIST lifecycle and process-death evaluation additions; latest production-code head is `1cde3c316fbf11271fe427c9c03e6ea67c380f47`. The production-code head passed Root CI 2/2, SQLite 4/4, Wails 2/2 and Linux distribution compatibility 8/8. The current test-only head passed Root CI 2/2 and SQLite 4/4. Both modernc and ncruces pass the isolated PERSIST lifecycle and abrupt-process-death tests on Ubuntu and Windows. SQLite silently recreates missing database/sidecar artifacts, so a fail-closed no-follow preflight and durable pre-provisioning boundary remain mandatory before this candidate can be approved. The retained JSON ledger remains production. The staging-only candidate builder, filesystem transaction executor, automatic rollback/reopen orchestration, full process-death recovery matrix, startup coordinator and Restore UI/CLI remain incomplete; Restore stays disabled. The branch is 851 commits ahead of main and 0 behind; no merge is authorized. Real-host WebKit sandbox validation, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review remain open. Remote inference remains policy-gated.
+Current status snapshot (2026-11-12): branch head `01913ec7fdbf63134739a21136f82540f1e66493` contains test-only PERSIST lifecycle and process-death evaluation additions; latest production-code head is `1cde3c316fbf11271fe427c9c03e6ea67c380f47`. The production-code head passed Root CI 2/2, SQLite 4/4, Wails 2/2 and Linux distribution compatibility 8/8. The current test-only head passed Root CI 2/2 and SQLite 4/4. Both modernc and ncruces pass the isolated PERSIST lifecycle and abrupt-process-death tests on Ubuntu and Windows. SQLite silently recreates missing database/sidecar artifacts, so a fail-closed no-follow preflight and durable pre-provisioning boundary remain mandatory before this candidate can be approved. The retained JSON ledger remains production. The staging-only candidate builder, filesystem transaction executor, automatic rollback/reopen orchestration, full process-death recovery matrix, startup coordinator and Restore UI/CLI remain incomplete; Restore stays disabled. At code/test head `01913ec`, the branch comparison was 851 commits ahead of main and 0 behind; subsequent commits are planning/architecture documentation only. No merge is authorized. Real-host WebKit sandbox validation, long-duration stress/performance, dependency license inventory, current Colab/model/SSE revalidation, packaging/uninstall and full source review remain open. Remote inference remains policy-gated.
 ## Decisions Made
 
 | Decision | Rationale |
