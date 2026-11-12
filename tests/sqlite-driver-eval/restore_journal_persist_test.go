@@ -3,7 +3,6 @@ package eval
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -155,9 +154,7 @@ func TestSQLiteSilentlyRecreatesMissingRestoreControlArtifacts(t *testing.T) {
 	requirePersistentJournalMode(t, ctx, reopenedConn)
 	requireSynchronousFull(t, ctx, reopenedConn)
 	commitRestoreControlWrite(t, ctx, reopenedConn, false)
-	if _, err := requirePersistentJournalFile(t, journalPath), error(nil); err != nil {
-		t.Fatal(err)
-	}
+	_ = requirePersistentJournalFile(t, journalPath)
 	if err := reopenedConn.Close(); err != nil {
 		_ = reopened.Close()
 		t.Fatalf("close recreated-sidecar connection: %v", err)
@@ -243,4 +240,3 @@ func requireZeroJournalHeader(t *testing.T, path string) {
 	}
 }
 
-var _ = errors.Is
