@@ -1576,3 +1576,32 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 ### Decision and safety
 - Do not replace the current JSON ledger yet. Do not begin the filesystem executor until the journal publication contract is settled.
 - No production code changed in this review. Restore remains disabled and unexposed; no startup recovery, GUI/CLI Restore, or merge to `main`.
+
+
+## 2026-11-12 06:50Z — PERSIST journal lifecycle and abrupt-process-death evaluation
+
+### Repository and workflow audit
+- Rechecked foundation/bootstrap, main, recent commits, the active plan, progress history, Restore lifecycle, executor constraints, journal writer/ledger, no-replace move adapters, no-follow identity readers, candidate builder and StoreController.
+- Branch head before the documentation updates: 01913ec7fdbf63134739a21136f82540f1e66493; latest production-code head: 1cde3c316fbf11271fe427c9c03e6ea67c380f47.
+- Compared against main: 851 commits ahead, 0 behind. No merge or force-push was attempted.
+- Audited the failed Root CI run 43167168518 on 590a67d. Ubuntu and Windows both failed at go vet because the new test passed an expected identity to a helper that still accepted only two arguments. Commit 1cde3c corrected the helper to call moveRestoreFileNoReplaceVerified. The exact code head passed all four workflow families: Root 2/2, SQLite 4/4, Wails 2/2 and Linux distributions 8/8.
+- The current test-only head 01913ec passed Root CI [43170647066](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43170647066) 2/2 and SQLite evaluation [43170647220](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43170647220) 4/4. Wails and distro workflows were not triggered by changes confined to tests/sqlite-driver-eval; their latest exact production-code runs remain the successful 1cde3c runs.
+
+### Changes made
+- Added tests/sqlite-driver-eval/restore_journal_persist_test.go to evaluate PERSIST mode, synchronous FULL, sidecar header zeroing, persistence across close/reopen, explicit mode reapplication, sidecar identity reuse, and the driver's behavior when the DB or sidecar is missing.
+- Added tests/sqlite-driver-eval/restore_journal_crash_test.go. A child process starts a large uncommitted transaction, confirms a live rollback-journal header, then exits with os.Exit without SQLite cleanup. The parent reopens the database and verifies that the committed baseline remains, uncommitted rows are absent, and PRAGMA integrity_check returns ok.
+- Test commits: [3142c8f](https://github.com/SoufianoDev/OhMyFreeAI/commit/3142c8fce61ee05e073e5bedc2567087aa1c8817) and [01913ec](https://github.com/SoufianoDev/OhMyFreeAI/commit/01913ec7fdbf63134739a21136f82540f1e66493). No production Restore code was changed in these commits.
+- Updated the active task plan to replace stale CI/commit information and record the new evidence and remaining gate.
+
+### PERSIST findings — all four driver/OS combinations passed
+- modernc v1.62.0 and ncruces v0.37.0 both accept PRAGMA journal_mode=PERSIST and PRAGMA synchronous=FULL on Ubuntu 24.04 and Windows.
+- After a committed transaction, both drivers retain a regular rollback-journal sidecar with a zeroed header. The sidecar survives close/reopen. Journal mode resets to DELETE on a fresh connection, so PERSIST must be explicitly set and verified again before writes. Reapplying PERSIST and committing another transaction reused the same sidecar file identity in all four combinations.
+- The forced process-death test passed on modernc/Ubuntu, ncruces/Ubuntu, modernc/Windows and ncruces/Windows. SQLite recovered the uncommitted transaction and passed integrity_check.
+- Critical limitation: normal SQLite open/use silently creates a missing database and silently recreates a missing PERSIST sidecar. The driver does not fail closed. A production design must validate both pre-provisioned artifacts through no-follow handles and open existing files only before touching the live Store.
+- These are driver and process-death results only. They do not prove durable initial DB/sidecar provisioning or hardware-independent power-loss safety. PERSIST remains a candidate, not an approved replacement for the retained JSON ledger.
+
+### Safety and next step
+- The JSON ledger remains the production journal. It is retained, bounded to 256 records / 1 MiB, and uses platform-specific publication. Initial publication now uses no-replace plus post-move no-follow identity verification. The PERSIST candidate has not yet been shown strictly stronger.
+- Next: prototype the no-follow fail-closed preflight/open-existing boundary and durable DB/sidecar pre-provisioning, then compare PERSIST against JSON including concurrent-process serialization and recovery. Do not start the transaction executor until the journal protocol is explicitly selected and qualified.
+- Restore remains disabled and is not connected to startup recovery, GUI or CLI. No main changes, merge, startup recovery or executor implementation occurred.
+- No local test execution is claimed; the reported results are from the exact-head GitHub Actions job logs.
