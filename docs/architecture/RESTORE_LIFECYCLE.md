@@ -157,3 +157,24 @@ The retained-ledger sequential rollover tests are in commit [c464d7b](https://gi
 - [Linux distribution compatibility](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42975743861): 8/8.
 
 This verifies the journal-ledger tests and current build matrix, not the absent transaction executor, power-loss behavior, or full process-death/restart matrix. Restore remains disabled.
+
+
+## SQLite PERSIST restore-control journal candidate evaluation — 2026-11-12
+
+**Status: evaluation evidence only; not approved for production.** The retained JSON ledger remains the current production journal.
+
+The isolated driver-evaluation module tested modernc v1.62.0 and ncruces v0.37.0 on Ubuntu 24.04 and Windows:
+
+- Both drivers accepted rollback-journal PERSIST mode and synchronous FULL.
+- After a committed transaction, the PERSIST sidecar remained as a regular file and its first eight header bytes were zeroed.
+- The sidecar survived database close/reopen. Journal mode reverted to DELETE on a fresh connection, so every new connection must explicitly set and verify PERSIST before any journal write. After reapplying PERSIST, both drivers reused the same sidecar file identity for a subsequent transaction.
+- A subprocess test forced process termination while a large uncommitted transaction had spilled pages and left a non-zero rollback-journal header. Reopening recovered the committed baseline, removed all uncommitted rows, and passed SQLite integrity_check.
+- These tests passed for all four driver/OS combinations in [SQLite evaluation run 43170647220](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43170647220).
+
+A critical fail-closed limitation was also confirmed: normal SQLite open/use silently creates a missing database file and recreates a missing PERSIST sidecar. SQLite does not enforce the required pre-provisioning contract. Any production implementation must inspect both artifacts without following symlinks/reparse points, reject missing/non-regular/unverified artifacts, and open existing files only before recording a restore phase or touching the live Store.
+
+This evaluation does not prove durable initial database/sidecar provisioning, every journal transaction boundary, or hardware-independent power-loss behavior. In particular, Windows still requires a separately verified fixed-local-NTFS write-through creation/metadata barrier for both pre-provisioned artifacts. Do not infer that the existing SQLite VFS file flush provides a parent-directory durability barrier.
+
+The PERSIST candidate must be compared against the retained JSON ledger, including concurrent-process serialization, migration, crash recovery, and operational complexity. Adopt it only if the complete evidence is stronger and existing transaction history can be migrated without loss or guesswork. Otherwise retain JSON and finish qualifying its publication/locking contract.
+
+Restore remains disabled. No executor, startup recovery, GUI/CLI Restore, or application-level restore orchestration is authorized by this evaluation.
