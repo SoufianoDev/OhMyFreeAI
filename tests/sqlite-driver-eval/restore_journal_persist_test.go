@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -240,3 +241,119 @@ func requireZeroJournalHeader(t *testing.T, path string) {
 	}
 }
 
+
+
+func TestSQLiteModeRWRequiresExistingDatabaseButDoesNotProtectPersistSidecar(t *testing.T) {
+	driver := selectedDriver(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	missingDBPath := filepath.Join(t.TempDir(), "missing-control.db")
+	missingDB, err := sql.Open(driver, restoreControlSQLiteURI(t, missingDBPath))
+	if err != nil {
+		t.Fatalf("create existing-only database handle: %v", err)
+	}
+	if err := missingDB.PingContext(ctx); err == nil {
+		_ = missingDB.Close()
+		t.Fatal("mode=rw opened a missing restore-control database")
+	}
+	if err := missingDB.Close(); err != nil {
+		t.Fatalf("close missing database handle: %v", err)
+	}
+	if _, err := os.Lstat(missingDBPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("mode=rw created a missing database: lstat error = %v", err)
+	}
+
+	dbPath := filepath.Join(t.TempDir(), "mode-rw-control.db")
+	db, err := sql.Open(driver, dbPath)
+	if err != nil {
+		t.Fatalf("open restore-control database for provisioning: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		_ = db.Close()
+		t.Fatalf("get provisioning connection: %v", err)
+	}
+	requirePersistentJournalMode(t, ctx, conn)
+	requireSynchronousFull(t, ctx, conn)
+	if _, err := conn.ExecContext(ctx, "CREATE TABLE events (id INTEGER PRIMARY KEY, phase TEXT NOT NULL)"); err != nil {
+		_ = conn.Close()
+		_ = db.Close()
+		t.Fatalf("create restore-control events table: %v", err)
+	}
+	if _, err := conn.ExecContext(ctx, "INSERT INTO events(phase) VALUES ('provisioned')"); err != nil {
+		_ = conn.Close()
+		_ = db.Close()
+		t.Fatalf("write provisioned baseline event: %v", err)
+	}
+	if err := conn.Close(); err != nil {
+		_ = db.Close()
+		t.Fatalf("close provisioning connection: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close provisioned database: %v", err)
+	}
+
+	journalPath := dbPath + "-journal"
+	originalJournal := requirePersistentJournalFile(t, journalPath)
+	requireZeroJournalHeader(t, journalPath)
+	if err := os.Remove(journalPath); err != nil {
+		t.Fatalf("remove PERSIST sidecar to simulate incomplete provisioning: %v", err)
+	}
+	if _, err := os.Lstat(journalPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("PERSIST sidecar still exists after removal: lstat error = %v", err)
+	}
+
+	reopened, err := sql.Open(driver, restoreControlSQLiteURI(t, dbPath))
+	if err != nil {
+		t.Fatalf("open existing database with mode=rw: %v", err)
+	}
+	reopened.SetMaxOpenConns(1)
+	if err := reopened.PingContext(ctx); err != nil {
+		_ = reopened.Close()
+		t.Fatalf("mode=rw could not open the existing database: %v", err)
+	}
+	reopenedConn, err := reopened.Conn(ctx)
+	if err != nil {
+		_ = reopened.Close()
+		t.Fatalf("get mode=rw connection: %v", err)
+	}
+	requirePersistentJournalMode(t, ctx, reopenedConn)
+	requireSynchronousFull(t, ctx, reopenedConn)
+	if _, err := reopenedConn.ExecContext(ctx, "INSERT INTO events(phase) VALUES ('sidecar-recreated')"); err != nil {
+		_ = reopenedConn.Close()
+		_ = reopened.Close()
+		t.Fatalf("write with missing PERSIST sidecar: %v", err)
+	}
+	if err := reopenedConn.Close(); err != nil {
+		_ = reopened.Close()
+		t.Fatalf("close mode=rw connection: %v", err)
+	}
+	if err := reopened.Close(); err != nil {
+		t.Fatalf("close mode=rw database: %v", err)
+	}
+
+	recreatedJournal := requirePersistentJournalFile(t, journalPath)
+	requireZeroJournalHeader(t, journalPath)
+	if originalJournal == nil || recreatedJournal == nil {
+		t.Fatal("PERSIST sidecar identity inspection returned no file information")
+	}
+}
+
+func restoreControlSQLiteURI(t *testing.T, path string) string {
+	t.Helper()
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		t.Fatalf("resolve SQLite URI path: %v", err)
+	}
+	slashPath := filepath.ToSlash(absolute)
+	if runtime.GOOS == "windows" {
+		slashPath = "/" + slashPath
+	}
+	uri := url.URL{Scheme: "file", Path: slashPath}
+	query := url.Values{}
+	query.Set("mode", "rw")
+	uri.RawQuery = query.Encode()
+	return uri.String()
+}
