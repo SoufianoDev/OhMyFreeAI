@@ -1,6 +1,7 @@
 package sqlite
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -64,10 +65,16 @@ type RestoreJournal struct {
 // in a bounded ledger. Terminal transaction records are retained so a later
 // restore can start without deleting evidence or relying on journal removal.
 func WriteRestoreJournal(stateDirectory string, journal RestoreJournal) error {
-	root, err := canonicalStateDirectory(stateDirectory)
+	lease, err := acquireRestoreJournalLease(context.Background(), stateDirectory)
 	if err != nil {
 		return err
 	}
+	writeErr := lease.Write(journal)
+	closeErr := lease.Close()
+	return errors.Join(writeErr, closeErr)
+}
+
+func writeRestoreJournalLocked(root string, journal RestoreJournal) error {
 	if journal.UpdatedAt.IsZero() {
 		journal.UpdatedAt = time.Now().UTC()
 	}
@@ -181,9 +188,13 @@ func ReadRestoreJournal(stateDirectory string) (RestoreJournal, error) {
 	if err != nil {
 		return empty, err
 	}
+	return readRestoreJournalLocked(root)
+}
+
+func readRestoreJournalLocked(root string) (RestoreJournal, error) {
 	ledger, err := readRestoreJournalLedger(root)
 	if err != nil {
-		return empty, err
+		return RestoreJournal{}, err
 	}
 	return currentRestoreJournal(ledger)
 }
@@ -352,6 +363,14 @@ func canonicalStatePath(root, path string) (string, error) {
 		return "", fmt.Errorf("%w: canonicalize transaction path parent: %v", ErrRestoreJournalInvalid, err)
 	}
 	resolvedCandidate := filepath.Join(parent, filepath.Base(absolute))
+	for _, reserved := range []string{
+		filepath.Join(resolvedRoot, restoreJournalFileName),
+		filepath.Join(resolvedRoot, restoreJournalLockFileName),
+	} {
+		if samePath(resolvedCandidate, reserved) {
+			return "", fmt.Errorf("%w: transaction path collides with a reserved Restore journal artifact", ErrRestoreJournalInvalid)
+		}
+	}
 	if info, statErr := os.Lstat(absolute); statErr == nil {
 		if info.Mode()&os.ModeSymlink != 0 {
 			return "", fmt.Errorf("%w: transaction path must not be a symbolic link", ErrRestoreJournalInvalid)
