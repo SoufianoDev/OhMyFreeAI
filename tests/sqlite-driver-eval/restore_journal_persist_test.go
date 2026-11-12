@@ -257,7 +257,17 @@ func TestSQLiteModeRWRequiresExistingDatabaseButDoesNotProtectPersistSidecar(t *
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	missingDBPath := filepath.Join(t.TempDir(), "missing-control.db")
+	testDirectory, err := os.MkdirTemp(".", ".restore-control-mode-rw-*")
+	if err != nil {
+		t.Fatalf("create same-volume restore-control test directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.RemoveAll(testDirectory); err != nil {
+			t.Errorf("remove restore-control test directory: %v", err)
+		}
+	})
+
+	missingDBPath := filepath.Join(testDirectory, "missing-control.db")
 	missingDB, err := sql.Open(driver, restoreControlSQLiteURI(t, missingDBPath))
 	if err != nil {
 		t.Fatalf("create existing-only database handle: %v", err)
