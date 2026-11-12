@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Latest verified code/test head: `5f679e5645a4893e22b5fc6ff1e2e6e9900e70cc` on `foundation/bootstrap` (2026-11-12). It adds an isolated existing-only database-open probe only. The latest production-code head remains `1cde3c316fbf11271fe427c9c03e6ea67c380f47`; no production Restore code changed in this run.
+Latest verified code/test head: `5f679e5645a4893e22b5fc6ff1e2e6e9900e70cc` on `foundation/bootstrap` (2026-11-12). Two later commits relative to this code/test head are planning-file-only; no later production or test code was observed. The latest production-code head remains `1cde3c316fbf11271fe427c9c03e6ea67c380f47`. The next gate is journal-protocol qualification, not StoreController integration: that integration and its Linux/Windows CI prerequisites are complete. Do not implement the filesystem executor until sidecar no-follow/open semantics, cross-process journal serialization, and platform durability are qualified.
 
 ### Current CI evidence
 
@@ -67,6 +67,16 @@ The isolated evaluation module now verifies modernc v1.62.0 and ncruces v0.37.0 
 
 This evidence is process-death and driver-behavior evidence only. It is not power-loss certification and does not prove durable initial DB/sidecar provisioning.
 
+### Additional journal boundary review — 2026-11-12 14:36Z
+
+- The requested historical Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee` is complete: Ubuntu and Windows both succeeded (2/2); every listed step completed successfully.
+- The latest test-only head `5f679e5` remains green on Root CI [43237308026](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43237308026) (Ubuntu + Windows, 2/2) and SQLite driver evaluation [43237307833](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43237307833) (modernc/ncruces × Ubuntu/Windows, 4/4). Retrieved job logs explicitly show `TestPersistentJournalRecoversAfterAbruptProcessDeath`, `TestPersistentRollbackJournalLifecycle`, `TestSQLiteSilentlyRecreatesMissingRestoreControlArtifacts`, and `TestSQLiteExistingOnlyOpenRequiresExistingDatabase` passing in all four driver/OS combinations.
+- Rechecked the exact production-code CI head `1cde3c`: Wails platform proof [43168230458](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43168230458) is 2/2, and Linux distribution compatibility [43168230439](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43168230439) is 8/8. These are separate exact-head evidence; do not combine them into a claim that all 16 jobs ran on `5f679e5`.
+- Re-reviewed the 16 `StoreController` tests, `config.Service`, Wails `main.go.tmpl`/`AppService`, and `Manager.CreateWithStoreController`. The integration gate is satisfied: config delegates through the controller-backed repository, backup holds `WithShared` through complete archive publication, and Wails shutdown calls controller `Close`. No duplicate implementation is needed.
+- SQLite's official [`sqlite3_open_v2` contract](https://sqlite.org/c3ref/open.html) documents `SQLITE_OPEN_NOFOLLOW` as rejecting a symbolic link in the database filename and `mode=rw` as read-write without creating a missing database. Neither statement establishes a no-follow/open-existing guarantee for the separate PERSIST `-journal` sidecar. The evaluation test already proves SQLite can silently recreate a missing sidecar. Do not treat main-DB `mode=rw` or `SQLITE_OPEN_NOFOLLOW` alone as a sidecar safety boundary.
+- The production JSON ledger remains a viable alternative only after its read-modify-publish sequence is serialized across processes. `WriteRestoreJournal` currently reads the ledger, validates it, then publishes a replacement without an explicit inter-process lock. Two cooperating processes could race that sequence; this must be addressed and tested before selecting JSON as the final protocol.
+- The Windows namespace-durability contract for journal publication remains unresolved. Linux parent-directory sync is implemented; Windows handle-bound write-through rename must not be described as power-loss certified.
+- No production code changed in this review. Restore remains disabled; no executor, startup recovery, GUI/CLI Restore, or main merge.
 ### Remaining journal qualification work
 
 1. Prototype a fail-closed preflight/open-existing boundary for the separate restore-control database. Missing, malformed, symlink/reparse, non-regular, or identity-unverified DB/sidecar artifacts must stop before the live Store is touched.
