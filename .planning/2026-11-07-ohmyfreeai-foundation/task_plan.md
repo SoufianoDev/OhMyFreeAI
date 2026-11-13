@@ -560,3 +560,13 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - No transaction executor, automatic startup recovery, process-death test matrix, or GUI/CLI Restore path exists. Restore remains disabled.
 - GitHub compare reports 804 commits ahead and 0 behind main; no open PR exists. Do not merge the branch wholesale. The first real testable delivery must be curated selectively.
 - Next: qualify the no-follow preflight/open-existing boundary for both the control DB and its PERSIST sidecar, prove durable provisioning, and settle cross-process serialization for both PERSIST and the retained JSON ledger. Select the journal protocol only after this comparison; do not start the filesystem executor until the protocol is explicitly selected and qualified.
+
+
+## 2026-11-13 verification update
+
+- The requested historical Root CI run `42419106009` on `f5396ee` is complete and passed on Ubuntu and Windows (2/2).
+- Current branch HEAD `21fdfb44bfc9da20bb94777092dcb78ee93b0e7e` has four successful workflow runs on that exact SHA: Root CI 2/2 ([43377131882](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131882)), SQLite driver evaluation 4/4 ([43377131804](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131804)), Wails platform proof 2/2 ([43377131897](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131897)), and Linux distribution compatibility 8/8 ([43377131790](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131790)).
+- StoreController integration is complete and revalidated: 16 controller tests plus the backup archive publication/drain test; Wails composition root, AppService, configuration and backup paths use the controller as intended.
+- Cross-process serialization for the retained JSON ledger is implemented with `restoreJournalLease`, Linux `flock`, Windows `LockFileEx`, and subprocess exclusion tests. Root CI's SQLite package passed on both OSes, and Ubuntu race detection passed. This closes the earlier missing-lock item, but the future executor must hold one lease across the whole transaction.
+- Still blocked: SQLite PERSIST sidecar no-follow qualification and Windows journal namespace power-loss durability. Do not infer power-loss safety from process-death tests.
+- Next: qualify the no-follow boundary for both the control DB and PERSIST sidecar, then settle Windows journal publication durability. Do not start the transaction executor, startup recovery or Restore UI/CLI until both platform gates are complete. Restore remains disabled.
