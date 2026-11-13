@@ -1,6 +1,7 @@
 package eval
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"errors"
@@ -320,4 +321,86 @@ func restoreControlSQLiteURI(t *testing.T, path string) string {
 	query.Set("mode", "rw")
 	uri.RawQuery = query.Encode()
 	return uri.String()
+}
+
+
+func TestPersistentSidecarSymlinkProbe(t *testing.T) {
+	driver := selectedDriver(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	dbPath := filepath.Join(t.TempDir(), "restore-control.db")
+	db, err := sql.Open(driver, dbPath)
+	if err != nil {
+		t.Fatalf("open restore-control database: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	conn, err := db.Conn(ctx)
+	if err != nil {
+		_ = db.Close()
+		t.Fatalf("get restore-control connection: %v", err)
+	}
+	requirePersistentJournalMode(t, ctx, conn)
+	requireSynchronousFull(t, ctx, conn)
+	commitRestoreControlWrite(t, ctx, conn, true)
+	if err := conn.Close(); err != nil {
+		_ = db.Close()
+		t.Fatalf("close restore-control connection: %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("close restore-control database: %v", err)
+	}
+
+	journalPath := dbPath + "-journal"
+	if err := os.Remove(journalPath); err != nil {
+		t.Fatalf("remove provisioned PERSIST sidecar: %v", err)
+	}
+	targetPath := filepath.Join(t.TempDir(), "outside-journal-target")
+	sentinel := []byte("unrelated file that must not become a SQLite rollback journal")
+	if err := os.WriteFile(targetPath, sentinel, 0o600); err != nil {
+		t.Fatalf("write outside journal target: %v", err)
+	}
+	if err := os.Symlink(targetPath, journalPath); err != nil {
+		if runtime.GOOS == "windows" && errors.Is(err, os.ErrPermission) {
+			t.Skip("creating a Windows symbolic link requires an unavailable privilege")
+		}
+		t.Fatalf("create PERSIST sidecar symlink: %v", err)
+	}
+
+	reopened, openErr := sql.Open(driver, dbPath)
+	var connectionErr, modeErr, syncErr, writeErr, connectionCloseErr, databaseCloseErr error
+	var mode string
+	if openErr == nil {
+		reopened.SetMaxOpenConns(1)
+		var reopenedConn *sql.Conn
+		reopenedConn, connectionErr = reopened.Conn(ctx)
+		if connectionErr == nil {
+			modeErr = reopenedConn.QueryRowContext(ctx, "PRAGMA journal_mode=PERSIST").Scan(&mode)
+			if modeErr == nil && strings.EqualFold(mode, "persist") {
+				_, syncErr = reopenedConn.ExecContext(ctx, "PRAGMA synchronous=FULL")
+				if syncErr == nil {
+					_, writeErr = reopenedConn.ExecContext(ctx, "INSERT INTO journal_events(phase) VALUES (?)", "symlink-probe")
+				}
+			}
+			connectionCloseErr = reopenedConn.Close()
+		}
+		databaseCloseErr = reopened.Close()
+	}
+
+	after, readErr := os.ReadFile(targetPath)
+	targetChanged := readErr != nil || !bytes.Equal(after, sentinel)
+	linkInfo, linkErr := os.Lstat(journalPath)
+	symlinkRetained := linkErr == nil && linkInfo.Mode()&os.ModeSymlink != 0
+	t.Logf("PERSIST sidecar symlink probe: driver=%s open_error=%v connection_error=%v mode=%q mode_error=%v sync_error=%v write_error=%v close_errors=%v/%v target_changed=%t symlink_retained=%t link_error=%v target_read_error=%v",
+		driver, openErr, connectionErr, mode, modeErr, syncErr, writeErr, connectionCloseErr, databaseCloseErr, targetChanged, symlinkRetained, linkErr, readErr)
+	switch {
+	case targetChanged:
+		t.Log("PERSIST sidecar path followed the symbolic link; this driver cannot satisfy the no-follow sidecar requirement")
+	case symlinkRetained && (connectionErr != nil || modeErr != nil || syncErr != nil || writeErr != nil):
+		t.Log("PERSIST sidecar symbolic link was retained and the operation was rejected")
+	case !symlinkRetained && !targetChanged:
+		t.Log("PERSIST sidecar symbolic link was replaced or removed without modifying its target")
+	default:
+		t.Log("PERSIST sidecar symbolic-link behavior is inconclusive and requires further inspection")
+	}
 }
