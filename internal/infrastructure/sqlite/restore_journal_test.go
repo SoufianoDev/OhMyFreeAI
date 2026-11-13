@@ -173,15 +173,23 @@ func TestReadRestoreJournalRejectsUnknownFieldsAndTrailingData(t *testing.T) {
 }
 
 func TestReadRestoreJournalRejectsSymlink(t *testing.T) {
-	if runtime.GOOS == "windows" {
-		t.Skip("creating symlinks may require elevated privileges on Windows")
-	}
 	root := restoreTestDir(t)
+	journal := validTestRestoreJournal(root)
+	data, err := json.Marshal(restoreJournalLedger{
+		Version: restoreJournalLedgerVersion,
+		Transactions: []RestoreJournal{journal},
+	})
+	if err != nil {
+		t.Fatalf("encode symlink target journal: %v", err)
+	}
 	target := filepath.Join(root, "target")
-	if err := os.WriteFile(target, []byte("{}"), 0o600); err != nil {
+	if err := os.WriteFile(target, data, 0o600); err != nil {
 		t.Fatalf("write symlink target: %v", err)
 	}
 	if err := os.Symlink(target, filepath.Join(root, restoreJournalFileName)); err != nil {
+		if errors.Is(err, os.ErrPermission) {
+			t.Skip("creating symlinks is not permitted by this runner")
+		}
 		t.Fatalf("create journal symlink: %v", err)
 	}
 	if _, err := ReadRestoreJournal(root); !errors.Is(err, ErrRestoreJournalInvalid) {

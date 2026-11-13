@@ -18,14 +18,7 @@ type restoreJournalLedger struct {
 func readRestoreJournalLedger(root string) (restoreJournalLedger, error) {
 	var empty restoreJournalLedger
 	path := filepath.Join(root, restoreJournalFileName)
-	info, err := os.Lstat(path)
-	if err != nil {
-		return empty, err
-	}
-	if !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxRestoreJournalBytes {
-		return empty, fmt.Errorf("%w: journal ledger is not a bounded regular file", ErrRestoreJournalInvalid)
-	}
-	data, err := os.ReadFile(path)
+	data, err := readRestoreJournalFilePlatform(path, maxRestoreJournalBytes)
 	if err != nil {
 		return empty, fmt.Errorf("read SQLite restore journal ledger: %w", err)
 	}
