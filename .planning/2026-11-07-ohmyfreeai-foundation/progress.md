@@ -1657,3 +1657,43 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - No production code changed and no local test execution is claimed. Evidence above comes from GitHub Actions job status and retrieved job logs.
 - Continue with an isolated, test-first comparison: (1) establish whether either pinned SQLite driver can enforce no-follow for both main DB and journal sidecar through a supported VFS/open boundary; (2) design cross-process serialization for the JSON ledger and test it with separate processes on Linux and Windows; (3) settle the Windows namespace-durability contract. Select the journal protocol only after these gates pass.
 - Do not start the filesystem transaction executor, startup recovery, GUI/CLI Restore, or main merge. Restore remains disabled.
+
+## 2026-11-13 14:04Z — requested CI, StoreController recheck, and journal lease review
+
+### Requested historical workflow
+- Rechecked Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on commit `f5396ee592b9b9756779f67aeabd6d7167520c40` through GitHub job details.
+- Ubuntu and Windows jobs both completed successfully (2/2). Both jobs completed module verification, Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks. No failure logs were applicable.
+
+### Current branch head and CI
+- Resolved `foundation/bootstrap` through the GitHub commit endpoint: `21fdfb44bfc9da20bb94777092dcb78ee93b0e7e`, message `fix(sqlite): declare restore journal write error`.
+- The latest commit fixes the short variable declaration in `writeRestoreJournalLocked` and adds a lease read/write/closed-state lifecycle test.
+- All four workflows for this exact SHA completed successfully:
+  - Root CI [43377131882](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131882): Ubuntu + Windows, 2/2. Job logs show `internal/infrastructure/sqlite` passed on both platforms; Ubuntu also passed `go test -race ./...`.
+  - SQLite driver evaluation [43377131804](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131804): modernc/ncruces × Ubuntu/Windows, 4/4. Logs show production migration, PERSIST lifecycle, abrupt-process-death recovery, missing-control-artifact recreation and existing-only-open probes passed.
+  - Wails platform proof [43377131897](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131897): Ubuntu + Windows, 2/2. Logs include CLI smoke checks; Ubuntu also passed the WebView-to-Go bridge and database reopen checks.
+  - Linux distribution compatibility [43377131790](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131790): 8/8 across Debian 12/13, Ubuntu 22.04/24.04, Fedora 44 GTK3/GTK4, Arch rolling and openSUSE Tumbleweed.
+- These results are attached to the exact current branch SHA, not inferred from older runs.
+
+### StoreController gate re-review
+- Re-fetched the current Wails composition root, AppService, controller and tests from `foundation/bootstrap`.
+- The integration remains complete: one application-lifetime controller is retained by the composition root; AppService uses it; configuration Load/Save use its shared leases; Wails and CLI backup export use `CreateWithStoreController` through archive publication; shutdown drains through controller Close.
+- Counted 16 `TestStoreController*` tests covering exclusive drain, writer preference, cancellation, replacement publication, stale/unavailable Store rejection, panic cleanup, concurrent leases and config Load/Save drain. `TestManagerCreateWithStoreControllerDrainsBeforeClose` covers the backup publication barrier.
+- No StoreController code was duplicated or changed.
+
+### Cross-process JSON ledger serialization — implementation now present
+- Current source contains `restoreJournalLease` and the persistent `.restore-journal.lock` artifact.
+- Linux acquires the lease with `flock` on a no-follow lock file opened relative to a pinned private directory handle.
+- Windows acquires the lease with `LockFileEx` on a handle opened relative to the validated directory handle; reparse points and unexpected lock-file contents are rejected.
+- `TestWriteRestoreJournalSerializesAcrossProcesses` starts a child process that holds the lease, verifies another process and `WriteRestoreJournal` wait, then verifies the write proceeds after release. Additional tests reject symlink/non-empty lock files and use-after-close.
+- Root CI on the current SHA confirms the SQLite package tests passed on Ubuntu and Windows; Ubuntu race detection also passed.
+- This supersedes the 2026-11-12 note that the JSON ledger had no explicit cross-process lock. The executor is not implemented yet: when added, it must hold one `restoreJournalLease` for the entire transaction and use that lease's Read/Write methods. The convenience `WriteRestoreJournal` acquires a lease per call and is not a substitute for a transaction-long lease.
+
+### Remaining blockers and scope
+- The PERSIST evaluation still proves SQLite can recreate a missing rollback-journal sidecar. Existing-only opening of the main DB does not qualify the sidecar; no-follow preflight/open and identity revalidation for both artifacts remain unresolved.
+- Windows namespace-entry power-loss durability is still not established by the available rename/write-through contract. Process-death tests are not power-loss tests.
+- No filesystem transaction executor, startup recovery, GUI/CLI Restore or Restore enablement was added.
+- No production code changed and no local test execution is claimed in this review. Evidence is from GitHub Actions jobs/logs and current branch source.
+- Branch comparison: `foundation/bootstrap` is 867 commits ahead and 0 behind `main`. No main changes, merge or force-push.
+
+### Next gate
+- Continue journal qualification: establish a supported no-follow boundary for both the control DB and PERSIST sidecar, and settle Windows journal namespace durability. Only after those platform gates pass may the transaction executor be started. Restore remains disabled.
