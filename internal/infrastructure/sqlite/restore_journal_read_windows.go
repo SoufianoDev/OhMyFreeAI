@@ -67,8 +67,12 @@ func readRestoreJournalFilePlatform(path string, maxBytes int) ([]byte, error) {
 		var status windows.NTStatus
 		if errors.As(err, &status) {
 			switch uint32(status) {
-			case 0xC000000F, 0xC0000034, 0xC000003A:
+			case 0xC000000F, 0xC0000034, 0xC000003A: // STATUS_NO_SUCH_FILE, STATUS_OBJECT_NAME_NOT_FOUND, STATUS_OBJECT_PATH_NOT_FOUND
 				return nil, fmt.Errorf("open SQLite restore journal ledger: %w (%v)", os.ErrNotExist, err)
+			case 0xC00000BA: // STATUS_FILE_IS_A_DIRECTORY
+				return nil, fmt.Errorf("%w: journal ledger path is a directory", ErrRestoreJournalInvalid)
+			case 0xC000050B, 0x8000002D: // STATUS_REPARSE_POINT_ENCOUNTERED, STATUS_STOPPED_ON_SYMLINK
+				return nil, fmt.Errorf("%w: journal ledger must not be a reparse point", ErrRestoreJournalInvalid)
 			}
 		}
 		return nil, fmt.Errorf("open SQLite restore journal ledger without following reparse points: %w", err)
