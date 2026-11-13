@@ -177,3 +177,34 @@ func waitForRestoreJournalLeaseMarker(t *testing.T, path string, timeout time.Du
 		}
 	}
 }
+
+func TestRestoreJournalLeaseReadsAndWritesWhileHeld(t *testing.T) {
+	root := restoreTestDir(t)
+	lease, err := acquireRestoreJournalLease(context.Background(), root)
+	if err != nil {
+		t.Fatalf("acquire Restore journal lease: %v", err)
+	}
+	defer lease.Close()
+
+	journal := validTestRestoreJournal(root)
+	if err := lease.Write(journal); err != nil {
+		t.Fatalf("write through Restore journal lease: %v", err)
+	}
+	got, err := lease.Read()
+	if err != nil {
+		t.Fatalf("read through Restore journal lease: %v", err)
+	}
+	if got.TransactionID != journal.TransactionID || got.Phase != journal.Phase {
+		t.Fatalf("leased journal = %q/%q, want %q/%q", got.TransactionID, got.Phase, journal.TransactionID, journal.Phase)
+	}
+
+	if err := lease.Close(); err != nil {
+		t.Fatalf("close Restore journal lease: %v", err)
+	}
+	if _, err := lease.Read(); !errors.Is(err, errRestoreJournalLeaseClosed) {
+		t.Fatalf("read after lease close error = %v, want closed-lease error", err)
+	}
+	if err := lease.Write(journal); !errors.Is(err, errRestoreJournalLeaseClosed) {
+		t.Fatalf("write after lease close error = %v, want closed-lease error", err)
+	}
+}

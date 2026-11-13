@@ -78,7 +78,7 @@ func writeRestoreJournalLocked(root string, journal RestoreJournal) error {
 	if journal.UpdatedAt.IsZero() {
 		journal.UpdatedAt = time.Now().UTC()
 	}
-	journal, err = canonicalizeRestoreJournal(root, journal)
+	journal, err := canonicalizeRestoreJournal(root, journal)
 	if err != nil {
 		return err
 	}
