@@ -570,3 +570,29 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - Cross-process serialization for the retained JSON ledger is implemented with `restoreJournalLease`, Linux `flock`, Windows `LockFileEx`, and subprocess exclusion tests. Root CI's SQLite package passed on both OSes, and Ubuntu race detection passed. This closes the earlier missing-lock item, but the future executor must hold one lease across the whole transaction.
 - Still blocked: SQLite PERSIST sidecar no-follow qualification and Windows journal namespace power-loss durability. Do not infer power-loss safety from process-death tests.
 - Next: qualify the no-follow boundary for both the control DB and PERSIST sidecar, then settle Windows journal publication durability. Do not start the transaction executor, startup recovery or Restore UI/CLI until both platform gates are complete. Restore remains disabled.
+
+
+## 2026-11-13 14:12Z — PERSIST sidecar symbolic-link capability probe
+
+### Probe implementation
+- Added `TestPersistentSidecarSymlinkProbe` to the isolated `tests/sqlite-driver-eval` module in commit [cf034e4](https://github.com/SoufianoDev/OhMyFreeAI/commit/cf034e4bdbf7191731636f751a4cc54b1711d07f).
+- The probe provisions a PERSIST journal, replaces the sidecar path with a symbolic link to a separate sentinel file, then attempts to re-enable PERSIST and commit a write. It records whether the target changed and whether the sidecar path remains a symlink.
+- This is deliberately a diagnostic capability probe: a green matrix means the probe executed, not that every driver passed the no-follow requirement.
+
+### Exact matrix observations
+- modernc / Ubuntu: `PRAGMA journal_mode=PERSIST` returned “unable to open database file”; the symlink remained and the external target was unchanged.
+- ncruces / Ubuntu: same fail-closed observation; symlink remained and the external target was unchanged.
+- ncruces / Windows: PERSIST activation and the write succeeded; the sidecar path no longer remained a symlink, while the external target was unchanged. This driver removed/replaced the link entry rather than modifying its target.
+- modernc / Windows: PERSIST activation and the write succeeded; the symlink remained and the external target changed. The pinned production driver followed the PERSIST sidecar symlink on Windows.
+
+### Decision
+- Reject SQLite PERSIST as the cross-platform Restore journal protocol with the currently pinned production driver (`modernc.org/sqlite`). The Windows result violates the required no-follow boundary.
+- Do not switch production to ncruces based on this probe. It is only an evaluation candidate, and its Windows behavior differs from Linux; no production driver change is approved.
+- Keep the retained JSON ledger as the current journal implementation while its Windows namespace-durability contract remains unresolved. Do not build the Restore executor on top of an unqualified PERSIST sidecar.
+- The probe does not test a race that swaps the sidecar after preflight, nor does it establish power-loss durability.
+
+### CI evidence
+- Root CI [43440257027](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43440257027): Ubuntu + Windows SUCCESS (2/2). Logs show the SQLite production package passed on both systems; Ubuntu race detection, build, Python tests, frontend syntax and architecture checks also passed.
+- SQLite driver evaluation [43440257066](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43440257066): modernc/ncruces × Ubuntu/Windows SUCCESS (4/4). The logs contain the four probe outcomes above.
+- Wails and Linux distribution workflows were not triggered by this test-only change.
+- No production Restore code changed. Restore remains disabled.
