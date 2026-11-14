@@ -141,6 +141,35 @@ func TestRestoreTransactionExecutorQuarantinesCandidateWhenReopenFails(t *testin
 	}
 }
 
+func TestRestoreTransactionExecutorRejectsRollbackSidecarCollisionBeforeJournal(t *testing.T) {
+	executor, controller, root, archivePath, previous, _ := newRestoreExecutorFixture(t)
+	executor.operations.newID = func() (string, error) { return "sidecar-collision", nil }
+	rollbackPath := filepath.Join(root, ".restore-rollback-sidecar-collision.sqlite")
+	sidecarPath := rollbackPath + "-wal"
+	sentinel := []byte("unexpected rollback sidecar")
+	if err := os.WriteFile(sidecarPath, sentinel, 0o600); err != nil {
+		t.Fatalf("create rollback sidecar collision: %v", err)
+	}
+
+	err := executor.Execute(context.Background(), restoreExecutorRequest(archivePath))
+	if err == nil {
+		t.Fatal("Restore accepted an unexpected rollback sidecar")
+	}
+	if got := loadControllerConfiguration(t, controller); !reflect.DeepEqual(got, previous) {
+		t.Fatalf("active configuration after sidecar collision = %#v, want previous %#v", got, previous)
+	}
+	if _, err := ReadRestoreJournal(root); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("journal should not be created before sidecar qualification; error = %v", err)
+	}
+	got, err := os.ReadFile(sidecarPath)
+	if err != nil {
+		t.Fatalf("read preserved rollback sidecar: %v", err)
+	}
+	if !reflect.DeepEqual(got, sentinel) {
+		t.Fatalf("rollback sidecar evidence changed: %q", got)
+	}
+}
+
 func TestRestoreTransactionExecutorPreservesUnexpectedRollbackCollision(t *testing.T) {
 	executor, controller, root, archivePath, previous, _ := newRestoreExecutorFixture(t)
 	target := filepath.Join(root, "state.db")
