@@ -654,3 +654,19 @@ Implement the isolated Restore transaction executor specified in `docs/architect
 - [ ] If CI passes, continue with restart reconciliation implementation and exhaustive recovery matrix. Keep Restore disabled and do not wire startup, Wails, GUI or CLI.
 
 Code/test commit: [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65497f9c853904badb286db111193320d168bc1). At the time of this update, Ubuntu was in progress at Go setup and Windows was queued; no test result is claimed. No local test execution is claimed.
+
+
+## 2026-11-14 — exact-head move-fault CI verification
+
+- [x] Root CI [43609032459](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43609032459) on code/test commit e65497f completed successfully: Ubuntu 1/1 and Windows 1/1.
+- [x] Ubuntu: Go vet, Go tests, race detector, build, Python compile/tests, frontend syntax and architecture checks all passed. SQLite package test: 3.306s; race package test: 16.402s.
+- [x] Windows: Go vet, Go tests, build, Python compile/tests, frontend syntax and architecture checks all passed. SQLite package test: 30.724s. Linux-only race step skipped as expected.
+- [x] Inspect both job summaries and logs; no failed steps.
+- No Wails, SQLite driver evaluation or Linux distro workflow was triggered by this internal SQLite-only change. The preceding exact code/test head 10b8fa2 had 16/16 successful jobs across Root, SQLite driver, Wails and Linux distribution workflows.
+- Code/test head: e65497f. Latest branch HEAD after planning/docs updates: 5d81500655a2e2bf3f870f6658a0f29c9169117f.
+- Branch comparison: 919 ahead, 0 behind main. No main change, merge or force-push.
+
+### Next
+- [ ] Design and implement an isolated restart-reconciliation executor. Hold one journal lease, validate every artifact with no-follow handles, use only planner-approved no-replace operations, persist intent before mutation and completion after verification, and keep StoreController unavailable until the target database is verified.
+- [ ] Add process-death/restart coverage for each recovery move and journal transition on Linux and Windows.
+- [ ] Keep startup recovery and GUI/CLI Restore unwired until the full safety matrix passes.
