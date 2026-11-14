@@ -177,7 +177,7 @@ func TestRestoreTransactionExecutorRejectsRollbackSidecarCollisionBeforeJournal(
 }
 
 func TestRestoreTransactionExecutorPreservesUnexpectedRollbackCollision(t *testing.T) {
-	executor, controller, root, archivePath, previous, _ := newRestoreExecutorFixture(t)
+	executor, controller, root, archivePath, _, _ := newRestoreExecutorFixture(t)
 	target := filepath.Join(root, "state.db")
 	sentinel := []byte("unexpected rollback evidence")
 	realMove := executor.operations.move
@@ -194,8 +194,8 @@ func TestRestoreTransactionExecutorPreservesUnexpectedRollbackCollision(t *testi
 	if err == nil {
 		t.Fatal("Restore unexpectedly replaced a colliding rollback artifact")
 	}
-	if got := loadControllerConfiguration(t, controller); !reflect.DeepEqual(got, previous) {
-		t.Fatalf("active configuration after collision = %#v, want previous %#v", got, previous)
+	if err := controller.WithShared(context.Background(), func(*Store) error { return nil }); !errors.Is(err, ErrStoreUnavailable) {
+		t.Fatalf("controller after ambiguous rollback collision = %v, want Store unavailable", err)
 	}
 	journal, readErr := ReadRestoreJournal(root)
 	if readErr != nil {
@@ -203,6 +203,18 @@ func TestRestoreTransactionExecutorPreservesUnexpectedRollbackCollision(t *testi
 	}
 	if journal.Phase != RestorePhasePreservingPrevious {
 		t.Fatalf("journal phase = %q, want preserving-previous", journal.Phase)
+	}
+	targetIdentity, readErr := readRestoreContentIdentityPlatform(target)
+	if readErr != nil || !targetIdentity.matches(journal.PreviousSHA256, journal.PreviousSize) {
+		t.Fatalf("previous target after collision = %#v, %v", targetIdentity, readErr)
+	}
+	files, readErr := inspectRestoreRecoveryFiles(root, journal)
+	if readErr != nil {
+		t.Fatalf("inspect rollback collision artifacts: %v", readErr)
+	}
+	plan, planErr := PlanRestoreRecovery(journal, files)
+	if !errors.Is(planErr, ErrRestoreRecoveryAmbiguous) || plan != (RestoreRecoveryPlan{}) {
+		t.Fatalf("rollback collision plan = %#v, %v; want empty ambiguous plan", plan, planErr)
 	}
 	got, readErr := os.ReadFile(journal.RollbackPath)
 	if readErr != nil {
