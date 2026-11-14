@@ -237,57 +237,60 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		UpdatedAt:                time.Now().UTC(),
 	}
 	executor.reachBoundary(restoreBoundaryBeforePrepared)
+	// From the first journal publication attempt onward, reopening SQLite could
+	// change the recorded previous-file identity. Keep the controller closed on
+	// every error so startup recovery can inspect the exact recorded artifacts.
 	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalPrepared); err != nil {
-		return reopenPrevious(fmt.Errorf("persist prepared SQLite Restore journal: %w", err))
+		return nil, fmt.Errorf("persist prepared SQLite Restore journal: %w", err)
 	}
 	journal.Phase = RestorePhaseStaging
 	journal.UpdatedAt = time.Now().UTC()
 	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalStaging); err != nil {
-		return reopenPrevious(fmt.Errorf("persist SQLite Restore staging intent: %w", err))
+		return nil, fmt.Errorf("persist SQLite Restore staging intent: %w", err)
 	}
 
 	candidate, err := request.BuildCandidate(ctx, archivePath, executor.stateDirectory, stagingPath)
 	if err != nil {
-		return reopenPrevious(fmt.Errorf("build staged SQLite Restore candidate: %w", err))
+		return nil, fmt.Errorf("build staged SQLite Restore candidate: %w", err)
 	}
 	executor.reachBoundary(restoreBoundaryCandidateBuilt)
 	if !samePath(candidate.Path, stagingPath) || candidate.Identity.Size == 0 || candidate.Identity.SHA256 == "" {
-		return reopenPrevious(fmt.Errorf("%w: candidate builder returned an unexpected path or incomplete identity", ErrRestoreJournalInvalid))
+		return nil, fmt.Errorf("%w: candidate builder returned an unexpected path or incomplete identity", ErrRestoreJournalInvalid)
 	}
 	journal.CandidateSHA256 = candidate.Identity.SHA256
 	journal.CandidateSize = candidate.Identity.Size
 	journal.UpdatedAt = time.Now().UTC()
 	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalCandidateIdentity); err != nil {
-		return reopenPrevious(fmt.Errorf("persist staged SQLite Restore candidate identity: %w", err))
+		return nil, fmt.Errorf("persist staged SQLite Restore candidate identity: %w", err)
 	}
 	if candidate.Identity.matches(previousIdentity.SHA256, previousIdentity.Size) {
-		return reopenPrevious(fmt.Errorf("%w: candidate and previous database identities are indistinguishable", ErrRestoreJournalInvalid))
+		return nil, fmt.Errorf("%w: candidate and previous database identities are indistinguishable", ErrRestoreJournalInvalid)
 	}
 	archiveAfterBuild, err := readRestoreArchiveIdentity(archivePath)
 	if err != nil {
-		return reopenPrevious(err)
+		return nil, err
 	}
 	if !archiveAfterBuild.matches(archiveIdentity.SHA256, archiveIdentity.Size) {
-		return reopenPrevious(fmt.Errorf("%w: archive changed while its candidate was being built", ErrRestoreSourceInvalid))
+		return nil, fmt.Errorf("%w: archive changed while its candidate was being built", ErrRestoreSourceInvalid)
 	}
 
 	if err := ctx.Err(); err != nil {
-		return reopenPrevious(err)
+		return nil, err
 	}
 
 	journal.Phase = RestorePhasePreservingPrevious
 	journal.UpdatedAt = time.Now().UTC()
 	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalPreservingPrevious); err != nil {
-		return reopenPrevious(fmt.Errorf("persist previous-database preservation intent: %w", err))
+		return nil, fmt.Errorf("persist previous-database preservation intent: %w", err)
 	}
 	if err := ensureNoSQLiteSidecars(target); err != nil {
-		return executor.reopenPreviousIfVerified(target, previousIdentity, err)
+		return nil, err
 	}
 	if err := ensureNoSQLiteSidecars(rollbackPath); err != nil {
-		return executor.reopenPreviousIfVerified(target, previousIdentity, err)
+		return nil, err
 	}
 	if err := executor.moveArtifact(target, rollbackPath, previousIdentity, restoreBoundaryMovePreviousToRollback); err != nil {
-		return executor.reopenPreviousIfVerified(target, previousIdentity, fmt.Errorf("preserve previous SQLite database: %w", err))
+		return nil, fmt.Errorf("preserve previous SQLite database: %w", err)
 	}
 	journal.Phase = RestorePhasePreviousPreserved
 	journal.UpdatedAt = time.Now().UTC()
@@ -355,24 +358,6 @@ func (executor *RestoreTransactionExecutor) reopenPrevious(target string, cause 
 		return nil, errors.Join(cause, fmt.Errorf("reopen previous SQLite database: %w", err))
 	}
 	return store, cause
-}
-
-func (executor *RestoreTransactionExecutor) reopenPreviousIfVerified(
-	target string,
-	expected RestoreContentIdentity,
-	cause error,
-) (*Store, error) {
-	if err := ensureNoSQLiteSidecars(target); err != nil {
-		return nil, errors.Join(cause, err)
-	}
-	actual, err := readRestoreContentIdentityPlatform(target)
-	if err != nil || !actual.matches(expected.SHA256, expected.Size) {
-		if err == nil {
-			err = fmt.Errorf("%w: previous database identity changed", ErrRestoreRecoveryAmbiguous)
-		}
-		return nil, errors.Join(cause, err)
-	}
-	return executor.reopenPrevious(target, cause)
 }
 
 func (executor *RestoreTransactionExecutor) rollback(
