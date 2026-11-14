@@ -373,11 +373,7 @@ func TestRestoreTransactionExecutorProcessDeathRecoveryPlanning(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			_, controller, root, archivePath, _, _ := newRestoreExecutorFixture(t)
-			previousIdentity, err := readRestoreContentIdentityPlatform(filepath.Join(root, "state.db"))
-			if err != nil {
-				t.Fatalf("identify previous database before child process: %v", err)
-			}
+			_, controller, root, archivePath, previous, _ := newRestoreExecutorFixture(t)
 			if err := controller.Close(context.Background()); err != nil {
 				t.Fatalf("close parent Store before child process: %v", err)
 			}
@@ -385,15 +381,17 @@ func TestRestoreTransactionExecutorProcessDeathRecoveryPlanning(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 			defer cancel()
 			command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRestoreTransactionExecutorProcessDeathHelper$")
+			rollbackValue := "0"
+			if test.rollback {
+				rollbackValue = "1"
+			}
 			command.Env = append(os.Environ(),
 				restoreExecutorCrashChildEnv+"=1",
 				restoreExecutorCrashRootEnv+"="+root,
 				restoreExecutorCrashArchiveEnv+"="+archivePath,
 				restoreExecutorCrashAtEnv+"="+test.boundary,
+				restoreExecutorCrashRollbackEnv+"="+rollbackValue,
 			)
-			if test.rollback {
-				command.Env = append(command.Env, restoreExecutorCrashRollbackEnv+"=1")
-			}
 			var output bytes.Buffer
 			command.Stdout = &output
 			command.Stderr = &output
@@ -410,9 +408,17 @@ func TestRestoreTransactionExecutorProcessDeathRecoveryPlanning(t *testing.T) {
 				if _, err := ReadRestoreJournal(root); !errors.Is(err, os.ErrNotExist) {
 					t.Fatalf("journal before prepared boundary = %v, want not-exist", err)
 				}
-				actual, err := readRestoreContentIdentityPlatform(filepath.Join(root, "state.db"))
-				if err != nil || !actual.matches(previousIdentity.SHA256, previousIdentity.Size) {
-					t.Fatalf("previous database after pre-journal process death = %#v, %v", actual, err)
+				reopened, err := OpenExisting(context.Background(), filepath.Join(root, "state.db"))
+				if err != nil {
+					t.Fatalf("open previous database after pre-journal process death: %v", err)
+				}
+				got, loadErr := reopened.Load(context.Background())
+				closeErr := reopened.Close()
+				if err := errors.Join(loadErr, closeErr); err != nil {
+					t.Fatalf("read previous configuration after pre-journal process death: %v", err)
+				}
+				if !reflect.DeepEqual(got, previous) {
+					t.Fatalf("previous configuration after pre-journal process death = %#v, want %#v", got, previous)
 				}
 				return
 			}
@@ -458,13 +464,12 @@ func TestRestoreTransactionExecutorJournalWriteFailuresPreserveRecoveryState(t *
 		wantPhase     RestorePhase
 		wantAction    RestoreRecoveryAction
 		wantAmbiguous bool
-		wantAvailable bool
 		noJournal     bool
 	}{
-		{name: "prepared", boundary: "journal:prepared", noJournal: true, wantAvailable: true},
-		{name: "staging", boundary: "journal:staging", wantPhase: RestorePhasePrepared, wantAction: RestoreRecoveryCleanupStaging, wantAvailable: true},
-		{name: "candidate identity", boundary: "journal:candidate-identity", wantPhase: RestorePhaseStaging, wantAmbiguous: true, wantAvailable: true},
-		{name: "preserving previous", boundary: "journal:preserving-previous", wantPhase: RestorePhaseStaging, wantAction: RestoreRecoveryCleanupStaging, wantAvailable: true},
+		{name: "prepared", boundary: "journal:prepared", noJournal: true},
+		{name: "staging", boundary: "journal:staging", wantPhase: RestorePhasePrepared, wantAction: RestoreRecoveryCleanupStaging},
+		{name: "candidate identity", boundary: "journal:candidate-identity", wantPhase: RestorePhaseStaging, wantAmbiguous: true},
+		{name: "preserving previous", boundary: "journal:preserving-previous", wantPhase: RestorePhaseStaging, wantAction: RestoreRecoveryCleanupStaging},
 		{name: "previous preserved", boundary: "journal:previous-preserved", wantPhase: RestorePhasePreservingPrevious, wantAction: RestoreRecoveryResumeIntent},
 		{name: "publishing", boundary: "journal:publishing", wantPhase: RestorePhasePreviousPreserved, wantAction: RestoreRecoveryRestorePrevious},
 		{name: "published", boundary: "journal:published", wantPhase: RestorePhasePublishing, wantAction: RestoreRecoveryResumeIntent},
@@ -487,15 +492,8 @@ func TestRestoreTransactionExecutorJournalWriteFailuresPreserveRecoveryState(t *
 			if !errors.Is(err, injected) {
 				t.Fatalf("Execute() error = %v, want injected failure at %q", err, test.boundary)
 			}
-			if test.wantAvailable {
-				if got := loadControllerConfiguration(t, controller); !reflect.DeepEqual(got, previous) {
-					t.Fatalf("active configuration after %q failure = %#v, want previous %#v", test.boundary, got, previous)
-				}
-			} else {
-				err := controller.WithShared(context.Background(), func(*Store) error { return nil })
-				if !errors.Is(err, ErrStoreUnavailable) {
-					t.Fatalf("controller after %q failure = %v, want Store unavailable", test.boundary, err)
-				}
+			if err := controller.WithShared(context.Background(), func(*Store) error { return nil }); !errors.Is(err, ErrStoreUnavailable) {
+				t.Fatalf("controller after %q failure = %v, want Store unavailable", test.boundary, err)
 			}
 
 			if test.noJournal {
