@@ -493,3 +493,19 @@ Exact-head CI for test head 10b8fa2c4f44ffd2184adb430317985868c3657a:
 - Linux distribution compatibility [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872): 8/8 passed, including Debian 12 legacy GTK3/WebKit41. Across Root CI, SQLite driver evaluation, Wails platform proof and Linux distribution compatibility, all 16 jobs passed.
 
 Remaining qualification work is move-error injection for each no-replace operation, especially an error after namespace rename but before the directory durability barrier is confirmed, plus the staging-to-quarantine crash point. Restore remains disabled and the executor remains unwired to startup, Wails, GUI and CLI.
+
+
+## 2026-11-14 — move-error and staging-quarantine fault qualification
+
+The isolated transaction executor and rollback path are now present, but they remain unwired to startup, Wails, GUI and CLI. This update closes two test-coverage gaps and tightens uncertain-move handling.
+
+- The common verified no-replace move has a private post-namespace-mutation test seam. Production passes nil.
+- Linux fault injection occurs after renameat2(RENAME_NOREPLACE) and before parent-directory fsync, so the test observes a changed namespace with an unconfirmed directory-sync boundary.
+- Windows fault injection occurs after the handle-bound NTFS write-through rename returns and before common post-move identity verification. The Windows test does not claim a separate directory-fsync stage; the rename call is the documented write-through metadata barrier under the fixed-local-NTFS policy.
+- The executor now fails closed on candidate-publication move errors. It does not launch a second filesystem mutation using assumptions about whether the first move changed the namespace. The StoreController remains unavailable for later recovery inspection.
+- Tests inject both pre-move errors and post-namespace errors for all five move roles: previous-to-rollback, staging-to-target, target-to-quarantine, staging-to-quarantine, and rollback-to-target. They assert journal phase, recovery planner action, controller availability and actual file identities.
+- The process-death matrix now includes staging-to-quarantine: the child cancels after publishing intent, enters rollback, and exits immediately after the staging artifact is quarantined. The parent verifies the retained intent and recovery plan.
+
+Exact test commit: [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65497f9c853904badb286db111193320d168bc1). Root CI [43609032459](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43609032459) was queued/in progress at the time of this note; do not treat this change as verified until Ubuntu and Windows jobs complete. These are process-death/failure-injection tests, not power-loss tests.
+
+Restore remains disabled. The executor is still isolated, and startup recovery/GUI/CLI wiring are not approved by this test slice. Next: close exact-head Root CI, fix any failures, then implement restart reconciliation only after the move-error tests pass on both supported platforms.
