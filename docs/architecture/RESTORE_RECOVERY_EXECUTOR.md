@@ -509,3 +509,28 @@ The isolated transaction executor and rollback path are now present, but they re
 Exact test commit: [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65497f9c853904badb286db111193320d168bc1). Root CI [43609032459](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43609032459) was queued/in progress at the time of this note; do not treat this change as verified until Ubuntu and Windows jobs complete. These are process-death/failure-injection tests, not power-loss tests.
 
 Restore remains disabled. The executor is still isolated, and startup recovery/GUI/CLI wiring are not approved by this test slice. Next: close exact-head Root CI, fix any failures, then implement restart reconciliation only after the move-error tests pass on both supported platforms.
+
+
+## 2026-11-14 — exact-head move-fault CI verification
+
+The move-error and staging-to-quarantine process-death test slice passed Root CI on both supported operating systems.
+
+- Root CI run [43609032459](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43609032459), code/test commit [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65497f9c853904badb286db111193320d168bc1): Ubuntu and Windows both succeeded (2/2).
+- Ubuntu completed Go vet, Go tests, race detector, build, Python compile/tests, frontend syntax and architecture checks. The SQLite package passed in 3.306s and under race detection in 16.402s.
+- Windows completed Go vet, Go tests, build, Python compile/tests, frontend syntax and architecture checks. The SQLite package passed in 30.724s; the Linux-only race step was skipped as expected.
+- Both jobs had no failed steps. The test command is non-verbose, so the evidence is the successful package result, not a separately printed line for every new test.
+- These internal SQLite changes did not trigger Wails, SQLite-driver evaluation or Linux distro workflows. The preceding exact code/test head 10b8fa2 had already passed the complete 16/16 matrix.
+
+### Required next implementation step — isolated restart reconciliation
+
+The in-process transaction executor is not a startup recovery coordinator. Implement a separate, isolated recovery executor before any application wiring. It must:
+
+1. Acquire and retain one restore-journal lease for the complete reconciliation.
+2. Read the journal and inspect target, staging, rollback and quarantine through no-follow handles; classify each by the recorded size/SHA-256 identity.
+3. Refuse to mutate when any path is missing unexpectedly, mismatched, unreadable, colliding or otherwise ambiguous. Preserve all evidence.
+4. Apply only operations explicitly justified by the recovery planner. Every namespace mutation must use the verified no-replace primitive; an uncertain move error leaves the process storeless and stops further mutation.
+5. Persist an intent before each recovery move and persist the corresponding completion only after post-move identity verification.
+6. Verify the single resulting target identity before any SQLite open. Reopen/validate only after that identity gate, and keep StoreController unavailable until the recovered database is validated.
+7. Add subprocess crash/restart tests around every recovery journal write, move, post-move verification and database-open boundary on Linux and Windows.
+
+The executor remains isolated. Do not wire startup recovery, Wails, GUI or CLI Restore until the new recovery executor and complete platform matrix pass. Process-death tests are not power-loss tests; retain the fixed-local-NTFS and storage-controller flush limitations.
