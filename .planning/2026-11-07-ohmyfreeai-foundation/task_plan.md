@@ -638,3 +638,19 @@ This section supersedes the stale 2026-11-12 status snapshot and the earlier 202
 
 ### Next engineering unit
 Implement the isolated Restore transaction executor specified in `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md`: hold the journal lease and StoreController exclusive lease for the full transaction; verify archive/candidate/previous identities through no-follow handles; persist intent before every namespace mutation; use only no-replace moves and verify each moved identity before SQLite opens; reopen and validate the published Store; and perform journaled quarantine/rollback on failure. Add failure-injection and abrupt-process-death/restart tests on Linux and Windows. Do not wire startup recovery or GUI/CLI Restore. Restore remains disabled.
+
+
+## 2026-11-14 — move-error and staging-quarantine qualification
+
+- [x] Recheck requested historical Root CI 42419106009 on f5396ee: Ubuntu and Windows jobs completed successfully; all steps passed.
+- [x] Revalidate StoreController/Wails/AppService/config/backup integration and its 16 controller tests plus archive-publication drain test. Integration stage remains complete.
+- [x] Add a private platform move-fault seam, nil in production.
+- [x] Linux seam injects after renameat2(RENAME_NOREPLACE) and before parent-directory fsync.
+- [x] Windows seam injects after the handle-bound NTFS write-through rename returns and before post-move identity verification; it does not claim a pre-barrier failure on Windows.
+- [x] Make candidate-publication move errors fail closed rather than attempting rollback from an uncertain namespace state.
+- [x] Add before/after-namespace error tests for all five no-replace move roles and verify recovery planning plus preserved content identities.
+- [x] Add the staging-to-quarantine abrupt-process-death point.
+- [ ] Verify Root CI run [43609032459](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43609032459) on both Ubuntu and Windows; inspect all failed-step logs if any.
+- [ ] If CI passes, continue with restart reconciliation implementation and exhaustive recovery matrix. Keep Restore disabled and do not wire startup, Wails, GUI or CLI.
+
+Code/test commit: [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65497f9c853904badb286db111193320d168bc1). At the time of this update, Ubuntu was in progress at Go setup and Windows was queued; no test result is claimed. No local test execution is claimed.
