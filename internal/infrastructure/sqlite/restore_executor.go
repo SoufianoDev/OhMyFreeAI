@@ -8,17 +8,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
 )
 
+type RestoreCandidateBuilder func(context.Context, string, string, string) (RestoreCandidate, error)
+
 type RestoreTransactionRequest struct {
-	ArchivePath           string
-	DatabaseSnapshotPath  string
-	MigrationFS           fs.FS
-	MigrationDir          string
+	ArchivePath    string
+	BuildCandidate RestoreCandidateBuilder
 }
 
 type RestoreTransactionExecutor struct {
@@ -28,7 +27,6 @@ type RestoreTransactionExecutor struct {
 }
 
 type restoreTransactionOperations struct {
-	buildCandidate func(context.Context, string, string, string, fs.FS, string) (RestoreCandidate, error)
 	openStore      func(context.Context, string) (*Store, error)
 	move           func(string, string, RestoreContentIdentity) error
 	newID          func() (string, error)
@@ -46,7 +44,6 @@ func NewRestoreTransactionExecutor(controller *StoreController, stateDirectory s
 		controller:     controller,
 		stateDirectory: root,
 		operations: restoreTransactionOperations{
-			buildCandidate: BuildRestoreCandidateAtPath,
 			openStore:      openVerifiedRestoreStore,
 			move:           moveRestoreFileNoReplaceVerified,
 			newID:          newRestoreTransactionID,
@@ -64,10 +61,7 @@ func (executor *RestoreTransactionExecutor) Execute(ctx context.Context, request
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if request.MigrationFS == nil {
-		return ErrInvalidMigration
-	}
-	if request.ArchivePath == "" || request.DatabaseSnapshotPath == "" {
+	if request.ArchivePath == "" || request.BuildCandidate == nil {
 		return ErrRestoreSourceInvalid
 	}
 
@@ -76,31 +70,9 @@ func (executor *RestoreTransactionExecutor) Execute(ctx context.Context, request
 		return fmt.Errorf("resolve SQLite restore archive: %w", err)
 	}
 	archivePath = filepath.Clean(archivePath)
-	snapshotPath, err := filepath.Abs(request.DatabaseSnapshotPath)
-	if err != nil {
-		return fmt.Errorf("resolve extracted SQLite restore snapshot: %w", err)
-	}
-	snapshotPath = filepath.Clean(snapshotPath)
 	archiveIdentity, err := readRestoreArchiveIdentity(archivePath)
 	if err != nil {
 		return err
-	}
-	snapshotIdentity, err := readRestoreArchiveIdentity(snapshotPath)
-	if err != nil {
-		return fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
-	}
-	if err := ensureNoSQLiteSidecars(snapshotPath); err != nil {
-		return fmt.Errorf("%w: extracted database snapshot has SQLite sidecars: %v", ErrRestoreSourceInvalid, err)
-	}
-	if err := verifyBackupDatabase(ctx, snapshotPath); err != nil {
-		return fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
-	}
-	verifiedSnapshotIdentity, err := readRestoreArchiveIdentity(snapshotPath)
-	if err != nil {
-		return err
-	}
-	if !verifiedSnapshotIdentity.matches(snapshotIdentity.SHA256, snapshotIdentity.Size) {
-		return fmt.Errorf("%w: extracted database snapshot changed during verification", ErrRestoreSourceInvalid)
 	}
 
 	lease, err := acquireRestoreJournalLease(ctx, executor.stateDirectory)
@@ -125,7 +97,7 @@ func (executor *RestoreTransactionExecutor) Execute(ctx context.Context, request
 			operationErr = errors.Join(operationErr, lease.Close())
 		}()
 		operationErr = executor.controller.WithExclusive(ctx, func(store *Store) (*Store, error) {
-			return executor.executeLocked(ctx, lease, store, archivePath, archiveIdentity, snapshotPath, snapshotIdentity, request)
+			return executor.executeLocked(ctx, lease, store, archivePath, archiveIdentity, request)
 		})
 	}()
 	return operationErr
@@ -137,8 +109,6 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	store *Store,
 	archivePath string,
 	archiveIdentity RestoreContentIdentity,
-	snapshotPath string,
-	snapshotIdentity RestoreContentIdentity,
 	request RestoreTransactionRequest,
 ) (*Store, error) {
 	if store == nil || store.db == nil {
@@ -152,7 +122,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if !samePath(filepath.Dir(target), executor.stateDirectory) {
 		return store, fmt.Errorf("%w: active database must be a direct child of the private state directory", ErrRestoreJournalInvalid)
 	}
-	if samePath(target, archivePath) || samePath(target, snapshotPath) {
+	if samePath(target, archivePath) {
 		return store, ErrInvalidDatabasePath
 	}
 	if err := checkpointStore(ctx, store); err != nil {
@@ -217,14 +187,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		return reopenPrevious(fmt.Errorf("persist SQLite Restore staging intent: %w", err))
 	}
 
-	candidate, err := executor.operations.buildCandidate(
-		ctx,
-		snapshotPath,
-		executor.stateDirectory,
-		stagingPath,
-		request.MigrationFS,
-		request.MigrationDir,
-	)
+	candidate, err := request.BuildCandidate(ctx, archivePath, executor.stateDirectory, stagingPath)
 	if err != nil {
 		return reopenPrevious(fmt.Errorf("build staged SQLite Restore candidate: %w", err))
 	}
@@ -247,13 +210,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if !archiveAfterBuild.matches(archiveIdentity.SHA256, archiveIdentity.Size) {
 		return reopenPrevious(fmt.Errorf("%w: archive changed while its candidate was being built", ErrRestoreSourceInvalid))
 	}
-	snapshotAfterBuild, err := readRestoreArchiveIdentity(snapshotPath)
-	if err != nil {
-		return reopenPrevious(err)
-	}
-	if !snapshotAfterBuild.matches(snapshotIdentity.SHA256, snapshotIdentity.Size) {
-		return reopenPrevious(fmt.Errorf("%w: extracted database snapshot changed while its candidate was being built", ErrRestoreSourceInvalid))
-	}
+
 	if err := ctx.Err(); err != nil {
 		return reopenPrevious(err)
 	}
