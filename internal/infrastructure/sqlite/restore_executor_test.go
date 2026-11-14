@@ -395,7 +395,7 @@ func TestRestoreTransactionExecutorProcessDeathRecoveryPlanning(t *testing.T) {
 			var output bytes.Buffer
 			command.Stdout = &output
 			command.Stderr = &output
-			err = command.Run()
+			err := command.Run()
 			if ctx.Err() != nil {
 				t.Fatalf("crash child timed out at %q: %v\n%s", test.boundary, ctx.Err(), output.String())
 			}
