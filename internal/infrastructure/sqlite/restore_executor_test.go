@@ -290,3 +290,247 @@ func TestRestoreTransactionExecutorHoldsJournalAndStoreLeasesDuringBuild(t *test
 	}
 	childExited = true
 }
+
+
+const (
+	restoreExecutorCrashChildEnv   = "OHMYFREEAI_RESTORE_EXECUTOR_CRASH_CHILD"
+	restoreExecutorCrashRootEnv    = "OHMYFREEAI_RESTORE_EXECUTOR_CRASH_ROOT"
+	restoreExecutorCrashArchiveEnv = "OHMYFREEAI_RESTORE_EXECUTOR_CRASH_ARCHIVE"
+	restoreExecutorCrashAtEnv      = "OHMYFREEAI_RESTORE_EXECUTOR_CRASH_AT"
+	restoreExecutorCrashRollbackEnv = "OHMYFREEAI_RESTORE_EXECUTOR_CRASH_ROLLBACK"
+)
+
+func TestRestoreTransactionExecutorProcessDeathHelper(t *testing.T) {
+	if os.Getenv(restoreExecutorCrashChildEnv) != "1" {
+		return
+	}
+	root := os.Getenv(restoreExecutorCrashRootEnv)
+	archivePath := os.Getenv(restoreExecutorCrashArchiveEnv)
+	crashAt := os.Getenv(restoreExecutorCrashAtEnv)
+	if root == "" || archivePath == "" || crashAt == "" {
+		t.Fatal("Restore executor crash helper environment is incomplete")
+	}
+
+	store, err := OpenExisting(context.Background(), filepath.Join(root, "state.db"))
+	if err != nil {
+		t.Fatalf("open previous database in crash child: %v", err)
+	}
+	controller := NewStoreController(store)
+	executor, err := NewRestoreTransactionExecutor(controller, root)
+	if err != nil {
+		t.Fatalf("create Restore executor in crash child: %v", err)
+	}
+	if os.Getenv(restoreExecutorCrashRollbackEnv) == "1" {
+		realOpen := executor.operations.openStore
+		var calls atomic.Int32
+		executor.operations.openStore = func(ctx context.Context, path string) (*Store, error) {
+			if calls.Add(1) == 1 {
+				return nil, errors.New("injected candidate reopen failure for crash matrix")
+			}
+			return realOpen(ctx, path)
+		}
+	}
+	executor.operations.afterBoundary = func(boundary string) {
+		if boundary == crashAt {
+			os.Exit(86)
+		}
+	}
+	if err := executor.Execute(context.Background(), restoreExecutorRequest(archivePath)); err != nil {
+		t.Fatalf("Restore executor exited before crash boundary %q: %v", crashAt, err)
+	}
+	t.Fatalf("Restore executor completed without reaching crash boundary %q", crashAt)
+}
+
+func TestRestoreTransactionExecutorProcessDeathRecoveryPlanning(t *testing.T) {
+	tests := []struct {
+		name             string
+		boundary         string
+		rollback         bool
+		noJournal        bool
+		wantPhase        RestorePhase
+		wantAction       RestoreRecoveryAction
+		wantAmbiguous    bool
+	}{
+		{name: "before prepared journal", boundary: "before:prepared", noJournal: true},
+		{name: "prepared journal", boundary: "journal:prepared", wantPhase: RestorePhasePrepared, wantAction: RestoreRecoveryCleanupStaging},
+		{name: "staging intent", boundary: "journal:staging", wantPhase: RestorePhaseStaging, wantAction: RestoreRecoveryCleanupStaging},
+		{name: "candidate built before identity journal", boundary: "candidate:built", wantPhase: RestorePhaseStaging, wantAmbiguous: true},
+		{name: "candidate identity journal", boundary: "journal:candidate-identity", wantPhase: RestorePhaseStaging, wantAction: RestoreRecoveryCleanupStaging},
+		{name: "previous preservation intent", boundary: "journal:preserving-previous", wantPhase: RestorePhasePreservingPrevious, wantAction: RestoreRecoveryResumeIntent},
+		{name: "previous moved before completion journal", boundary: "move:previous-to-rollback", wantPhase: RestorePhasePreservingPrevious, wantAction: RestoreRecoveryResumeIntent},
+		{name: "previous preserved completion", boundary: "journal:previous-preserved", wantPhase: RestorePhasePreviousPreserved, wantAction: RestoreRecoveryRestorePrevious},
+		{name: "candidate publication intent", boundary: "journal:publishing", wantPhase: RestorePhasePublishing, wantAction: RestoreRecoveryResumeIntent},
+		{name: "candidate moved before completion journal", boundary: "move:staging-to-target", wantPhase: RestorePhasePublishing, wantAction: RestoreRecoveryResumeIntent},
+		{name: "candidate published completion", boundary: "journal:published", wantPhase: RestorePhasePublished, wantAction: RestoreRecoveryRestorePrevious},
+		{name: "candidate reopen intent", boundary: "journal:reopening", wantPhase: RestorePhaseReopening, wantAction: RestoreRecoveryRestorePrevious},
+		{name: "candidate opened before commit journal", boundary: "store:candidate-opened", wantPhase: RestorePhaseReopening, wantAction: RestoreRecoveryRestorePrevious},
+		{name: "committed journal", boundary: "journal:committed", wantPhase: RestorePhaseCommitted, wantAction: RestoreRecoveryVerifyCommitted},
+		{name: "rollback intent", boundary: "journal:restoring-previous", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
+		{name: "candidate quarantined before rollback move", boundary: "move:candidate-to-quarantine", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
+		{name: "previous moved back before completion", boundary: "move:rollback-to-target", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
+		{name: "previous reopened before rollback journal", boundary: "store:previous-opened", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
+		{name: "rolled back journal", boundary: "journal:rolled-back", rollback: true, wantPhase: RestorePhaseRolledBack, wantAction: RestoreRecoveryVerifyRolledBack},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, controller, root, archivePath, _, _ := newRestoreExecutorFixture(t)
+			previousIdentity, err := readRestoreContentIdentityPlatform(filepath.Join(root, "state.db"))
+			if err != nil {
+				t.Fatalf("identify previous database before child process: %v", err)
+			}
+			if err := controller.Close(context.Background()); err != nil {
+				t.Fatalf("close parent Store before child process: %v", err)
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+			defer cancel()
+			command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRestoreTransactionExecutorProcessDeathHelper$")
+			command.Env = append(os.Environ(),
+				restoreExecutorCrashChildEnv+"=1",
+				restoreExecutorCrashRootEnv+"="+root,
+				restoreExecutorCrashArchiveEnv+"="+archivePath,
+				restoreExecutorCrashAtEnv+"="+test.boundary,
+			)
+			if test.rollback {
+				command.Env = append(command.Env, restoreExecutorCrashRollbackEnv+"=1")
+			}
+			var output bytes.Buffer
+			command.Stdout = &output
+			command.Stderr = &output
+			err = command.Run()
+			if ctx.Err() != nil {
+				t.Fatalf("crash child timed out at %q: %v\n%s", test.boundary, ctx.Err(), output.String())
+			}
+			exitError, ok := err.(*exec.ExitError)
+			if !ok || exitError.ExitCode() != 86 {
+				t.Fatalf("crash child exit = %v, want deliberate exit 86 at %q\n%s", err, test.boundary, output.String())
+			}
+
+			if test.noJournal {
+				if _, err := ReadRestoreJournal(root); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("journal before prepared boundary = %v, want not-exist", err)
+				}
+				actual, err := readRestoreContentIdentityPlatform(filepath.Join(root, "state.db"))
+				if err != nil || !actual.matches(previousIdentity.SHA256, previousIdentity.Size) {
+					t.Fatalf("previous database after pre-journal process death = %#v, %v", actual, err)
+				}
+				return
+			}
+
+			journal, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read journal after process death at %q: %v", test.boundary, err)
+			}
+			if journal.Phase != test.wantPhase {
+				t.Fatalf("journal phase after %q = %q, want %q", test.boundary, journal.Phase, test.wantPhase)
+			}
+			files, err := inspectRestoreRecoveryFiles(root, journal)
+			if err != nil {
+				t.Fatalf("inspect artifacts after process death at %q: %v", test.boundary, err)
+			}
+			plan, planErr := PlanRestoreRecovery(journal, files)
+			if test.wantAmbiguous {
+				if !errors.Is(planErr, ErrRestoreRecoveryAmbiguous) {
+					t.Fatalf("recovery plan after %q error = %v, want ambiguous", test.boundary, planErr)
+				}
+				if plan != (RestoreRecoveryPlan{}) {
+					t.Fatalf("ambiguous recovery plan after %q = %#v, want empty", test.boundary, plan)
+				}
+				if _, err := os.Lstat(journal.StagingPath); err != nil {
+					t.Fatalf("unidentified candidate was not preserved after %q: %v", test.boundary, err)
+				}
+				return
+			}
+			if planErr != nil {
+				t.Fatalf("recovery plan after %q: %v", test.boundary, planErr)
+			}
+			if plan.Action != test.wantAction {
+				t.Fatalf("recovery action after %q = %q, want %q", test.boundary, plan.Action, test.wantAction)
+			}
+		})
+	}
+}
+
+func TestRestoreTransactionExecutorJournalWriteFailuresPreserveRecoveryState(t *testing.T) {
+	tests := []struct {
+		name          string
+		boundary      string
+		wantPhase     RestorePhase
+		wantAction    RestoreRecoveryAction
+		wantAmbiguous bool
+		wantAvailable bool
+		noJournal     bool
+	}{
+		{name: "prepared", boundary: "journal:prepared", noJournal: true, wantAvailable: true},
+		{name: "staging", boundary: "journal:staging", wantPhase: RestorePhasePrepared, wantAction: RestoreRecoveryCleanupStaging, wantAvailable: true},
+		{name: "candidate identity", boundary: "journal:candidate-identity", wantPhase: RestorePhaseStaging, wantAmbiguous: true, wantAvailable: true},
+		{name: "preserving previous", boundary: "journal:preserving-previous", wantPhase: RestorePhaseStaging, wantAction: RestoreRecoveryCleanupStaging, wantAvailable: true},
+		{name: "previous preserved", boundary: "journal:previous-preserved", wantPhase: RestorePhasePreservingPrevious, wantAction: RestoreRecoveryResumeIntent},
+		{name: "publishing", boundary: "journal:publishing", wantPhase: RestorePhasePreviousPreserved, wantAction: RestoreRecoveryRestorePrevious},
+		{name: "published", boundary: "journal:published", wantPhase: RestorePhasePublishing, wantAction: RestoreRecoveryResumeIntent},
+		{name: "reopening", boundary: "journal:reopening", wantPhase: RestorePhasePublished, wantAction: RestoreRecoveryRestorePrevious},
+		{name: "committed", boundary: "journal:committed", wantPhase: RestorePhaseReopening, wantAction: RestoreRecoveryRestorePrevious},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			executor, controller, root, archivePath, previous, _ := newRestoreExecutorFixture(t)
+			injected := errors.New("injected journal write failure at " + test.boundary)
+			realWrite := executor.operations.writeJournal
+			executor.operations.writeJournal = func(lease *restoreJournalLease, journal RestoreJournal, boundary string) error {
+				if boundary == test.boundary {
+					return injected
+				}
+				return realWrite(lease, journal, boundary)
+			}
+
+			err := executor.Execute(context.Background(), restoreExecutorRequest(archivePath))
+			if !errors.Is(err, injected) {
+				t.Fatalf("Execute() error = %v, want injected failure at %q", err, test.boundary)
+			}
+			if test.wantAvailable {
+				if got := loadControllerConfiguration(t, controller); !reflect.DeepEqual(got, previous) {
+					t.Fatalf("active configuration after %q failure = %#v, want previous %#v", test.boundary, got, previous)
+				}
+			} else {
+				err := controller.WithShared(context.Background(), func(*Store) error { return nil })
+				if !errors.Is(err, ErrStoreUnavailable) {
+					t.Fatalf("controller after %q failure = %v, want Store unavailable", test.boundary, err)
+				}
+			}
+
+			if test.noJournal {
+				if _, err := ReadRestoreJournal(root); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("journal after %q failure = %v, want not-exist", test.boundary, err)
+				}
+				return
+			}
+			journal, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read journal after %q failure: %v", test.boundary, err)
+			}
+			if journal.Phase != test.wantPhase {
+				t.Fatalf("journal phase after %q failure = %q, want %q", test.boundary, journal.Phase, test.wantPhase)
+			}
+			files, err := inspectRestoreRecoveryFiles(root, journal)
+			if err != nil {
+				t.Fatalf("inspect artifacts after %q failure: %v", test.boundary, err)
+			}
+			plan, planErr := PlanRestoreRecovery(journal, files)
+			if test.wantAmbiguous {
+				if !errors.Is(planErr, ErrRestoreRecoveryAmbiguous) || plan != (RestoreRecoveryPlan{}) {
+					t.Fatalf("recovery plan after %q failure = %#v, %v; want empty ambiguous plan", test.boundary, plan, planErr)
+				}
+				if _, err := os.Lstat(journal.StagingPath); err != nil {
+					t.Fatalf("unidentified candidate was not preserved after %q failure: %v", test.boundary, err)
+				}
+				return
+			}
+			if planErr != nil {
+				t.Fatalf("recovery plan after %q failure: %v", test.boundary, planErr)
+			}
+			if plan.Action != test.wantAction {
+				t.Fatalf("recovery action after %q failure = %q, want %q", test.boundary, plan.Action, test.wantAction)
+			}
+		})
+	}
+}
