@@ -490,6 +490,6 @@ Exact-head CI for test head 10b8fa2c4f44ffd2184adb430317985868c3657a:
 - Root CI [43606878844](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878844): 2/2 Ubuntu/Windows passed; Ubuntu race detector passed.
 - SQLite driver evaluation [43606878840](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878840): 4/4 modernc/ncruces × Ubuntu/Windows.
 - Wails platform proof [43606878902](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878902): 2/2 Ubuntu/Windows.
-- Linux distribution compatibility [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872): 7/8 passed at the last check; Debian 12 legacy GTK3/WebKit41 remained in progress.
+- Linux distribution compatibility [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872): 8/8 passed, including Debian 12 legacy GTK3/WebKit41. Across Root CI, SQLite driver evaluation, Wails platform proof and Linux distribution compatibility, all 16 jobs passed.
 
 Remaining qualification work is move-error injection for each no-replace operation, especially an error after namespace rename but before the directory durability barrier is confirmed, plus the staging-to-quarantine crash point. Restore remains disabled and the executor remains unwired to startup, Wails, GUI and CLI.
