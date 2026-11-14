@@ -1,6 +1,6 @@
 # Restore Recovery Executor — Design Constraints
 
-**Status:** first isolated in-process transaction executor slice implemented; not wired to the application. Failure-injection and process-death/restart qualification remain incomplete.  
+**Status:** isolated in-process transaction executor implemented and not wired to the application. Deterministic journal-write fault injection and a 19-point process-death/restart-planning matrix are present; move-error injection and actual restart reconciliation remain incomplete.  
 **Scope:** Linux and Windows desktop installations, with SQLite state files confined to the canonical application state directory.
 
 ## Why the executor is a separate safety boundary
@@ -469,3 +469,27 @@ The isolated executor now exists in `internal/infrastructure/sqlite/restore_exec
 - No startup recovery coordinator exists; active intent phases are not automatically reconciled before app Store open.
 - The production backup-manager callback is not wired to AppService/CLI; the unit tests use the SQLite candidate builder directly rather than a real `.omfaibackup` container.
 - Restore remains disabled. Do not add startup recovery, GUI/CLI Restore or application wiring until the full Linux/Windows safety matrix passes.
+
+
+## 2026-11-14 — journal-write fault injection and process-death planning matrix
+
+The isolated executor now exposes two nil-by-default test seams in its internal operations: a journal writer callback that receives the named boundary, and an after-boundary callback invoked only after a journal write or verified no-replace move succeeds. The production defaults remain the real journal lease writer and platform move primitive.
+
+The current tests add:
+
+- 19 subprocess termination points spanning the pre-journal boundary, all persisted transaction phases, both primary database moves, candidate open, rollback intent, candidate quarantine, rollback restoration, previous-store reopen, and terminal journal publication.
+- Nine journal-write failure injections. The tests verify whether the controller remains unavailable, inspect the retained artifacts, and require the recovery planner to return the conservative expected action.
+- An ambiguous rollback-destination collision assertion proving the previous target still matches its journal identity, the controller remains storeless, the planner returns an empty ambiguous plan, and the unexpected collision artifact is preserved.
+
+A safety correction was required: after the first prepared-journal publication attempt, the executor must not reopen SQLite on any failure. Reopening the previous database can alter its bytes after its SHA-256/size identity has been persisted, making the retained journal disagree with the file. The executor now leaves StoreController without a Store so no later application write can further mutate that recorded identity. Errors before the first journal publication attempt may still reopen the previous Store because no journal identity has been committed or ambiguously published.
+
+These subprocess tests terminate the child and verify the next-process journal/artifact classification. They do **not** execute an automatic recovery coordinator, prove recovery completion, simulate power loss during a file or directory flush, or certify hardware-level durability.
+
+Exact-head CI for test head 10b8fa2c4f44ffd2184adb430317985868c3657a:
+
+- Root CI [43606878844](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878844): 2/2 Ubuntu/Windows passed; Ubuntu race detector passed.
+- SQLite driver evaluation [43606878840](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878840): 4/4 modernc/ncruces × Ubuntu/Windows.
+- Wails platform proof [43606878902](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878902): 2/2 Ubuntu/Windows.
+- Linux distribution compatibility [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872): 7/8 passed at the last check; Debian 12 legacy GTK3/WebKit41 remained in progress.
+
+Remaining qualification work is move-error injection for each no-replace operation, especially an error after namespace rename but before the directory durability barrier is confirmed, plus the staging-to-quarantine crash point. Restore remains disabled and the executor remains unwired to startup, Wails, GUI and CLI.
