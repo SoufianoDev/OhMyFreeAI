@@ -142,6 +142,27 @@ func TestRestoreJournalLeaseRejectsSymlinkLockFile(t *testing.T) {
 	}
 }
 
+func TestRestoreJournalLeaseRejectsHardLinkLockFile(t *testing.T) {
+	root := restoreTestDir(t)
+	target := filepath.Join(root, "lock-target")
+	if err := os.WriteFile(target, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := filepath.Join(root, restoreJournalLockFileName)
+	if err := os.Link(target, lockPath); err != nil {
+		t.Fatalf("create hard-linked Restore journal lock: %v", err)
+	}
+
+	lease, err := acquireRestoreJournalLease(context.Background(), root)
+	if lease != nil {
+		_ = lease.Close()
+		t.Fatal("Restore journal lease accepted a hard-linked lock file")
+	}
+	if err == nil {
+		t.Fatal("Restore journal lease accepted a hard-linked lock file")
+	}
+}
+
 func TestRestoreJournalLeaseRejectsNonEmptyLockFile(t *testing.T) {
 	root := restoreTestDir(t)
 	lockPath := filepath.Join(root, restoreJournalLockFileName)

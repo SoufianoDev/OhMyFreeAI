@@ -133,6 +133,10 @@ func openRestoreJournalLockFile(directory windows.Handle) (windows.Handle, error
 		_ = windows.CloseHandle(handle)
 		return windows.InvalidHandle, fmt.Errorf("Restore journal lock is not a regular non-reparse file")
 	}
+	if info.NumberOfLinks != 1 {
+		_ = windows.CloseHandle(handle)
+		return windows.InvalidHandle, fmt.Errorf("Restore journal lock must be a single-link file")
+	}
 	if info.FileSizeHigh != 0 || info.FileSizeLow != 0 {
 		_ = windows.CloseHandle(handle)
 		return windows.InvalidHandle, fmt.Errorf("Restore journal lock file contains unexpected data")
