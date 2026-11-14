@@ -1796,3 +1796,39 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 ### Next step
 - Add deterministic Linux/Windows failure-injection and abrupt-process-death/restart tests for every executor transition. Verify that restart planning preserves ambiguous artifacts and restores the previous database before any Store open when the journal is in an active intent phase.
 - Then connect the backup-manager candidate builder to an internal application service only after the recovery coordinator and full safety matrix pass. Do not add GUI/CLI Restore or enable Restore before that gate.
+
+
+## 2026-11-14 — executor crash-boundary and journal-write fault qualification
+
+### Requested baseline and StoreController review
+
+- Rechecked the requested historical Root CI run [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) for f5396ee: Ubuntu and Windows both completed successfully (2/2). Retrieved both job logs; no failed steps were present.
+- Re-reviewed the current StoreController integration. store_controller_test.go contains 16 tests covering exclusive/shared lease ordering, cancellation, close/drain, replacement, panic handling, concurrent stress, and configuration Load/Save drain.
+- Confirmed Wails main.go.tmpl creates the application-lifetime controller, AppService receives it, and backup export uses CreateWithStoreController. archive.go holds WithShared until the complete archive has been verified and published. This integration stage is already complete; no duplicate implementation was made.
+
+### Executor changes
+
+- Added test seams for journal persistence and completed transaction boundaries in internal/infrastructure/sqlite/restore_executor.go. The default path still calls the real journal lease writer and verified no-replace move; hooks are nil in production.
+- Added TestRestoreTransactionExecutorProcessDeathRecoveryPlanning: 19 child-process termination points across pre-journal, journal phases, previous-database preservation, candidate publication, candidate reopen, rollback quarantine/restore/reopen, and terminal journal publication. The parent process reads the retained artifacts and checks the pure recovery planner. This validates restart planning, not an automatic recovery coordinator.
+- Added TestRestoreTransactionExecutorJournalWriteFailuresPreserveRecoveryState: injected failures at all nine journal-write boundaries. It verifies the retained journal/artifacts and expected conservative planner result.
+- The tests exposed a real identity hazard: reopening SQLite after a journal publication attempt can alter the previous database bytes after its size/SHA-256 were recorded. The executor now keeps StoreController storeless after the first prepared-journal publication attempt, including an uncertain write error. It does not reopen the previous Store on later failures; the journal and all artifacts remain for a future recovery coordinator.
+- Updated the unexpected rollback-collision test: controller must remain unavailable, the previous target must still match its journal identity, the planner must return an empty ambiguous plan, and the colliding rollback evidence must remain unchanged.
+
+### CI evidence for exact test head
+
+Latest test head: 10b8fa2c4f44ffd2184adb430317985868c3657a on foundation/bootstrap.
+
+- Root CI [43606878844](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878844), run #442: **2/2 success**. Ubuntu passed vet, Go tests, race detector, build, Python compile/tests, frontend syntax, and architecture checks. Windows passed vet, Go tests, build, Python compile/tests, frontend syntax, and architecture checks. Both Go test logs show the SQLite package passing.
+- SQLite driver evaluation [43606878840](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878840), run #321: **4/4 success** for modernc/ncruces on Ubuntu/Windows.
+- Wails platform proof [43606878902](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878902), run #387: **2/2 success**. Ubuntu logs confirm native CLI smoke, two WebView-to-Go bridge launches, and database reopen. Windows logs confirm native executable and CLI smoke.
+- Linux distribution compatibility [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872), run #326: **7/8 success; Debian 12 legacy GTK3/WebKit41 build was still running at the last check**. The other seven distributions completed successfully. No failure was observed in the remaining job; do not claim the matrix is complete.
+
+Intermediate CI failures during this test-first sequence were inspected and corrected: the initial hook-less test commit failed vet as expected; a missing child-process error scope was fixed; and the old collision test expectation was updated to match the fail-closed behavior. The final Root CI head above is green on both operating systems.
+
+### Repository state and next gate
+
+- Current branch HEAD: 10b8fa2c4f44ffd2184adb430317985868c3657a.
+- Current production-code commit: e538ba59a49eacdbf127feb69bbd10bad606570d; boundary-hook commit: 8806eb0dcc5322610f75070839e9b558974aaee9.
+- foundation/bootstrap is 905 commits ahead of main, 0 behind. main was not modified; no merge or force-push was performed.
+- Restore remains disabled. The executor is not wired to startup, Wails, GUI or CLI. No startup recovery coordinator exists.
+- Next: add move-error injection for every no-replace move, including an error returned after namespace rename but before the directory durability barrier is confirmed; add the missing process-death point for staging-to-quarantine. Then implement and test actual restart reconciliation. Keep all uncertain artifacts and keep Restore disabled until the complete Linux/Windows matrix passes.
