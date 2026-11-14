@@ -219,6 +219,9 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if err := lease.Write(journal); err != nil {
 		return reopenPrevious(fmt.Errorf("persist staged SQLite Restore candidate identity: %w", err))
 	}
+	if candidate.Identity.matches(previousIdentity.SHA256, previousIdentity.Size) {
+		return reopenPrevious(fmt.Errorf("%w: candidate and previous database identities are indistinguishable", ErrRestoreJournalInvalid))
+	}
 	archiveAfterBuild, err := readRestoreArchiveIdentity(archivePath)
 	if err != nil {
 		return reopenPrevious(err)
