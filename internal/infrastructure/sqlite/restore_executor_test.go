@@ -39,8 +39,15 @@ func newRestoreExecutorFixture(t *testing.T) (*RestoreTransactionExecutor, *Stor
 	}
 	controller := NewStoreController(targetStore)
 	archivePath, archiveStore, candidate := createRestoreCandidateSnapshot(t)
+	if err := archiveStore.Close(); err != nil {
+		_ = controller.Close(context.Background())
+		t.Fatalf("close source snapshot Store: %v", err)
+	}
+	if err := ensureNoSQLiteSidecars(archivePath); err != nil {
+		_ = controller.Close(context.Background())
+		t.Fatalf("source snapshot is not self-contained after close: %v", err)
+	}
 	t.Cleanup(func() {
-		_ = archiveStore.Close()
 		_ = controller.Close(context.Background())
 	})
 	executor, err := NewRestoreTransactionExecutor(controller, root)
