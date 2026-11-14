@@ -6,6 +6,9 @@ from scripts.smoke_desktop import parse_snapshot_marker
 
 
 class SnapshotMarkerTests(unittest.TestCase):
+    def test_treats_empty_marker_as_an_in_progress_write(self) -> None:
+        self.assertIsNone(parse_snapshot_marker(""))
+
     def test_accepts_one_successful_bridge_call(self) -> None:
         self.assertEqual(parse_snapshot_marker("GetSnapshot success count=1\n"), 1)
 

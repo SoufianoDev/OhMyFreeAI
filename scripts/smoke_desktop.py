@@ -15,7 +15,11 @@ import time
 from pathlib import Path
 
 
-def parse_snapshot_marker(value: str) -> int:
+def parse_snapshot_marker(value: str) -> int | None:
+    # os.WriteFile creates/truncates the marker before writing its contents.
+    # An existing but empty file is therefore an in-progress write, not a bad marker.
+    if value == "":
+        return None
     match = re.fullmatch(r"GetSnapshot success count=([1-9][0-9]*)\n?", value)
     if match is None:
         raise ValueError(f"invalid snapshot marker: {value!r}")
@@ -158,7 +162,7 @@ def smoke_once(binary: Path, marker: Path, log_path: Path, attempt: int) -> None
                     if call_count == 1 and not initial_call_logged:
                         print(f"WEBVIEW_GO_BRIDGE_PROGRESS attempt={attempt} initial_call=1", flush=True)
                         initial_call_logged = True
-                    if call_count != 1:
+                    if call_count is not None and call_count != 1:
                         raise RuntimeError(f"Expected one initial bridge call before UI import, got {call_count}.")
                 if process.poll() is not None:
                     output.flush()
