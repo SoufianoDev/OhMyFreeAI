@@ -342,12 +342,18 @@ func TestRestoreTransactionExecutorProcessDeathHelper(t *testing.T) {
 			return realOpen(ctx, path)
 		}
 	}
+	crashContext, cancel := context.WithCancel(context.Background())
+	defer cancel()
 	executor.operations.afterBoundary = func(boundary string) {
+		if crashAt == restoreBoundaryMoveStagingToQuarantine && boundary == restoreBoundaryJournalPublishing {
+			cancel()
+			return
+		}
 		if boundary == crashAt {
 			os.Exit(86)
 		}
 	}
-	if err := executor.Execute(context.Background(), restoreExecutorRequest(archivePath)); err != nil {
+	if err := executor.Execute(crashContext, restoreExecutorRequest(archivePath)); err != nil {
 		t.Fatalf("Restore executor exited before crash boundary %q: %v", crashAt, err)
 	}
 	t.Fatalf("Restore executor completed without reaching crash boundary %q", crashAt)
@@ -379,6 +385,7 @@ func TestRestoreTransactionExecutorProcessDeathRecoveryPlanning(t *testing.T) {
 		{name: "committed journal", boundary: "journal:committed", wantPhase: RestorePhaseCommitted, wantAction: RestoreRecoveryVerifyCommitted},
 		{name: "rollback intent", boundary: "journal:restoring-previous", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
 		{name: "candidate quarantined before rollback move", boundary: "move:candidate-to-quarantine", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
+		{name: "staged candidate quarantined before rollback restore", boundary: "move:staging-to-quarantine", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
 		{name: "previous moved back before completion", boundary: "move:rollback-to-target", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
 		{name: "previous reopened before rollback journal", boundary: "store:previous-opened", rollback: true, wantPhase: RestorePhaseRestoringPrevious, wantAction: RestoreRecoveryResumeIntent},
 		{name: "rolled back journal", boundary: "journal:rolled-back", rollback: true, wantPhase: RestorePhaseRolledBack, wantAction: RestoreRecoveryVerifyRolledBack},
@@ -542,5 +549,142 @@ func TestRestoreTransactionExecutorJournalWriteFailuresPreserveRecoveryState(t *
 				t.Fatalf("recovery action after %q failure = %q, want %q", test.boundary, plan.Action, test.wantAction)
 			}
 		})
+	}
+}
+
+
+// TestRestoreTransactionExecutorMoveErrorsPreserveRecoveryState injects both
+// pre-move failures and errors after the platform namespace operation. The
+// latter occurs before Linux parent-directory fsync and before common
+// post-move identity verification; on Windows the native write-through rename
+// has returned, and the error is injected before identity verification.
+func TestRestoreTransactionExecutorMoveErrorsPreserveRecoveryState(t *testing.T) {
+	tests := []struct {
+		name                string
+		source              string
+		destination         string
+		wantPhase           RestorePhase
+		previousIdentity    bool
+		failCandidateOpen   bool
+		cancelBeforePublish bool
+	}{
+		{name: "previous to rollback", source: "target", destination: "rollback", wantPhase: RestorePhasePreservingPrevious, previousIdentity: true},
+		{name: "staging to target", source: "staging", destination: "target", wantPhase: RestorePhasePublishing},
+		{name: "target to quarantine", source: "target", destination: "quarantine", wantPhase: RestorePhaseRestoringPrevious, failCandidateOpen: true},
+		{name: "staging to quarantine", source: "staging", destination: "quarantine", wantPhase: RestorePhaseRestoringPrevious, cancelBeforePublish: true},
+		{name: "rollback to target", source: "rollback", destination: "target", wantPhase: RestorePhaseRestoringPrevious, previousIdentity: true, failCandidateOpen: true},
+	}
+
+	for _, test := range tests {
+		for _, afterNamespaceMutation := range []bool{false, true} {
+			stage := "before namespace mutation"
+			if afterNamespaceMutation {
+				stage = "after namespace mutation"
+			}
+			t.Run(test.name+"/"+stage, func(t *testing.T) {
+				executor, controller, root, archivePath, _, _ := newRestoreExecutorFixture(t)
+				const transactionID = "move-error-injection"
+				executor.operations.newID = func() (string, error) { return transactionID, nil }
+
+				paths := map[string]string{
+					"target":     filepath.Join(root, "state.db"),
+					"staging":    filepath.Join(root, ".restore-stage-"+transactionID+".sqlite"),
+					"rollback":   filepath.Join(root, ".restore-rollback-"+transactionID+".sqlite"),
+					"quarantine": filepath.Join(root, ".restore-quarantine-"+transactionID+".sqlite"),
+				}
+				sourcePath := paths[test.source]
+				destinationPath := paths[test.destination]
+				injected := errors.New("injected no-replace move error at " + test.name + "/" + stage)
+
+				if test.failCandidateOpen {
+					realOpen := executor.operations.openStore
+					var calls atomic.Int32
+					executor.operations.openStore = func(ctx context.Context, path string) (*Store, error) {
+						if calls.Add(1) == 1 {
+							return nil, errors.New("injected candidate reopen failure")
+						}
+					return realOpen(ctx, path)
+					}
+				}
+
+				ctx, cancel := context.WithCancel(context.Background())
+				defer cancel()
+				if test.cancelBeforePublish {
+					executor.operations.afterBoundary = func(boundary string) {
+						if boundary == restoreBoundaryJournalPublishing {
+							cancel()
+						}
+					}
+				}
+
+				realMove := executor.operations.move
+				executor.operations.move = func(source, destination string, expected RestoreContentIdentity) error {
+					if !samePath(source, sourcePath) || !samePath(destination, destinationPath) {
+						return realMove(source, destination, expected)
+					}
+					if !afterNamespaceMutation {
+						return injected
+					}
+					return moveRestoreFileNoReplaceVerifiedWithHook(source, destination, expected, func() error {
+						return injected
+					})
+				}
+
+				err := executor.Execute(ctx, restoreExecutorRequest(archivePath))
+				if !errors.Is(err, injected) {
+					t.Fatalf("Execute() error = %v, want injected move error", err)
+				}
+				if err := controller.WithShared(context.Background(), func(*Store) error { return nil }); !errors.Is(err, ErrStoreUnavailable) {
+					t.Fatalf("controller after uncertain move = %v, want Store unavailable", err)
+				}
+
+				journal, err := ReadRestoreJournal(root)
+				if err != nil {
+					t.Fatalf("read journal after move error: %v", err)
+				}
+				if journal.Phase != test.wantPhase {
+					t.Fatalf("journal phase after move error = %q, want %q", journal.Phase, test.wantPhase)
+				}
+				files, err := inspectRestoreRecoveryFiles(root, journal)
+				if err != nil {
+					t.Fatalf("inspect artifacts after move error: %v", err)
+				}
+				plan, err := PlanRestoreRecovery(journal, files)
+				if err != nil {
+					t.Fatalf("plan recovery after move error: %v", err)
+				}
+				if plan.Action != RestoreRecoveryResumeIntent {
+					t.Fatalf("recovery action after move error = %q, want %q", plan.Action, RestoreRecoveryResumeIntent)
+				}
+
+				identity := RestoreContentIdentity{SHA256: journal.CandidateSHA256, Size: journal.CandidateSize}
+				if test.previousIdentity {
+					identity = RestoreContentIdentity{SHA256: journal.PreviousSHA256, Size: journal.PreviousSize}
+				}
+				if afterNamespaceMutation {
+					actual, err := readRestoreContentIdentityPlatform(destinationPath)
+					if err != nil {
+						t.Fatalf("read moved destination after injected error: %v", err)
+					}
+					if !actual.matches(identity.SHA256, identity.Size) {
+						t.Fatalf("moved destination identity = %#v, want %#v", actual, identity)
+					}
+					if _, err := os.Lstat(sourcePath); !errors.Is(err, os.ErrNotExist) {
+						t.Fatalf("source after completed namespace move = %v, want not-exist", err)
+					}
+				} else {
+					actual, err := readRestoreContentIdentityPlatform(sourcePath)
+					if err != nil {
+						t.Fatalf("read source after pre-move error: %v", err)
+					}
+					if !actual.matches(identity.SHA256, identity.Size) {
+						t.Fatalf("source identity = %#v, want %#v", actual, identity)
+					}
+					if _, err := os.Lstat(destinationPath); !errors.Is(err, os.ErrNotExist) {
+						t.Fatalf("destination after pre-move error = %v, want not-exist", err)
+					}
+				}
+			})
+		}
 	}
 }
