@@ -16,6 +16,10 @@ import (
 )
 
 func moveRestoreFileNoReplacePlatform(source, destination string) error {
+	return moveRestoreFileNoReplacePlatformWithHook(source, destination, nil)
+}
+
+func moveRestoreFileNoReplacePlatformWithHook(source, destination string, afterNamespaceMutation func() error) error {
 	directoryHandle, err := openRestoreDirectoryNoReparse(filepath.Dir(destination))
 	if err != nil {
 		return fmt.Errorf("open SQLite restore destination directory without reparse traversal: %w", err)
@@ -28,7 +32,17 @@ func moveRestoreFileNoReplacePlatform(source, destination string) error {
 	}
 	defer windows.CloseHandle(sourceHandle)
 
-	return renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination))
+	if err := renameRestoreHandleNoReplace(sourceHandle, directoryHandle, filepath.Base(destination)); err != nil {
+		return err
+	}
+	// The handle-bound NTFS write-through rename has completed. This seam lets
+	// tests model a later error before the common post-move identity check.
+	if afterNamespaceMutation != nil {
+		if err := afterNamespaceMutation(); err != nil {
+			return fmt.Errorf("handle-bound no-replace rename completed before post-move verification: %w", err)
+		}
+	}
+	return nil
 }
 
 func openRestoreDirectoryNoReparse(path string) (windows.Handle, error) {
