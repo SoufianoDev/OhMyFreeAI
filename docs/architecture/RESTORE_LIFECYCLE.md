@@ -159,22 +159,28 @@ The retained-ledger sequential rollover tests are in commit [c464d7b](https://gi
 This verifies the journal-ledger tests and current build matrix, not the absent transaction executor, power-loss behavior, or full process-death/restart matrix. Restore remains disabled.
 
 
-## SQLite PERSIST restore-control journal candidate evaluation — 2026-11-12
+## Production Restore journal selection — 2026-11-14
 
-**Status: evaluation evidence only; not approved for production.** The retained JSON ledger remains the current production journal.
+**Decision: retain the bounded JSON ledger; reject SQLite PERSIST for production.**
 
-The isolated driver-evaluation module tested modernc v1.62.0 and ncruces v0.37.0 on Ubuntu 24.04 and Windows:
+The isolated PERSIST symlink capability probe showed a cross-platform safety mismatch:
+- modernc / Ubuntu: PERSIST activation failed closed; the symlink and external target were unchanged.
+- ncruces / Ubuntu: same fail-closed result.
+- ncruces / Windows: PERSIST activation and write succeeded, but the sidecar link entry was replaced; the external target was unchanged.
+- modernc / Windows: PERSIST activation and write succeeded while the sidecar remained a symlink; the external target changed. This violates the required no-follow contract for the pinned production driver.
 
-- Both drivers accepted rollback-journal PERSIST mode and synchronous FULL.
-- After a committed transaction, the PERSIST sidecar remained as a regular file and its first eight header bytes were zeroed.
-- The sidecar survived database close/reopen. Journal mode reverted to DELETE on a fresh connection, so every new connection must explicitly set and verify PERSIST before any journal write. After reapplying PERSIST, both drivers reused the same sidecar file identity for a subsequent transaction.
-- A subprocess test forced process termination while a large uncommitted transaction had spilled pages and left a non-zero rollback-journal header. Reopening recovered the committed baseline, removed all uncommitted rows, and passed SQLite integrity_check.
-- These tests passed for all four driver/OS combinations in [SQLite evaluation run 43170647220](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43170647220).
+Do not switch the production SQLite driver to ncruces based on this diagnostic probe. Its behavior differs by OS, and the production driver decision remains modernc. The JSON ledger is the selected journal protocol.
 
-A critical fail-closed limitation was also confirmed: normal SQLite open/use silently creates a missing database file and recreates a missing PERSIST sidecar. SQLite does not enforce the required pre-provisioning contract. Any production implementation must inspect both artifacts without following symlinks/reparse points, reject missing/non-regular/unverified artifacts, and open existing files only before recording a restore phase or touching the live Store.
+### Qualified JSON-ledger boundaries
+- Linux cross-process serialization uses `flock`; Windows uses `LockFileEx`. The transaction executor must retain one lease for the entire restore, not lock each journal write independently.
+- Linux and Windows ledger readers use no-follow handle-based reads and validate the opened file identity/type before decoding.
+- Windows journal lock files must be regular, non-reparse, empty, private and single-link. A hard-link regression test now runs in the cross-platform Go suite.
+- Linux publication syncs the pinned parent-directory FD after the namespace update.
+- Windows publication and artifact moves use the same source handle opened with native `FILE_WRITE_THROUGH`, flush that handle, then perform the handle-bound rename under the fixed-local-NTFS/persistent-ACL volume policy. See [Restore Recovery Executor](RESTORE_RECOVERY_EXECUTOR.md) for the documented API boundary and its hardware caveat.
+- The ledger retains terminal transaction history and is capped at 256 records / 1 MiB. It fails closed at the cap; safe manual export/archive or compaction is still required before enabling Restore for indefinite long-term use.
 
-This evaluation does not prove durable initial database/sidecar provisioning, every journal transaction boundary, or hardware-independent power-loss behavior. In particular, Windows still requires a separately verified fixed-local-NTFS write-through creation/metadata barrier for both pre-provisioned artifacts. Do not infer that the existing SQLite VFS file flush provides a parent-directory durability barrier.
+### Verification
+- Root CI on [865c745](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43564870024) passed 2/2; SQLite driver evaluation [43564870094](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43564870094) passed 4/4; Wails [43564870013](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43564870013) passed 2/2; Linux distributions [43564870022](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43564870022) passed 8/8.
+- After the WebView smoke-marker race fix, Root CI [43565534118](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43565534118) passed 2/2, Wails [43565533969](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43565533969) passed 2/2, and Linux distributions [43565533971](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43565533971) passed 8/8. The SQLite matrix was not triggered by the Python-only follow-up.
 
-The PERSIST candidate must be compared against the retained JSON ledger, including concurrent-process serialization, migration, crash recovery, and operational complexity. Adopt it only if the complete evidence is stronger and existing transaction history can be migrated without loss or guesswork. Otherwise retain JSON and finish qualifying its publication/locking contract.
-
-Restore remains disabled. No executor, startup recovery, GUI/CLI Restore, or application-level restore orchestration is authorized by this evaluation.
+The journal protocol is qualified sufficiently to begin the isolated filesystem transaction executor. This does **not** mean Restore is enabled: executor, rollback/reopen orchestration, startup recovery, and the full failure-injection/process-death/restart matrix are still missing. Restore remains disabled and must not be wired to GUI, CLI or startup recovery.

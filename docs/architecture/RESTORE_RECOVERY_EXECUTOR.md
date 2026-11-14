@@ -421,3 +421,24 @@ Together these documented contracts support the NTFS write-through metadata barr
 
 This closes the documented Windows namespace-metadata prerequisite for both artifact moves and the current journal-ledger replacement operation under the fixed-local-NTFS policy. The retained ledger removes the need to delete a terminal journal before starting another transaction. It does **not** complete process-death recovery or the filesystem executor; the 256-record / 1 MiB cap also remains a fail-closed retention limit.
 
+
+
+## 2026-11-14 — retained JSON journal and lock qualification
+
+The retained JSON ledger is the selected production Restore journal. SQLite PERSIST is rejected for the pinned modernc driver because the Windows sidecar symlink probe showed the driver following the symlink and modifying its external target. The ncruces probe is diagnostic only and does not authorize a production driver switch.
+
+The JSON-ledger path now includes:
+- Linux `flock` and Windows `LockFileEx` cross-process serialization. The future executor must hold one lease across the entire transaction.
+- Linux and Windows no-follow handle-based journal readers.
+- Windows native error classification for directory/reparse journal entries.
+- A Windows lock-file single-link invariant checked through `NumberOfLinks`, with a cross-platform hard-link regression test.
+- Linux parent-directory `fsync` after namespace publication.
+- Fixed-local-NTFS Windows write-through journal publication and handle-bound artifact rename, with the documented hardware/controller flush caveat described above.
+
+Exact-head evidence:
+- [865c745](https://github.com/SoufianoDev/OhMyFreeAI/commit/865c745cdeba899a6abdb4326af16f8ec89250a7): Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8.
+- [cfcaa4b](https://github.com/SoufianoDev/OhMyFreeAI/commit/cfcaa4be5f01128cf28ff08633e903b8e325a0ae): Root 2/2, Wails 2/2, Linux distributions 8/8; SQLite evaluation was not triggered because only smoke-test Python files changed.
+
+A prior Debian 12 WebView smoke failure was a test-harness race: the marker path was visible between `os.WriteFile` create/truncate and content write. The smoke parser now treats only an empty marker as pending; malformed non-empty markers remain failures. The exact-head Linux matrix passed 8/8, and its Debian 13 log records two successful bridge calls and successful database reopen.
+
+The next implementation unit is the filesystem transaction executor. It must consume the current v3 journal/planner, hold the cross-process journal lease and StoreController exclusive lease for the full operation, persist intent before every mutation, use only no-replace moves, verify moved identity through no-follow handles before SQLite opens, and retain rollback/quarantine artifacts. The full Linux/Windows failure-injection and abrupt-process-death/restart matrix is still mandatory. Restore remains disabled.

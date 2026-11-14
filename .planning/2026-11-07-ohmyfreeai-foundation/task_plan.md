@@ -559,7 +559,7 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - Linux no-replace move now fsyncs the pinned parent-directory FD after rename. Windows source open uses native FILE_WRITE_THROUGH, FlushFileBuffers, and the same retained handle for NtSetInformationFile(FileRenameInformationEx=65) with no replacement. **Superseded by the 2026-11-10 15:45Z documentation re-review:** the cited Microsoft contracts do not explicitly establish durability of the parent-directory namespace entry for this rename, so the Windows namespace-durability gate remains unresolved.
 - No transaction executor, automatic startup recovery, process-death test matrix, or GUI/CLI Restore path exists. Restore remains disabled.
 - GitHub compare reports 804 commits ahead and 0 behind main; no open PR exists. Do not merge the branch wholesale. The first real testable delivery must be curated selectively.
-- Next: qualify the no-follow preflight/open-existing boundary for both the control DB and its PERSIST sidecar, prove durable provisioning, and settle cross-process serialization for both PERSIST and the retained JSON ledger. Select the journal protocol only after this comparison; do not start the filesystem executor until the protocol is explicitly selected and qualified.
+- Superseded by the 2026-11-14 qualification checkpoint below: SQLite PERSIST was rejected for the pinned production driver; the retained JSON ledger now has cross-process serialization and no-follow readers; and the fixed-local-NTFS write-through rename contract is documented. The filesystem transaction executor is now the next engineering unit. Restore remains disabled until its full Linux/Windows recovery matrix passes.
 
 
 ## 2026-11-13 verification update
@@ -568,8 +568,8 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - Current branch HEAD `21fdfb44bfc9da20bb94777092dcb78ee93b0e7e` has four successful workflow runs on that exact SHA: Root CI 2/2 ([43377131882](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131882)), SQLite driver evaluation 4/4 ([43377131804](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131804)), Wails platform proof 2/2 ([43377131897](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131897)), and Linux distribution compatibility 8/8 ([43377131790](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43377131790)).
 - StoreController integration is complete and revalidated: 16 controller tests plus the backup archive publication/drain test; Wails composition root, AppService, configuration and backup paths use the controller as intended.
 - Cross-process serialization for the retained JSON ledger is implemented with `restoreJournalLease`, Linux `flock`, Windows `LockFileEx`, and subprocess exclusion tests. Root CI's SQLite package passed on both OSes, and Ubuntu race detection passed. This closes the earlier missing-lock item, but the future executor must hold one lease across the whole transaction.
-- Still blocked: SQLite PERSIST sidecar no-follow qualification and Windows journal namespace power-loss durability. Do not infer power-loss safety from process-death tests.
-- Next: qualify the no-follow boundary for both the control DB and PERSIST sidecar, then settle Windows journal publication durability. Do not start the transaction executor, startup recovery or Restore UI/CLI until both platform gates are complete. Restore remains disabled.
+- Superseded 2026-11-14: PERSIST was rejected after the pinned modernc driver followed a PERSIST sidecar symlink on Windows and modified its external target. The Windows fixed-local-NTFS write-through metadata contract is documented at the OS API level; it is not a hardware-independent power-loss guarantee.
+- Next: implement the isolated filesystem transaction executor against the retained JSON ledger. Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete failure-injection and process-death/restart matrix passes on Linux and Windows.
 
 
 ## 2026-11-13 14:12Z — PERSIST sidecar symbolic-link capability probe
@@ -596,3 +596,29 @@ Do not treat this probe as proof of power-loss safety. Keep Restore disabled and
 - SQLite driver evaluation [43440257066](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43440257066): modernc/ncruces × Ubuntu/Windows SUCCESS (4/4). The logs contain the four probe outcomes above.
 - Wails and Linux distribution workflows were not triggered by this test-only change.
 - No production Restore code changed. Restore remains disabled.
+
+
+## 2026-11-14 — journal qualification and executor handoff
+
+This section supersedes the stale 2026-11-12 status snapshot and the earlier 2026-11-13 statements that the PERSIST sidecar and Windows namespace-metadata gates were still open.
+
+### Verified branch and CI
+- Current code head: `cfcaa4be5f01128cf28ff08633e903b8e325a0ae` on `foundation/bootstrap`.
+- The preceding code head `865c745cdeba899a6abdb4326af16f8ec89250a7` passed Root CI 2/2 ([43564870024](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43564870024)), SQLite driver evaluation 4/4 ([43564870094](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43564870094)), Wails 2/2 ([43564870013](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43564870013)), and Linux distribution compatibility 8/8 ([43564870022](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43564870022)).
+- The current code head `cfcaa4b` passed Root CI 2/2 ([43565534118](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43565534118)), Wails 2/2 ([43565533969](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43565533969)), and Linux distribution compatibility 8/8 ([43565533971](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43565533971)). The SQLite matrix was not triggered by the script-only follow-up; its exact-head evidence remains the 4/4 run on `865c745`.
+
+### Journal decision
+- Retain `restore-journal.json` as the production journal protocol.
+- Reject SQLite rollback-journal PERSIST for the pinned production driver. The isolated symlink probe showed modernc on Windows followed the PERSIST sidecar symlink and changed the external sentinel. ncruces behaved differently across OSes and is not approved as a production driver replacement.
+- The JSON ledger now has Linux `flock` and Windows `LockFileEx` cross-process serialization. The executor must hold one lease across the entire transaction, not acquire/release it around individual writes.
+- Linux and Windows no-follow readers inspect the ledger through safe handles. Windows error classification now maps directory/reparse entries to the intended invalid-ledger result.
+- Windows lock-file validation now rejects hard-linked lock files; a regression test covers the link-count invariant on both supported CI platforms.
+- The Windows fixed-local-NTFS write-through metadata barrier is documented in `RESTORE_RECOVERY_EXECUTOR.md`. It is an OS-level write-through request, not a guarantee against hardware/controllers that fail to honor flushes. Other Windows filesystem providers remain unsupported.
+
+### Regression and CI reliability fixes
+- The Windows journal-reader directory case was fixed by mapping the native directory status to `ErrRestoreJournalInvalid`; the exact code head `4e0ffbe` passed all four workflow families.
+- A Debian 12 desktop smoke failure was traced to the test harness observing the marker immediately after Go's `os.WriteFile` created/truncated it but before the content write completed. Empty means “write in progress”; malformed non-empty content remains an error. The parser now treats only the empty window as pending, and a Python regression test covers it.
+- Root CI logs on `cfcaa4b` report 16 Python tests passing. The Debian 13 WebView smoke log shows two successful bridge invocations and `WEBVIEW_REOPEN_PASS`; the full Linux matrix passed 8/8.
+
+### Next engineering unit
+Implement the isolated Restore transaction executor specified in `docs/architecture/RESTORE_RECOVERY_EXECUTOR.md`: hold the journal lease and StoreController exclusive lease for the full transaction; verify archive/candidate/previous identities through no-follow handles; persist intent before every namespace mutation; use only no-replace moves and verify each moved identity before SQLite opens; reopen and validate the published Store; and perform journaled quarantine/rollback on failure. Add failure-injection and abrupt-process-death/restart tests on Linux and Windows. Do not wire startup recovery or GUI/CLI Restore. Restore remains disabled.

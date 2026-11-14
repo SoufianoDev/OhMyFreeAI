@@ -1723,3 +1723,33 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - SQLite driver evaluation [43440257066](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43440257066): modernc/ncruces × Ubuntu/Windows SUCCESS (4/4). The logs contain the four probe outcomes above.
 - Wails and Linux distribution workflows were not triggered by this test-only change.
 - No production Restore code changed. Restore remains disabled.
+
+
+## 2026-11-14 morning run — journal hard-link and desktop smoke race
+
+### Initial state and repository review
+- Started from `4e0ffbe374327969684be8cbe86102984ea19669` on `foundation/bootstrap`; no workflow was active at the start.
+- Reviewed `.planning/.active_plan`, the current task plan and progress history, `RESTORE_LIFECYCLE.md`, `RESTORE_RECOVERY_EXECUTOR.md`, the journal lease/read/publish code, StoreController, candidate builder, identity reader, no-replace move adapter and recovery planner.
+- Confirmed the executor design document already closes the fixed-local-NTFS write-through metadata prerequisite at the OS API level, with an explicit no-hardware-independent guarantee. The task-plan/progress notes had not been reconciled with that later architecture decision.
+
+### Production-code security improvement
+- Added a Windows lock-file single-link check using `ByHandleFileInformation.NumberOfLinks`. A lock file with multiple hard links is rejected rather than accepted as the process-wide serialization object.
+- Added `TestRestoreJournalLeaseRejectsHardLinkLockFile`; Linux and Windows Root CI both passed the SQLite package.
+- Code commit: [865c745](https://github.com/SoufianoDev/OhMyFreeAI/commit/865c745cdeba899a6abdb4326af16f8ec89250a7).
+
+### CI smoke-harness race correction
+- Inspected failed Debian 12 job `132205208799` from Linux run [43518120672](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43518120672). The app's first WebView call succeeded; on the second launch Python observed an existing but empty marker and failed immediately.
+- Go's AppService writes the marker with `os.WriteFile`, which creates/truncates the file before writing its contents. The empty observation is a transient marker-publication window, not evidence that the bridge call failed.
+- Changed `parse_snapshot_marker` to return pending only for an empty marker; malformed non-empty markers and explicit Go failure markers still fail. Added a unit test.
+- Test commit: [cfcaa4b](https://github.com/SoufianoDev/OhMyFreeAI/commit/cfcaa4be5f01128cf28ff08633e903b8e325a0ae).
+- Root CI logs on the exact head show 16 Python tests passing, including the empty-marker regression. Linux run logs show Debian 13 completed both WebView attempts with `calls=2` and `WEBVIEW_REOPEN_PASS`; the exact-head matrix finished 8/8.
+
+### Exact-head CI evidence
+- `865c745`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8.
+- `cfcaa4b`: Root 2/2, Wails 2/2, Linux distributions 8/8. SQLite evaluation was correctly not triggered because the follow-up changed only Python smoke-test files.
+
+### Journal protocol decision and next work
+- SQLite PERSIST is rejected for production: modernc on Windows followed the sidecar symlink and modified the external sentinel. ncruces' differing behavior is not grounds for a driver switch.
+- Keep the retained JSON ledger. Linux `flock`, Windows `LockFileEx`, no-follow readers and fixed-local-NTFS write-through publication are now the qualified journal path. The Windows lock must be single-link; that invariant is now tested.
+- The next engineering task is the isolated Restore transaction executor. It must hold one journal lease and the StoreController exclusive lease for the full transaction, persist every intent before mutation, use only verified no-replace moves, verify size/SHA-256 before opening SQLite, and preserve rollback/quarantine evidence. Add Linux/Windows failure-injection and process-death/restart tests before any application wiring.
+- Restore remains disabled; `main` was not modified or merged.
