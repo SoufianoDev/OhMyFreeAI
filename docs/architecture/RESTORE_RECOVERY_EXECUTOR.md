@@ -1,11 +1,11 @@
 # Restore Recovery Executor — Design Constraints
 
-**Status:** design gate; no filesystem executor is implemented yet.  
+**Status:** first isolated in-process transaction executor slice implemented; not wired to the application. Failure-injection and process-death/restart qualification remain incomplete.  
 **Scope:** Linux and Windows desktop installations, with SQLite state files confined to the canonical application state directory.
 
 ## Why the executor is a separate safety boundary
 
-The current journal and PlanRestoreRecovery are metadata persistence and a pure decision layer. They do not perform filesystem operations. os.Rename alone is not an acceptable publication primitive for recovery because replacement behavior differs by platform and can overwrite an unexpected destination. A path-level Lstat followed by a later rename also leaves a time-of-check/time-of-use window.
+The journal and PlanRestoreRecovery remain the metadata persistence and pure decision layers. A separate isolated transaction executor now performs the in-process filesystem transaction while holding the journal and StoreController exclusive leases. It is not wired to startup, Wails or CLI. os.Rename alone is not an acceptable publication primitive for recovery because replacement behavior differs by platform and can overwrite an unexpected destination. A path-level Lstat followed by a later rename also leaves a time-of-check/time-of-use window.
 
 The executor must never infer ownership merely because a path appears in a journal. It must distinguish transaction artifacts from unexpected files and must preserve ambiguous state rather than deleting, replacing, or silently moving it.
 
@@ -83,13 +83,13 @@ Implemented as low-level primitives only:
 - Windows owner/DACL and volume qualification: fixed local NTFS with persistent ACLs only. ReFS, SMB, removable and unknown volumes fail closed.
 - Linux and Windows no-follow content identity readers, plus `moveRestoreFileNoReplaceVerified`, which checks the moved destination's size and SHA-256 through a no-follow handle and preserves it on mismatch.
 - Platform-specific journal publication: Linux syncs the containing directory after same-directory ledger publication; Windows uses the handle-bound native write-through replacement rename path for the ledger. Journal deletion is intentionally unsupported on both platforms; terminal records are retained instead.
-- StoreController shared/exclusive leases and lower-level SQLite backup/staging primitives.
+- StoreController shared/exclusive leases and lower-level SQLite backup/staging primitives.\n- An isolated StoreController-backed transaction executor that holds one journal lease and the exclusive Store lease across candidate construction and the full transaction; persists intent/completion phases; uses only verified no-replace moves; verifies moved identities before SQLite open; reopens/validates the candidate; and attempts journaled quarantine/rollback on candidate reopen failure. The archive-to-candidate boundary is a callback so the backup layer can inspect/extract the actual archive without an import cycle.
 
 Not implemented:
 
-- Filesystem transaction executor, startup recovery coordinator, process-death/failure-injection executor tests, and application-level Restore orchestration.
-- Integration of the post-move identity verifier into every transaction move. The future executor must call it immediately after each successful no-replace move and before any SQLite database open.
-- Automatic reconciliation of journal intent phases after process death.
+- Startup recovery coordinator and automatic reconciliation of journal intent phases after process death.
+- The full Linux/Windows failure-injection and abrupt-process-death/restart executor test matrix.
+- Application-level Restore orchestration and the production backup-manager callback wiring.
 - Hardware-independent power-loss qualification.
 
 Threat and durability boundaries:
@@ -392,7 +392,7 @@ A targeted follow-up reviewed Microsoft's [NtFlushBuffersFileEx](https://learn.m
 
 Linux continues to use `fsync` on the pinned parent-directory FD after successful no-replace namespace mutations. Its source-leaf selection race remains separate: the executor must verify size/SHA-256 from a no-follow handle after every move and before SQLite is opened.
 
-The retained ledger lifecycle now permits sequential transactions without deleting terminal evidence. The filesystem transaction executor, startup recovery, rollback orchestration and process-death/failure-injection tests remain unimplemented.
+The retained ledger lifecycle now permits sequential transactions without deleting terminal evidence. The initial in-process transaction executor and rollback orchestration now exist. Startup recovery and the complete process-death/failure-injection test matrix remain unimplemented.
 
 ### Required next implementation step
 
@@ -442,3 +442,30 @@ Exact-head evidence:
 A prior Debian 12 WebView smoke failure was a test-harness race: the marker path was visible between `os.WriteFile` create/truncate and content write. The smoke parser now treats only an empty marker as pending; malformed non-empty markers remain failures. The exact-head Linux matrix passed 8/8, and its Debian 13 log records two successful bridge calls and successful database reopen.
 
 The next implementation unit is the filesystem transaction executor. It must consume the current v3 journal/planner, hold the cross-process journal lease and StoreController exclusive lease for the full operation, persist intent before every mutation, use only no-replace moves, verify moved identity through no-follow handles before SQLite opens, and retain rollback/quarantine artifacts. The full Linux/Windows failure-injection and abrupt-process-death/restart matrix is still mandatory. Restore remains disabled.
+
+
+## 2026-11-14 — initial in-process transaction executor slice
+
+The isolated executor now exists in `internal/infrastructure/sqlite/restore_executor.go`. It is not called by the application and must remain unexposed from GUI/CLI and startup until recovery tests pass.
+
+### Transaction boundary
+- Acquires one `restoreJournalLease` and the StoreController exclusive lease for the entire candidate build and transaction.
+- Checkpoints/closes the active Store, captures previous database size/SHA-256 through the no-follow identity reader, and records the selected archive's size/SHA-256 in the journal.
+- Accepts a `RestoreCandidateBuilder` callback. The backup layer is responsible for inspecting/extracting the actual archive and returning a fully built, migrated and closed candidate at the exact staging path. This avoids an import cycle between the SQLite and backup packages.
+- Persists prepared, staging, preserving-previous, previous-preserved, publishing, published, reopening, committed, restoring-previous and rolled-back phases around the corresponding moves.
+- Uses `moveRestoreFileNoReplaceVerified` for target/rollback/staging/quarantine moves. The moved identity is verified before any SQLite open.
+- Validates the reopened candidate Store. If reopen fails, it persists rollback intent, moves the candidate to the pre-recorded quarantine path, restores the verified previous database without replacement, reopens it, and records rolled-back.
+- Retains rollback and quarantine artifacts. Unexpected path or sidecar collisions are not replaced or deleted.
+
+### Tests and exact-head CI
+- Added tests for successful publication with rollback retention, candidate reopen failure and rollback/quarantine, unexpected rollback destination collision, unexpected rollback sidecar collision, and holding both leases across candidate construction using a second process for the journal lock.
+- Root CI [43604778121](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604778121): SUCCESS 2/2 on code/test head `8f2999cc02d1ba803c6a0f3b5f1a8b22c912c0ef`; Ubuntu race detection passed, and Windows Go tests/build passed.
+- Wails platform proof [43604778158](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604778158): SUCCESS 2/2.
+- SQLite driver evaluation [43604778118](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604778118): SUCCESS 4/4.
+- Linux distribution compatibility [43604778106](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604778106): one Fedora 44 GTK4 job succeeded; seven matrix jobs were queued at the time of this update.
+
+### Incomplete gates
+- No process-death/restart executor matrix exists.
+- No startup recovery coordinator exists; active intent phases are not automatically reconciled before app Store open.
+- The production backup-manager callback is not wired to AppService/CLI; the unit tests use the SQLite candidate builder directly rather than a real `.omfaibackup` container.
+- Restore remains disabled. Do not add startup recovery, GUI/CLI Restore or application wiring until the full Linux/Windows safety matrix passes.
