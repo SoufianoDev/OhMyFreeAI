@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -59,10 +58,10 @@ func newRestoreExecutorFixture(t *testing.T) (*RestoreTransactionExecutor, *Stor
 
 func restoreExecutorRequest(archivePath string) RestoreTransactionRequest {
 	return RestoreTransactionRequest{
-		ArchivePath:          archivePath,
-		DatabaseSnapshotPath: archivePath,
-		MigrationFS:          migrations.Files,
-		MigrationDir: ".",
+		ArchivePath: archivePath,
+		BuildCandidate: func(ctx context.Context, archive, stateDirectory, candidatePath string) (RestoreCandidate, error) {
+			return BuildRestoreCandidateAtPath(ctx, archive, stateDirectory, candidatePath, migrations.Files, ".")
+		},
 	}
 }
 
@@ -216,21 +215,22 @@ func TestRestoreTransactionExecutorPreservesUnexpectedRollbackCollision(t *testi
 
 func TestRestoreTransactionExecutorHoldsJournalAndStoreLeasesDuringBuild(t *testing.T) {
 	executor, controller, root, archivePath, _, _ := newRestoreExecutorFixture(t)
-	realBuild := executor.operations.buildCandidate
+	request := restoreExecutorRequest(archivePath)
+	realBuild := request.BuildCandidate
 	buildReady := make(chan struct{})
 	releaseBuild := make(chan struct{})
 	var releaseOnce sync.Once
 	release := func() { releaseOnce.Do(func() { close(releaseBuild) }) }
 	defer release()
-	executor.operations.buildCandidate = func(ctx context.Context, source, state, staging string, migrationsFS fs.FS, migrationDir string) (RestoreCandidate, error) {
-		candidate, err := realBuild(ctx, source, state, staging, migrationsFS, migrationDir)
+	request.BuildCandidate = func(ctx context.Context, archive, stateDirectory, staging string) (RestoreCandidate, error) {
+		candidate, err := realBuild(ctx, archive, stateDirectory, staging)
 		close(buildReady)
 		<-releaseBuild
 		return candidate, err
 	}
 	done := make(chan error, 1)
 	go func() {
-		done <- executor.Execute(context.Background(), restoreExecutorRequest(archivePath))
+		done <- executor.Execute(context.Background(), request)
 	}()
 	select {
 	case <-buildReady:
