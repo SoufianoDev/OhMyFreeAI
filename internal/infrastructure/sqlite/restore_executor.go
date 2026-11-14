@@ -316,7 +316,10 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		return executor.rollback(lease, journal, err)
 	}
 	if err := executor.moveArtifact(stagingPath, target, candidate.Identity, restoreBoundaryMoveStagingToTarget); err != nil {
-		return executor.rollback(lease, journal, fmt.Errorf("publish verified SQLite Restore candidate: %w", err))
+		// A move error may be reported after the namespace changed but before
+		// its durability or identity-verification boundary is confirmed. Do not
+		// issue another mutation based on an assumed source/destination state.
+		return nil, fmt.Errorf("publish verified SQLite Restore candidate: %w", err)
 	}
 	journal.Phase = RestorePhasePublished
 	journal.UpdatedAt = time.Now().UTC()
