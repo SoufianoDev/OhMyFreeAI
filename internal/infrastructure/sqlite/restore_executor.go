@@ -27,9 +27,64 @@ type RestoreTransactionExecutor struct {
 }
 
 type restoreTransactionOperations struct {
-	openStore      func(context.Context, string) (*Store, error)
-	move           func(string, string, RestoreContentIdentity) error
-	newID          func() (string, error)
+	openStore     func(context.Context, string) (*Store, error)
+	move          func(string, string, RestoreContentIdentity) error
+	writeJournal  func(*restoreJournalLease, RestoreJournal, string) error
+	afterBoundary func(string)
+	newID         func() (string, error)
+}
+
+const (
+	restoreBoundaryBeforePrepared           = "before:prepared"
+	restoreBoundaryJournalPrepared          = "journal:prepared"
+	restoreBoundaryJournalStaging           = "journal:staging"
+	restoreBoundaryCandidateBuilt           = "candidate:built"
+	restoreBoundaryJournalCandidateIdentity = "journal:candidate-identity"
+	restoreBoundaryJournalPreservingPrevious = "journal:preserving-previous"
+	restoreBoundaryMovePreviousToRollback   = "move:previous-to-rollback"
+	restoreBoundaryJournalPreviousPreserved = "journal:previous-preserved"
+	restoreBoundaryJournalPublishing        = "journal:publishing"
+	restoreBoundaryMoveStagingToTarget      = "move:staging-to-target"
+	restoreBoundaryJournalPublished         = "journal:published"
+	restoreBoundaryJournalReopening         = "journal:reopening"
+	restoreBoundaryStoreCandidateOpened     = "store:candidate-opened"
+	restoreBoundaryJournalCommitted         = "journal:committed"
+	restoreBoundaryJournalRestoringPrevious = "journal:restoring-previous"
+	restoreBoundaryMoveTargetToQuarantine   = "move:candidate-to-quarantine"
+	restoreBoundaryMoveStagingToQuarantine  = "move:staging-to-quarantine"
+	restoreBoundaryMoveRollbackToTarget     = "move:rollback-to-target"
+	restoreBoundaryStorePreviousOpened      = "store:previous-opened"
+	restoreBoundaryJournalRolledBack        = "journal:rolled-back"
+)
+
+func (executor *RestoreTransactionExecutor) reachBoundary(boundary string) {
+	if executor.operations.afterBoundary != nil {
+		executor.operations.afterBoundary(boundary)
+	}
+}
+
+func (executor *RestoreTransactionExecutor) persistJournal(
+	lease *restoreJournalLease,
+	journal RestoreJournal,
+	boundary string,
+) error {
+	if err := executor.operations.writeJournal(lease, journal, boundary); err != nil {
+		return err
+	}
+	executor.reachBoundary(boundary)
+	return nil
+}
+
+func (executor *RestoreTransactionExecutor) moveArtifact(
+	source, destination string,
+	expected RestoreContentIdentity,
+	boundary string,
+) error {
+	if err := executor.operations.move(source, destination, expected); err != nil {
+		return err
+	}
+	executor.reachBoundary(boundary)
+	return nil
 }
 
 func NewRestoreTransactionExecutor(controller *StoreController, stateDirectory string) (*RestoreTransactionExecutor, error) {
@@ -44,9 +99,12 @@ func NewRestoreTransactionExecutor(controller *StoreController, stateDirectory s
 		controller:     controller,
 		stateDirectory: root,
 		operations: restoreTransactionOperations{
-			openStore:      openVerifiedRestoreStore,
-			move:           moveRestoreFileNoReplaceVerified,
-			newID:          newRestoreTransactionID,
+			openStore: openVerifiedRestoreStore,
+			move:      moveRestoreFileNoReplaceVerified,
+			writeJournal: func(lease *restoreJournalLease, journal RestoreJournal, _ string) error {
+				return lease.Write(journal)
+			},
+			newID: newRestoreTransactionID,
 		},
 	}, nil
 }
@@ -178,12 +236,13 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		ArchiveSize:              archiveIdentity.Size,
 		UpdatedAt:                time.Now().UTC(),
 	}
-	if err := lease.Write(journal); err != nil {
+	executor.reachBoundary(restoreBoundaryBeforePrepared)
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalPrepared); err != nil {
 		return reopenPrevious(fmt.Errorf("persist prepared SQLite Restore journal: %w", err))
 	}
 	journal.Phase = RestorePhaseStaging
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalStaging); err != nil {
 		return reopenPrevious(fmt.Errorf("persist SQLite Restore staging intent: %w", err))
 	}
 
@@ -191,13 +250,14 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if err != nil {
 		return reopenPrevious(fmt.Errorf("build staged SQLite Restore candidate: %w", err))
 	}
+	executor.reachBoundary(restoreBoundaryCandidateBuilt)
 	if !samePath(candidate.Path, stagingPath) || candidate.Identity.Size == 0 || candidate.Identity.SHA256 == "" {
 		return reopenPrevious(fmt.Errorf("%w: candidate builder returned an unexpected path or incomplete identity", ErrRestoreJournalInvalid))
 	}
 	journal.CandidateSHA256 = candidate.Identity.SHA256
 	journal.CandidateSize = candidate.Identity.Size
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalCandidateIdentity); err != nil {
 		return reopenPrevious(fmt.Errorf("persist staged SQLite Restore candidate identity: %w", err))
 	}
 	if candidate.Identity.matches(previousIdentity.SHA256, previousIdentity.Size) {
@@ -217,7 +277,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 
 	journal.Phase = RestorePhasePreservingPrevious
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalPreservingPrevious); err != nil {
 		return reopenPrevious(fmt.Errorf("persist previous-database preservation intent: %w", err))
 	}
 	if err := ensureNoSQLiteSidecars(target); err != nil {
@@ -226,12 +286,12 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if err := ensureNoSQLiteSidecars(rollbackPath); err != nil {
 		return executor.reopenPreviousIfVerified(target, previousIdentity, err)
 	}
-	if err := executor.operations.move(target, rollbackPath, previousIdentity); err != nil {
+	if err := executor.moveArtifact(target, rollbackPath, previousIdentity, restoreBoundaryMovePreviousToRollback); err != nil {
 		return executor.reopenPreviousIfVerified(target, previousIdentity, fmt.Errorf("preserve previous SQLite database: %w", err))
 	}
 	journal.Phase = RestorePhasePreviousPreserved
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalPreviousPreserved); err != nil {
 		return nil, fmt.Errorf("persist previous-database preservation completion: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
@@ -240,7 +300,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 
 	journal.Phase = RestorePhasePublishing
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalPublishing); err != nil {
 		return nil, fmt.Errorf("persist SQLite candidate publication intent: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
@@ -252,17 +312,17 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if err := ensureNoSQLiteSidecars(target); err != nil {
 		return executor.rollback(lease, journal, err)
 	}
-	if err := executor.operations.move(stagingPath, target, candidate.Identity); err != nil {
+	if err := executor.moveArtifact(stagingPath, target, candidate.Identity, restoreBoundaryMoveStagingToTarget); err != nil {
 		return executor.rollback(lease, journal, fmt.Errorf("publish verified SQLite Restore candidate: %w", err))
 	}
 	journal.Phase = RestorePhasePublished
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalPublished); err != nil {
 		return nil, fmt.Errorf("persist SQLite candidate publication completion: %w", err)
 	}
 	journal.Phase = RestorePhaseReopening
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalReopening); err != nil {
 		return nil, fmt.Errorf("persist SQLite candidate reopen intent: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
@@ -273,13 +333,14 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if err != nil {
 		return executor.rollback(lease, journal, fmt.Errorf("open and validate published SQLite candidate: %w", err))
 	}
+	executor.reachBoundary(restoreBoundaryStoreCandidateOpened)
 	if err := ctx.Err(); err != nil {
 		_ = candidateStore.Close()
 		return executor.rollback(lease, journal, err)
 	}
 	journal.Phase = RestorePhaseCommitted
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalCommitted); err != nil {
 		_ = candidateStore.Close()
 		return nil, fmt.Errorf("persist committed SQLite Restore transaction: %w", err)
 	}
@@ -324,7 +385,7 @@ func (executor *RestoreTransactionExecutor) rollback(
 
 	journal.Phase = RestorePhaseRestoringPrevious
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalRestoringPrevious); err != nil {
 		return nil, errors.Join(cause, fmt.Errorf("persist SQLite Restore rollback intent: %w", err))
 	}
 	files, err := inspectRestoreRecoveryFiles(executor.stateDirectory, journal)
@@ -345,10 +406,10 @@ func (executor *RestoreTransactionExecutor) rollback(
 		if err := ensureNoSQLiteSidecars(journal.CandidateQuarantinePath); err != nil {
 			return nil, errors.Join(cause, err)
 		}
-		if err := executor.operations.move(journal.TargetPath, journal.CandidateQuarantinePath, RestoreContentIdentity{
+		if err := executor.moveArtifact(journal.TargetPath, journal.CandidateQuarantinePath, RestoreContentIdentity{
 			Size: journal.CandidateSize,
 			SHA256: journal.CandidateSHA256,
-		}); err != nil {
+		}, restoreBoundaryMoveTargetToQuarantine); err != nil {
 			return nil, errors.Join(cause, fmt.Errorf("quarantine failed SQLite Restore candidate: %w", err))
 		}
 	}
@@ -359,10 +420,10 @@ func (executor *RestoreTransactionExecutor) rollback(
 		if err := ensureNoSQLiteSidecars(journal.CandidateQuarantinePath); err != nil {
 			return nil, errors.Join(cause, err)
 		}
-		if err := executor.operations.move(journal.StagingPath, journal.CandidateQuarantinePath, RestoreContentIdentity{
+		if err := executor.moveArtifact(journal.StagingPath, journal.CandidateQuarantinePath, RestoreContentIdentity{
 			Size: journal.CandidateSize,
 			SHA256: journal.CandidateSHA256,
-		}); err != nil {
+		}, restoreBoundaryMoveStagingToQuarantine); err != nil {
 			return nil, errors.Join(cause, fmt.Errorf("quarantine staged SQLite Restore candidate: %w", err))
 		}
 	}
@@ -373,10 +434,10 @@ func (executor *RestoreTransactionExecutor) rollback(
 		if err := ensureNoSQLiteSidecars(journal.TargetPath); err != nil {
 			return nil, errors.Join(cause, err)
 		}
-		if err := executor.operations.move(journal.RollbackPath, journal.TargetPath, RestoreContentIdentity{
+		if err := executor.moveArtifact(journal.RollbackPath, journal.TargetPath, RestoreContentIdentity{
 			Size: journal.PreviousSize,
 			SHA256: journal.PreviousSHA256,
-		}); err != nil {
+		}, restoreBoundaryMoveRollbackToTarget); err != nil {
 			return nil, errors.Join(cause, fmt.Errorf("restore previous SQLite database: %w", err))
 		}
 	}
@@ -395,9 +456,10 @@ func (executor *RestoreTransactionExecutor) rollback(
 	if err != nil {
 		return nil, errors.Join(cause, fmt.Errorf("open and validate rolled-back SQLite database: %w", err))
 	}
+	executor.reachBoundary(restoreBoundaryStorePreviousOpened)
 	journal.Phase = RestorePhaseRolledBack
 	journal.UpdatedAt = time.Now().UTC()
-	if err := lease.Write(journal); err != nil {
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalRolledBack); err != nil {
 		return restoredStore, errors.Join(cause, fmt.Errorf("persist rolled-back SQLite Restore transaction: %w", err))
 	}
 	return restoredStore, cause
