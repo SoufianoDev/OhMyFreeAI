@@ -15,22 +15,22 @@ import (
 )
 
 type RestoreTransactionRequest struct {
-	ArchivePath string
-	MigrationFS fs.FS
+	ArchivePath  string
+	MigrationFS  fs.FS
 	MigrationDir string
 }
 
 type RestoreTransactionExecutor struct {
-	controller *StoreController
+	controller     *StoreController
 	stateDirectory string
-	operations restoreTransactionOperations
+	operations     restoreTransactionOperations
 }
 
 type restoreTransactionOperations struct {
 	buildCandidate func(context.Context, string, string, string, fs.FS, string) (RestoreCandidate, error)
-	openStore func(context.Context, string) (*Store, error)
-	move func(string, string, RestoreContentIdentity) error
-	newID func() (string, error)
+	openStore      func(context.Context, string) (*Store, error)
+	move           func(string, string, RestoreContentIdentity) error
+	newID          func() (string, error)
 }
 
 func NewRestoreTransactionExecutor(controller *StoreController, stateDirectory string) (*RestoreTransactionExecutor, error) {
@@ -42,13 +42,13 @@ func NewRestoreTransactionExecutor(controller *StoreController, stateDirectory s
 		return nil, err
 	}
 	return &RestoreTransactionExecutor{
-		controller: controller,
+		controller:     controller,
 		stateDirectory: root,
 		operations: restoreTransactionOperations{
 			buildCandidate: BuildRestoreCandidateAtPath,
-			openStore: openVerifiedRestoreStore,
-			move: moveRestoreFileNoReplaceVerified,
-			newID: newRestoreTransactionID,
+			openStore:      openVerifiedRestoreStore,
+			move:           moveRestoreFileNoReplaceVerified,
+			newID:          newRestoreTransactionID,
 		},
 	}, nil
 }
@@ -96,19 +96,26 @@ func (executor *RestoreTransactionExecutor) Execute(ctx context.Context, request
 	}
 	current, readErr := lease.Read()
 	if readErr == nil && !terminalRestorePhase(current.Phase) {
-		_ = lease.Close()
-		return fmt.Errorf("%w: transaction %q is still active in phase %q", ErrRestoreRecoveryAmbiguous, current.TransactionID, current.Phase)
+		closeErr := lease.Close()
+		return errors.Join(
+			fmt.Errorf("%w: transaction %q is still active in phase %q", ErrRestoreRecoveryAmbiguous, current.TransactionID, current.Phase),
+			closeErr,
+		)
 	}
 	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
-		_ = lease.Close()
-		return readErr
+		return errors.Join(readErr, lease.Close())
 	}
 
-	operationErr := executor.controller.WithExclusive(ctx, func(store *Store) (*Store, error) {
-		return executor.executeLocked(ctx, lease, store, archivePath, archiveIdentity, request)
-	})
-	closeErr := lease.Close()
-	return errors.Join(operationErr, closeErr)
+	var operationErr error
+	func() {
+		defer func() {
+			operationErr = errors.Join(operationErr, lease.Close())
+		}()
+		operationErr = executor.controller.WithExclusive(ctx, func(store *Store) (*Store, error) {
+			return executor.executeLocked(ctx, lease, store, archivePath, archiveIdentity, request)
+		})
+	}()
+	return operationErr
 }
 
 func (executor *RestoreTransactionExecutor) executeLocked(
@@ -169,19 +176,19 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 
 	previousExists := true
 	journal := RestoreJournal{
-		Version: restoreJournalVersion,
-		TransactionID: transactionID,
-		Phase: RestorePhasePrepared,
-		TargetPath: target,
-		StagingPath: stagingPath,
-		RollbackPath: rollbackPath,
-		CandidateQuarantinePath: quarantinePath,
-		PreviousDatabaseExisted: &previousExists,
-		PreviousSHA256: previousIdentity.SHA256,
-		PreviousSize: previousIdentity.Size,
-		ArchiveSHA256: archiveIdentity.SHA256,
-		ArchiveSize: archiveIdentity.Size,
-		UpdatedAt: time.Now().UTC(),
+		Version:                  restoreJournalVersion,
+		TransactionID:            transactionID,
+		Phase:                    RestorePhasePrepared,
+		TargetPath:               target,
+		StagingPath:              stagingPath,
+		RollbackPath:             rollbackPath,
+		CandidateQuarantinePath:  quarantinePath,
+		PreviousDatabaseExisted:  &previousExists,
+		PreviousSHA256:           previousIdentity.SHA256,
+		PreviousSize:             previousIdentity.Size,
+		ArchiveSHA256:            archiveIdentity.SHA256,
+		ArchiveSize:              archiveIdentity.Size,
+		UpdatedAt:                time.Now().UTC(),
 	}
 	if err := lease.Write(journal); err != nil {
 		return reopenPrevious(fmt.Errorf("persist prepared SQLite Restore journal: %w", err))
@@ -237,7 +244,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		return nil, fmt.Errorf("persist previous-database preservation completion: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
-		return executor.rollback(ctx, lease, journal, err)
+		return executor.rollback(lease, journal, err)
 	}
 
 	journal.Phase = RestorePhasePublishing
@@ -246,10 +253,10 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		return nil, fmt.Errorf("persist SQLite candidate publication intent: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
-		return executor.rollback(ctx, lease, journal, err)
+		return executor.rollback(lease, journal, err)
 	}
 	if err := executor.operations.move(stagingPath, target, candidate.Identity); err != nil {
-		return executor.rollback(ctx, lease, journal, fmt.Errorf("publish verified SQLite Restore candidate: %w", err))
+		return executor.rollback(lease, journal, fmt.Errorf("publish verified SQLite Restore candidate: %w", err))
 	}
 	journal.Phase = RestorePhasePublished
 	journal.UpdatedAt = time.Now().UTC()
@@ -262,16 +269,16 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		return nil, fmt.Errorf("persist SQLite candidate reopen intent: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
-		return executor.rollback(ctx, lease, journal, err)
+		return executor.rollback(lease, journal, err)
 	}
 
 	candidateStore, err := executor.operations.openStore(ctx, target)
 	if err != nil {
-		return executor.rollback(ctx, lease, journal, fmt.Errorf("open and validate published SQLite candidate: %w", err))
+		return executor.rollback(lease, journal, fmt.Errorf("open and validate published SQLite candidate: %w", err))
 	}
 	if err := ctx.Err(); err != nil {
 		_ = candidateStore.Close()
-		return executor.rollback(ctx, lease, journal, err)
+		return executor.rollback(lease, journal, err)
 	}
 	journal.Phase = RestorePhaseCommitted
 	journal.UpdatedAt = time.Now().UTC()
@@ -311,7 +318,6 @@ func (executor *RestoreTransactionExecutor) reopenPreviousIfVerified(
 }
 
 func (executor *RestoreTransactionExecutor) rollback(
-	ctx context.Context,
 	lease *restoreJournalLease,
 	journal RestoreJournal,
 	cause error,
@@ -442,7 +448,7 @@ func readRestoreArchiveIdentity(path string) (RestoreContentIdentity, error) {
 	closeErr := file.Close()
 	if copyErr != nil || statErr != nil || closeErr != nil {
 		return identity, errors.Join(
-			fmt.Errorf("read SQLite Restore archive identity: %w", copyErr),
+			wrapRestoreArchiveError("read SQLite Restore archive identity", copyErr),
 			wrapRestoreArchiveError("reinspect SQLite Restore archive", statErr),
 			wrapRestoreArchiveError("close SQLite Restore archive", closeErr),
 		)
@@ -451,7 +457,8 @@ func readRestoreArchiveIdentity(path string) (RestoreContentIdentity, error) {
 	if err != nil {
 		return identity, fmt.Errorf("reinspect SQLite Restore archive path: %w", err)
 	}
-	if !after.Mode().IsRegular() || !os.SameFile(before, after) || !os.SameFile(after, afterPath) ||
+	if !after.Mode().IsRegular() || !afterPath.Mode().IsRegular() ||
+		!os.SameFile(before, after) || !os.SameFile(after, afterPath) ||
 		size == 0 || size != after.Size() || before.Size() != after.Size() ||
 		!before.ModTime().Equal(after.ModTime()) {
 		return identity, fmt.Errorf("%w: archive changed while being read", ErrRestoreSourceInvalid)
