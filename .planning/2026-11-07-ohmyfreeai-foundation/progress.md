@@ -1839,3 +1839,32 @@ Intermediate CI failures during this test-first sequence were inspected and corr
 The previously running Debian 12 legacy GTK3/WebKit41 job completed successfully. Linux distribution compatibility run [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872) is now **8/8 successful**. Its Debian 12 log confirms CLI smoke, backup no-overwrite/existing-database preservation, two WebView-to-Go bridge launches, and database reopen.
 
 All four workflow families for exact test head 10b8fa2c4f44ffd2184adb430317985868c3657a are now complete and green: Root CI 2/2, SQLite driver evaluation 4/4, Wails platform proof 2/2, and Linux distribution compatibility 8/8 (**16/16 jobs total**). The earlier 7/8 note above records the state at the time of that check; this section supersedes it.
+
+
+## 2026-11-14 — move-error and staging-quarantine fault qualification
+
+### Requested baseline and StoreController gate
+- Rechecked historical Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on f5396ee592b9b9756779f67aeabd6d7167520c40 through the GitHub connector. Ubuntu and Windows jobs are both completed/successful; every listed step succeeded and no failure log exists.
+- Revalidated the current StoreController integration: 16 TestStoreController tests, plus the backup archive publication/drain test. Wails composition root, AppService, configuration, Wails/CLI backup and controller shutdown all use the shared controller/lease boundary. This stage is complete; no duplicate integration was made.
+- The preceding exact code/test head 10b8fa2c4f44ffd2184adb430317985868c3657a has complete evidence: Root 2/2, SQLite evaluation 4/4, Wails 2/2, Linux distribution matrix 8/8 (16/16 total).
+
+### Move-error safety changes
+- Added a private post-namespace-mutation fault seam to the verified no-replace move path. Production calls pass nil.
+- Linux tests can now inject an error after renameat2(RENAME_NOREPLACE) has changed the namespace but before the pinned parent-directory fsync is attempted.
+- Windows tests inject after the handle-bound fixed-local-NTFS write-through rename call returns and before common post-move identity verification. This is not described as a pre-flush error: the Windows write-through rename call itself is the qualified metadata barrier.
+- Changed the executor to fail closed on any candidate-publication move error. It no longer attempts rollback from an uncertain source/destination state; the StoreController stays unavailable and the journal/artifacts remain for later recovery inspection.
+- Added before/after-namespace error cases for all five no-replace move roles: previous→rollback, staging→target, target→quarantine, staging→quarantine, and rollback→target. Each test verifies the journal phase, recovery planner result, controller availability, and actual source/destination content identity.
+- Added the missing abrupt-process-death boundary for staging→quarantine by cancelling immediately after the publishing intent and exiting after the quarantine move. This tests recovery planning; it does not implement startup recovery or simulate power loss.
+
+### Commits and current CI
+- Common move seam: [771f0bc](https://github.com/SoufianoDev/OhMyFreeAI/commit/771f0bc5ee66a96d3304b2316f2e8fed8a84a04c).
+- Linux post-rename/pre-directory-fsync seam: [c7dd422](https://github.com/SoufianoDev/OhMyFreeAI/commit/c7dd4220bed8647a64021de990793450182eb4da).
+- Windows post-rename/pre-identity-verification seam: [40af172](https://github.com/SoufianoDev/OhMyFreeAI/commit/40af172a3e5f74312746cb3eb0f215b8dfae7f55).
+- Fail-closed executor behavior: [b91a159](https://github.com/SoufianoDev/OhMyFreeAI/commit/b91a15912cf3694650d87a6da2131077dffbeb4c).
+- Move-error and process-death tests: [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65497f9c853904badb286db111193320d168bc1).
+- Root CI [43609032459](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43609032459) was observed in progress: Ubuntu was at Go setup and Windows was queued. No test result is claimed yet. No local Go test execution is claimed.
+
+### Safety and next step
+- Restore remains disabled and the executor remains unwired to startup, Wails, GUI and CLI. No automatic cleanup of ambiguous artifacts was added.
+- Recheck Root CI 43609032459, inspect both OS jobs and logs, and fix any regression before proceeding. After the exact-head matrix passes, continue with actual restart reconciliation design/tests; do not add startup recovery or UI/CLI wiring until the full safety matrix passes.
+- foundation/bootstrap is 916 commits ahead and 0 behind main; main was not changed. No merge or force-push.
