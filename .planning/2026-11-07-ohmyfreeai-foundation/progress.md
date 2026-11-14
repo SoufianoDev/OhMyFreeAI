@@ -1832,3 +1832,10 @@ Intermediate CI failures during this test-first sequence were inspected and corr
 - foundation/bootstrap is 905 commits ahead of main, 0 behind. main was not modified; no merge or force-push was performed.
 - Restore remains disabled. The executor is not wired to startup, Wails, GUI or CLI. No startup recovery coordinator exists.
 - Next: add move-error injection for every no-replace move, including an error returned after namespace rename but before the directory durability barrier is confirmed; add the missing process-death point for staging-to-quarantine. Then implement and test actual restart reconciliation. Keep all uncertain artifacts and keep Restore disabled until the complete Linux/Windows matrix passes.
+
+
+## 2026-11-14 — exact-head CI matrix closed
+
+The previously running Debian 12 legacy GTK3/WebKit41 job completed successfully. Linux distribution compatibility run [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872) is now **8/8 successful**. Its Debian 12 log confirms CLI smoke, backup no-overwrite/existing-database preservation, two WebView-to-Go bridge launches, and database reopen.
+
+All four workflow families for exact test head 10b8fa2c4f44ffd2184adb430317985868c3657a are now complete and green: Root CI 2/2, SQLite driver evaluation 4/4, Wails platform proof 2/2, and Linux distribution compatibility 8/8 (**16/16 jobs total**). The earlier 7/8 note above records the state at the time of that check; this section supersedes it.
