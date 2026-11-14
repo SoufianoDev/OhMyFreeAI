@@ -1753,3 +1753,46 @@ Proceed test-first with the collision-safe filesystem recovery executor, followi
 - Keep the retained JSON ledger. Linux `flock`, Windows `LockFileEx`, no-follow readers and fixed-local-NTFS write-through publication are now the qualified journal path. The Windows lock must be single-link; that invariant is now tested.
 - The next engineering task is the isolated Restore transaction executor. It must hold one journal lease and the StoreController exclusive lease for the full transaction, persist every intent before mutation, use only verified no-replace moves, verify size/SHA-256 before opening SQLite, and preserve rollback/quarantine evidence. Add Linux/Windows failure-injection and process-death/restart tests before any application wiring.
 - Restore remains disabled; `main` was not modified or merged.
+
+
+## 2026-11-14 — first isolated Restore transaction executor slice
+
+### CI and requested historical run
+- Rechecked historical Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee`: completed successfully on Ubuntu and Windows (2/2).
+- Current code/test head: [8f2999cc02d1ba803c6a0f3b5f1a8b22c912c0ef](https://github.com/SoufianoDev/OhMyFreeAI/commit/8f2999cc02d1ba803c6a0f3b5f1a8b22c912c0ef), branch `foundation/bootstrap`.
+- Root CI [43604778121](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604778121): SUCCESS (2/2). Ubuntu passed vet, Go tests, race detector, build, Python compile/tests, frontend syntax and architecture checks. Windows passed vet, Go tests, build, Python compile/tests, frontend syntax and architecture checks; Linux-only race step was skipped as expected.
+- Wails platform proof [43604778158](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604778158): SUCCESS (2/2). Ubuntu native build, CLI dispatch, executable verification, WebView bridge and database reopen passed. Windows native build, CLI dispatch and executable verification passed.
+- SQLite driver evaluation [43604778118](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604778118): SUCCESS (4/4), modernc/ncruces on Ubuntu/Windows.
+- Linux distribution compatibility [43604778106](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604778106): still running/queued at this update; Fedora 44 GTK4 completed successfully and the other seven matrix jobs were queued. Do not count this matrix as complete.
+
+### StoreController gate revalidation
+- Re-fetched the Wails composition root, AppService, controller, controller tests, config repository and backup manager on the current branch.
+- The integration remains complete: one application-lifetime StoreController in the Wails composition root; AppService and configuration use the controller; Wails and CLI backup export hold shared leases through archive verification and publication; shutdown drains through controller Close.
+- The current tree has 16 `TestStoreController*` tests plus `TestManagerCreateWithStoreControllerDrainsBeforeClose`. Root CI passed these on Ubuntu and Windows.
+- No StoreController implementation was duplicated or changed in this run.
+
+### Executor implementation
+- Added an isolated `RestoreTransactionExecutor` in `internal/infrastructure/sqlite/restore_executor.go`. It is not wired to Wails, CLI, startup recovery or a user-facing Restore entry point.
+- The executor holds one `restoreJournalLease` and the StoreController exclusive lease across candidate construction and the complete transaction.
+- It checkpoints and closes the active Store, captures the previous database size/SHA-256, records the selected archive identity, persists prepared/staging/preserving-previous/previous-preserved/publishing/published/reopening/committed phases, and uses only `moveRestoreFileNoReplaceVerified` for database artifact moves.
+- The move helper performs post-move no-follow identity verification before the executor opens the candidate with SQLite. The executor validates the reopened Store and retains the previous database as rollback evidence.
+- If candidate reopen fails, the executor persists restoring-previous intent, moves the candidate to the pre-recorded quarantine path, restores the verified previous database without replacement, reopens it, and records rolled-back. Unexpected destination/sidecar collisions are preserved and fail closed.
+- The archive-to-candidate boundary is a `RestoreCandidateBuilder` callback so the backup layer can inspect/extract the actual `.omfaibackup` container and produce a verified SQLite candidate without introducing an import cycle. The current unit tests exercise the SQLite candidate builder directly; the production backup-manager callback is not wired yet.
+- Added tests for successful publication with retained rollback, candidate-reopen rollback/quarantine, unexpected rollback collision preservation, sidecar-collision rejection before journal creation, and holding both journal and StoreController leases throughout candidate construction.
+
+### Failure found and corrected during this run
+- An intermediate Root CI run [43604406561](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43604406561) failed on Ubuntu because the executor treated SQLite sidecars created by read-only source opens as source corruption after candidate construction. That false rejection also prevented rollback/collision/lease tests from reaching their intended branches.
+- Corrected the boundary: the executor now delegates archive inspection/extraction/candidate construction to the callback, hashes the original archive before and after the callback, and does not reject SQLite-generated read-only source sidecars after the builder returns. It still rejects pre-existing sidecars at the active target and checks target/staging/rollback/quarantine sidecars at mutation boundaries.
+- The exact final head `8f2999cc` passed Root CI on both platforms, including the new transaction tests and Ubuntu race detector.
+
+### Remaining safety gates
+- This is the first in-process executor slice, not a complete Restore implementation.
+- No process-death/restart matrix exists for every journal write, no-replace move, directory-sync boundary, candidate reopen and rollback boundary.
+- No startup recovery coordinator exists; the executor must remain uncalled until restart recovery can inspect and reconcile active intent phases before opening the canonical Store.
+- The backup-manager callback is not connected to AppService or CLI. GUI/CLI Restore and startup recovery remain absent.
+- Windows write-through behavior remains scoped to fixed local NTFS and is not a hardware-independent power-loss guarantee. Linux source-leaf selection remains name-based at the final rename; post-move verification is mandatory and does not eliminate every same-user race.
+- Restore remains disabled. `main` was not touched, no merge or force-push occurred.
+
+### Next step
+- Add deterministic Linux/Windows failure-injection and abrupt-process-death/restart tests for every executor transition. Verify that restart planning preserves ambiguous artifacts and restores the previous database before any Store open when the journal is in an active intent phase.
+- Then connect the backup-manager candidate builder to an internal application service only after the recovery coordinator and full safety matrix pass. Do not add GUI/CLI Restore or enable Restore before that gate.
