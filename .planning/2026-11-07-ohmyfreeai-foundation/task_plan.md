@@ -6,7 +6,11 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-Latest verified code/test head: `5f679e5645a4893e22b5fc6ff1e2e6e9900e70cc` on `foundation/bootstrap` (2026-11-12). Two later commits relative to this code/test head are planning-file-only; no later production or test code was observed. The latest production-code head remains `1cde3c316fbf11271fe427c9c03e6ea67c380f47`. The next gate is journal-protocol qualification, not StoreController integration: that integration and its Linux/Windows CI prerequisites are complete. Do not implement the filesystem executor until sidecar no-follow/open semantics, cross-process journal serialization, and platform durability are qualified.
+**Current verified code/test head:** `8f2999cc02d1ba803c6a0f3b5f1a8b22c912c0ef` on `foundation/bootstrap` (2026-11-14). StoreController integration is complete. The first isolated in-process Restore transaction executor slice is implemented and passes exact-head Root CI on Ubuntu/Windows, Wails platform proof, and the SQLite driver matrix. The Linux distribution matrix has one successful Fedora 44 job and seven jobs still queued at this update.
+
+The next gate is the complete Linux/Windows executor failure-injection and process-death/restart matrix. The executor is not wired into the app; startup recovery, GUI/CLI Restore and Restore enablement remain prohibited until restart reconciliation is implemented and verified. Do not touch or merge `main`.
+
+Older dated sections below are historical checkpoints. This current status supersedes their earlier statements that journal qualification or the executor implementation had not yet been completed.
 
 ### Current CI evidence
 
@@ -46,11 +50,13 @@ The coordinated Store lifecycle stage is complete and present in the current tre
 
 The prerequisite is satisfied. The retained journal ledger, recovery planner, no-replace moves, no-follow identity verification and staging-only candidate builder remain infrastructure-only. None is connected to startup, GUI or CLI Restore.
 
-### Immediate gate — settle journal storage before the executor
+### Immediate gate — executor safety matrix before application wiring
 
-Do not start the filesystem transaction executor until the durability and recovery contract for every journal phase update is settled.
+The retained JSON ledger is the selected production journal. SQLite PERSIST is rejected for the pinned modernc driver because the Windows sidecar symlink probe showed it following the PERSIST sidecar symlink and modifying its external target. The JSON ledger is bounded to 256 records / 1 MiB, retains terminal history, rejects malformed or concurrent active transaction state, and uses platform-specific publication. Linux uses parent-directory sync; Windows uses the handle-bound write-through rename path under the fixed-local-NTFS policy, with the hardware/controller flush caveat retained.
 
-The current production journal remains the retained JSON ledger. It is bounded to 256 records / 1 MiB, retains terminal history, rejects malformed or concurrent active transaction state, and uses platform-specific atomic publication. Initial publication now uses a no-replace move followed by no-follow size/SHA-256 verification. Subsequent ledger updates use same-directory atomic replacement with a Linux parent-directory sync or the Windows handle-bound NTFS write-through rename path. The PERSIST alternative below remains an evaluation candidate only; it has not replaced the JSON ledger.
+The first in-process transaction executor slice now exists. It holds one journal lease and the StoreController exclusive lease across candidate construction and transaction moves, persists phase intents, verifies moved identities before SQLite open, retains rollback, and attempts journaled quarantine/rollback when candidate reopen fails. Its archive-to-candidate boundary is a callback so the backup layer can validate/extract the actual archive without an import cycle.
+
+The remaining gate is not journal selection. It is deterministic failure-injection and abrupt-process-death/restart coverage for every executor transition on Linux and Windows, followed by a startup recovery coordinator that runs before opening the canonical Store. Do not wire the executor to Wails, CLI or startup yet.
 
 ### SQLite PERSIST candidate — driver and process-death evidence
 
@@ -84,23 +90,22 @@ This evidence is process-death and driver-behavior evidence only. It is not powe
 3. Extend process-death tests to the relevant commit and reopen boundaries, preserving transaction history. Do not infer power-loss safety from process termination.
 4. Compare the complete PERSIST design against the retained JSON ledger, including concurrent-process serialization, recovery, migration and operational complexity. Adopt PERSIST only if evidence is strictly stronger and migration is lossless. Otherwise explicitly retain JSON and finish qualifying its update/locking protocol.
 
-### Subsequent engineering unit — isolated transaction executor
+### Executor safety matrix and application-wiring gate
 
-Only after the journal protocol is explicitly selected and qualified, implement the StoreController-backed filesystem transaction executor as an infrastructure-only component:
+The initial executor slice is implemented in `internal/infrastructure/sqlite/restore_executor.go`. It is infrastructure-only and has no production call site. Its current tests cover successful publication with rollback retention, candidate-reopen rollback/quarantine, unexpected rollback collision preservation, sidecar-collision rejection before journal creation, and holding the journal plus exclusive StoreController leases through candidate construction.
 
-1. Acquire the exclusive lease, drain shared work, checkpoint/close the active Store, and establish the previous database's no-follow size/SHA-256 identity.
-2. Validate the already journal-selected staging, rollback and quarantine paths. Build or consume the staged candidate without touching the live Store; persist the candidate identity before any publication move.
-3. Persist each intent phase before its corresponding namespace mutation.
-4. Use only the qualified no-replace move adapter. Immediately after each successful move, verify the moved file's size and SHA-256 through a no-follow handle before opening it with SQLite.
-5. Reopen and validate the candidate (integrity, foreign keys, migration history, configuration and required repositories). Publish the new Store through the controller only after the commit decision is durably recorded.
-6. If publication/reopen fails, persist rollback intent, quarantine the candidate at its pre-recorded path, restore the verified previous database without replacement, reopen and validate it, and record `rolled-back`. Preserve every artifact and leave the controller unavailable if any step is ambiguous.
-7. Add deterministic failure injection and abrupt-process-death/restart coverage on Linux and Windows before startup recovery or application-level Restore wiring.
+Remaining required work:
+1. Add failure injection around every journal write and no-replace move boundary, including uncertain post-rename directory-sync outcomes.
+2. Add subprocess termination/restart tests for every durable intent phase and each side of every move. Restart must inspect the journal and all artifacts before opening SQLite; ambiguous combinations preserve every artifact and keep Store unavailable.
+3. Verify rollback and candidate reopen failures on both Linux and Windows, including sidecar/reparse/collision cases and no-replace destination races.
+4. Integrate the backup manager's archive inspect/extract/candidate builder through the executor callback, then add an integration test using a real `.omfaibackup` container.
+5. Only after the full matrix passes, add a startup recovery coordinator that runs before the canonical Store is opened. GUI/CLI Restore remains a later, separately gated step.
 
-The current JSON ledger remains bounded to 256 records / 1 MiB; automatic pruning/deletion is unsupported. Linux source-leaf selection is still name-based at the final rename call, so post-move identity verification is mandatory and does not eliminate every same-user race. Windows write-through behavior is qualified only for fixed local NTFS and is not hardware-independent power-loss certification.
+The JSON ledger remains bounded to 256 records / 1 MiB; automatic pruning/deletion is unsupported. Linux source-leaf selection remains name-based at the final rename call, so post-move identity verification is mandatory and does not eliminate every same-user race. Windows write-through behavior is qualified only for fixed local NTFS and is not hardware-independent power-loss certification.
 
 Do not add startup recovery, GUI/CLI Restore, or enable Restore until the complete journal, executor, rollback and process-death matrix passes on both platforms.
 
-**Delivery warning:** at the verified code/test head `5f679e5`, `foundation/bootstrap` is 861 commits ahead of `main` and 0 behind. The commits since `1cde3c` are confined to isolated SQLite driver-evaluation tests and planning records; no production Restore implementation was added. Do not merge the branch wholesale. Prepare a selective delivery containing only required runtime/build files and essential user documentation when the first genuinely testable build is ready; no merge is authorized by this plan update.
+**Delivery warning:** at the verified code/test head `8f2999cc`, `foundation/bootstrap` is 894 commits ahead of `main` and 0 behind. The commits since the prior journal-qualification checkpoint include the isolated executor and its tests; they are not ready for selective delivery. Do not merge the branch wholesale. When the first genuinely testable build is ready, curate only the runtime/build files and essential user documentation; no merge is authorized by this plan update.
 
 ## Current Phase
 
