@@ -266,6 +266,9 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if err := lease.Write(journal); err != nil {
 		return reopenPrevious(fmt.Errorf("persist previous-database preservation intent: %w", err))
 	}
+	if err := ensureNoSQLiteSidecars(target); err != nil {
+		return executor.reopenPreviousIfVerified(target, previousIdentity, err)
+	}
 	if err := ensureNoSQLiteSidecars(rollbackPath); err != nil {
 		return executor.reopenPreviousIfVerified(target, previousIdentity, err)
 	}
