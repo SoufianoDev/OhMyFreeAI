@@ -8,10 +8,14 @@ import (
 )
 
 func moveRestoreFileNoReplace(source, destination string) error {
+	return moveRestoreFileNoReplaceWithHook(source, destination, nil)
+}
+
+func moveRestoreFileNoReplaceWithHook(source, destination string, afterNamespaceMutation func() error) error {
 	if err := validateRestoreMovePaths(source, destination); err != nil {
 		return err
 	}
-	if err := moveRestoreFileNoReplacePlatform(source, destination); err != nil {
+	if err := moveRestoreFileNoReplacePlatformWithHook(source, destination, afterNamespaceMutation); err != nil {
 		return fmt.Errorf("move SQLite restore artifact without replacement: %w", err)
 	}
 	return nil
@@ -22,10 +26,18 @@ func moveRestoreFileNoReplace(source, destination string) error {
 // A mismatch or verification error deliberately leaves the destination in
 // place for manual/recovery handling; callers must not open it as SQLite.
 func moveRestoreFileNoReplaceVerified(source, destination string, expected RestoreContentIdentity) error {
+	return moveRestoreFileNoReplaceVerifiedWithHook(source, destination, expected, nil)
+}
+
+func moveRestoreFileNoReplaceVerifiedWithHook(
+	source, destination string,
+	expected RestoreContentIdentity,
+	afterNamespaceMutation func() error,
+) error {
 	if err := validateRestoreContentIdentity(expected.SHA256, expected.Size, "restore move", true); err != nil {
 		return err
 	}
-	if err := moveRestoreFileNoReplace(source, destination); err != nil {
+	if err := moveRestoreFileNoReplaceWithHook(source, destination, afterNamespaceMutation); err != nil {
 		return err
 	}
 
