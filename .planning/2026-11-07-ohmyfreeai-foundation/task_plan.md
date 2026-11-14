@@ -58,7 +58,7 @@ The first in-process transaction executor slice now exists. It holds one journal
 
 The remaining gate is not journal selection. It is deterministic failure-injection and abrupt-process-death/restart coverage for every executor transition on Linux and Windows, followed by a startup recovery coordinator that runs before opening the canonical Store. Do not wire the executor to Wails, CLI or startup yet.
 
-### SQLite PERSIST candidate — driver and process-death evidence
+### SQLite PERSIST evaluation — rejected for production
 
 The isolated evaluation module now verifies modernc v1.62.0 and ncruces v0.37.0 independently on Ubuntu 24.04 and Windows:
 
@@ -69,7 +69,7 @@ The isolated evaluation module now verifies modernc v1.62.0 and ncruces v0.37.0 
 - Normal SQLite open/use silently creates a missing database file and recreates a missing PERSIST sidecar. SQLite itself therefore does **not** provide the required fail-closed behavior. A production candidate must no-follow preflight both pre-provisioned artifacts and open existing files only before any restore phase can be written.
 - The new `TestSQLiteExistingOnlyOpenRequiresExistingDatabase` probe passes in all four driver/OS combinations. It proves that the main DB can be opened without CREATE (URI `mode=rw` where the pinned driver/VFS supports the URI, and native `OPEN_READWRITE` for ncruces on Windows) and that a missing main DB is not created.
 - The existing `TestSQLiteSilentlyRecreatesMissingRestoreControlArtifacts` still passes in all four combinations: a missing PERSIST sidecar is recreated when a later journaled write occurs. Existing-only main-database open is therefore insufficient. The sidecar needs its own no-follow preflight and identity revalidation before any journal write.
-- This probe does not establish a race-free DB/sidecar preflight, durable pre-provisioning, concurrent-process serialization, or power-loss safety. PERSIST remains unapproved.
+- This probe does not establish a race-free DB/sidecar preflight, durable pre-provisioning, concurrent-process serialization, or power-loss safety. PERSIST is rejected for the pinned production driver; retain the JSON ledger.
 
 This evidence is process-death and driver-behavior evidence only. It is not power-loss certification and does not prove durable initial DB/sidecar provisioning.
 
