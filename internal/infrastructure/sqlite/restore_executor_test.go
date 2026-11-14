@@ -1,10 +1,12 @@
 package sqlite
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io/fs"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"sync"
@@ -199,20 +201,40 @@ func TestRestoreTransactionExecutorHoldsJournalAndStoreLeasesDuringBuild(t *test
 		t.Fatal("candidate build did not reach the lease assertion point")
 	}
 
-	journalContext, cancelJournal := context.WithTimeout(context.Background(), 150*time.Millisecond)
-	defer cancelJournal()
-	lease, err := acquireRestoreJournalLease(journalContext, root)
-	if lease != nil {
-		_ = lease.Close()
-		t.Fatal("another operation acquired the journal lease during Restore")
+	readyPath := filepath.Join(root, "lease-ready")
+	releasePath := filepath.Join(root, "lease-release")
+	command := exec.Command(os.Args[0], "-test.run=^TestRestoreJournalLeaseProcessHelper$")
+	command.Env = append(os.Environ(),
+		restoreJournalLeaseChildEnv+"=1",
+		restoreJournalLeaseRootEnv+"="+root,
+		restoreJournalLeaseReadyEnv+"="+readyPath,
+		restoreJournalLeaseReleaseEnv+"="+releasePath,
+	)
+	var output bytes.Buffer
+	command.Stdout = &output
+	command.Stderr = &output
+	if err := command.Start(); err != nil {
+		t.Fatalf("start second journal process: %v", err)
 	}
-	if !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("second journal lease error = %v, want context deadline exceeded", err)
+	childExited := false
+	t.Cleanup(func() {
+		if !childExited {
+			_ = command.Process.Kill()
+			_ = command.Wait()
+		}
+	})
+	select {
+	case <-time.After(200 * time.Millisecond):
+		if _, err := os.Lstat(readyPath); err == nil {
+			t.Fatal("second process acquired the journal lease while Restore was active")
+		} else if !errors.Is(err, os.ErrNotExist) {
+			t.Fatalf("inspect second-process lease marker: %v", err)
+		}
 	}
 
-	storeContext, cancelStore := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	storeContext, cancelStore := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancelStore()
-	err = controller.WithShared(storeContext, func(*Store) error { return nil })
+	err := controller.WithShared(storeContext, func(*Store) error { return nil })
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("shared Store operation error = %v, want context deadline exceeded", err)
 	}
@@ -221,4 +243,13 @@ func TestRestoreTransactionExecutorHoldsJournalAndStoreLeasesDuringBuild(t *test
 	if err := <-done; err != nil {
 		t.Fatalf("Restore transaction after releasing build gate: %v", err)
 	}
+	waitForRestoreJournalLeaseMarker(t, readyPath, 10*time.Second)
+	if err := os.WriteFile(releasePath, []byte("release"), 0o600); err != nil {
+		t.Fatalf("release second journal process: %v", err)
+	}
+	if err := command.Wait(); err != nil {
+		childExited = true
+		t.Fatalf("second journal process failed: %v\n%s", err, output.String())
+	}
+	childExited = true
 }
