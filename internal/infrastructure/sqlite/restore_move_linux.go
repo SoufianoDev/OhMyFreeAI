@@ -10,6 +10,10 @@ import (
 )
 
 func moveRestoreFileNoReplacePlatform(source, destination string) error {
+	return moveRestoreFileNoReplacePlatformWithHook(source, destination, nil)
+}
+
+func moveRestoreFileNoReplacePlatformWithHook(source, destination string, afterNamespaceMutation func() error) error {
 	directory := filepath.Dir(source)
 	// Pin the containing directory and reject symlinks in every path component.
 	// If openat2 is unavailable, fail closed rather than falling back to a
@@ -30,6 +34,13 @@ func moveRestoreFileNoReplacePlatform(source, destination string) error {
 	destinationName := filepath.Base(destination)
 	if err := unix.Renameat2(dirfd, sourceName, dirfd, destinationName, unix.RENAME_NOREPLACE); err != nil {
 		return err
+	}
+	// This seam models an error after the namespace changed but before the
+	// parent-directory durability barrier. Production callers pass nil.
+	if afterNamespaceMutation != nil {
+		if err := afterNamespaceMutation(); err != nil {
+			return fmt.Errorf("no-replace rename completed before parent-directory sync: %w", err)
+		}
 	}
 	// The rename changes the directory namespace. Sync the already-pinned
 	// parent handle before reporting the move as durable; never reopen by path.
