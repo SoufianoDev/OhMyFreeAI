@@ -3,9 +3,11 @@ package sqlite
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -178,6 +180,9 @@ func TestRestoreTransactionExecutorHoldsJournalAndStoreLeasesDuringBuild(t *test
 	realBuild := executor.operations.buildCandidate
 	buildReady := make(chan struct{})
 	releaseBuild := make(chan struct{})
+	var releaseOnce sync.Once
+	release := func() { releaseOnce.Do(func() { close(releaseBuild) }) }
+	defer release()
 	executor.operations.buildCandidate = func(ctx context.Context, source, state, staging string, migrationsFS fs.FS, migrationDir string) (RestoreCandidate, error) {
 		candidate, err := realBuild(ctx, source, state, staging, migrationsFS, migrationDir)
 		close(buildReady)
@@ -212,7 +217,7 @@ func TestRestoreTransactionExecutorHoldsJournalAndStoreLeasesDuringBuild(t *test
 		t.Fatalf("shared Store operation error = %v, want context deadline exceeded", err)
 	}
 
-	close(releaseBuild)
+	release()
 	if err := <-done; err != nil {
 		t.Fatalf("Restore transaction after releasing build gate: %v", err)
 	}
