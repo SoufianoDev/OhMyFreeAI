@@ -52,8 +52,9 @@ func newRestoreExecutorFixture(t *testing.T) (*RestoreTransactionExecutor, *Stor
 
 func restoreExecutorRequest(archivePath string) RestoreTransactionRequest {
 	return RestoreTransactionRequest{
-		ArchivePath: archivePath,
-		MigrationFS: migrations.Files,
+		ArchivePath:          archivePath,
+		DatabaseSnapshotPath: archivePath,
+		MigrationFS:          migrations.Files,
 		MigrationDir: ".",
 	}
 }
