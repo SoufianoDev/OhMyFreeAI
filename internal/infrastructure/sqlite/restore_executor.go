@@ -89,6 +89,9 @@ func (executor *RestoreTransactionExecutor) Execute(ctx context.Context, request
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
 	}
+	if err := ensureNoSQLiteSidecars(snapshotPath); err != nil {
+		return fmt.Errorf("%w: extracted database snapshot has SQLite sidecars: %v", ErrRestoreSourceInvalid, err)
+	}
 	if err := verifyBackupDatabase(ctx, snapshotPath); err != nil {
 		return fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
 	}
@@ -184,6 +187,9 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		if err := requireRestorePathAbsent(path); err != nil {
 			return reopenPrevious(err)
 		}
+		if err := ensureNoSQLiteSidecars(path); err != nil {
+			return reopenPrevious(fmt.Errorf("inspect SQLite Restore artifact sidecars: %w", err))
+		}
 	}
 
 	previousExists := true
@@ -248,6 +254,9 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if !snapshotAfterBuild.matches(snapshotIdentity.SHA256, snapshotIdentity.Size) {
 		return reopenPrevious(fmt.Errorf("%w: extracted database snapshot changed while its candidate was being built", ErrRestoreSourceInvalid))
 	}
+	if err := ensureNoSQLiteSidecars(snapshotPath); err != nil {
+		return reopenPrevious(fmt.Errorf("%w: extracted database snapshot acquired SQLite sidecars: %v", ErrRestoreSourceInvalid, err))
+	}
 	if err := ctx.Err(); err != nil {
 		return reopenPrevious(err)
 	}
@@ -256,6 +265,9 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	journal.UpdatedAt = time.Now().UTC()
 	if err := lease.Write(journal); err != nil {
 		return reopenPrevious(fmt.Errorf("persist previous-database preservation intent: %w", err))
+	}
+	if err := ensureNoSQLiteSidecars(rollbackPath); err != nil {
+		return executor.reopenPreviousIfVerified(target, previousIdentity, err)
 	}
 	if err := executor.operations.move(target, rollbackPath, previousIdentity); err != nil {
 		return executor.reopenPreviousIfVerified(target, previousIdentity, fmt.Errorf("preserve previous SQLite database: %w", err))
@@ -275,6 +287,12 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		return nil, fmt.Errorf("persist SQLite candidate publication intent: %w", err)
 	}
 	if err := ctx.Err(); err != nil {
+		return executor.rollback(lease, journal, err)
+	}
+	if err := ensureNoSQLiteSidecars(stagingPath); err != nil {
+		return executor.rollback(lease, journal, err)
+	}
+	if err := ensureNoSQLiteSidecars(target); err != nil {
 		return executor.rollback(lease, journal, err)
 	}
 	if err := executor.operations.move(stagingPath, target, candidate.Identity); err != nil {
@@ -367,6 +385,9 @@ func (executor *RestoreTransactionExecutor) rollback(
 		if err := ensureNoSQLiteSidecars(journal.TargetPath); err != nil {
 			return nil, errors.Join(cause, err)
 		}
+		if err := ensureNoSQLiteSidecars(journal.CandidateQuarantinePath); err != nil {
+			return nil, errors.Join(cause, err)
+		}
 		if err := executor.operations.move(journal.TargetPath, journal.CandidateQuarantinePath, RestoreContentIdentity{
 			Size: journal.CandidateSize,
 			SHA256: journal.CandidateSHA256,
@@ -376,6 +397,9 @@ func (executor *RestoreTransactionExecutor) rollback(
 	}
 	if plan.PreserveStaging {
 		if err := ensureNoSQLiteSidecars(journal.StagingPath); err != nil {
+			return nil, errors.Join(cause, err)
+		}
+		if err := ensureNoSQLiteSidecars(journal.CandidateQuarantinePath); err != nil {
 			return nil, errors.Join(cause, err)
 		}
 		if err := executor.operations.move(journal.StagingPath, journal.CandidateQuarantinePath, RestoreContentIdentity{
