@@ -15,9 +15,10 @@ import (
 )
 
 type RestoreTransactionRequest struct {
-	ArchivePath  string
-	MigrationFS  fs.FS
-	MigrationDir string
+	ArchivePath           string
+	DatabaseSnapshotPath  string
+	MigrationFS           fs.FS
+	MigrationDir          string
 }
 
 type RestoreTransactionExecutor struct {
@@ -66,7 +67,7 @@ func (executor *RestoreTransactionExecutor) Execute(ctx context.Context, request
 	if request.MigrationFS == nil {
 		return ErrInvalidMigration
 	}
-	if request.ArchivePath == "" {
+	if request.ArchivePath == "" || request.DatabaseSnapshotPath == "" {
 		return ErrRestoreSourceInvalid
 	}
 
@@ -75,19 +76,28 @@ func (executor *RestoreTransactionExecutor) Execute(ctx context.Context, request
 		return fmt.Errorf("resolve SQLite restore archive: %w", err)
 	}
 	archivePath = filepath.Clean(archivePath)
+	snapshotPath, err := filepath.Abs(request.DatabaseSnapshotPath)
+	if err != nil {
+		return fmt.Errorf("resolve extracted SQLite restore snapshot: %w", err)
+	}
+	snapshotPath = filepath.Clean(snapshotPath)
 	archiveIdentity, err := readRestoreArchiveIdentity(archivePath)
 	if err != nil {
 		return err
 	}
-	if err := verifyBackupDatabase(ctx, archivePath); err != nil {
+	snapshotIdentity, err := readRestoreArchiveIdentity(snapshotPath)
+	if err != nil {
 		return fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
 	}
-	verifiedArchiveIdentity, err := readRestoreArchiveIdentity(archivePath)
+	if err := verifyBackupDatabase(ctx, snapshotPath); err != nil {
+		return fmt.Errorf("%w: %v", ErrRestoreSourceInvalid, err)
+	}
+	verifiedSnapshotIdentity, err := readRestoreArchiveIdentity(snapshotPath)
 	if err != nil {
 		return err
 	}
-	if !verifiedArchiveIdentity.matches(archiveIdentity.SHA256, archiveIdentity.Size) {
-		return fmt.Errorf("%w: archive changed during verification", ErrRestoreSourceInvalid)
+	if !verifiedSnapshotIdentity.matches(snapshotIdentity.SHA256, snapshotIdentity.Size) {
+		return fmt.Errorf("%w: extracted database snapshot changed during verification", ErrRestoreSourceInvalid)
 	}
 
 	lease, err := acquireRestoreJournalLease(ctx, executor.stateDirectory)
@@ -112,7 +122,7 @@ func (executor *RestoreTransactionExecutor) Execute(ctx context.Context, request
 			operationErr = errors.Join(operationErr, lease.Close())
 		}()
 		operationErr = executor.controller.WithExclusive(ctx, func(store *Store) (*Store, error) {
-			return executor.executeLocked(ctx, lease, store, archivePath, archiveIdentity, request)
+			return executor.executeLocked(ctx, lease, store, archivePath, archiveIdentity, snapshotPath, snapshotIdentity, request)
 		})
 	}()
 	return operationErr
@@ -124,6 +134,8 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	store *Store,
 	archivePath string,
 	archiveIdentity RestoreContentIdentity,
+	snapshotPath string,
+	snapshotIdentity RestoreContentIdentity,
 	request RestoreTransactionRequest,
 ) (*Store, error) {
 	if store == nil || store.db == nil {
@@ -137,7 +149,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if !samePath(filepath.Dir(target), executor.stateDirectory) {
 		return store, fmt.Errorf("%w: active database must be a direct child of the private state directory", ErrRestoreJournalInvalid)
 	}
-	if samePath(target, archivePath) {
+	if samePath(target, archivePath) || samePath(target, snapshotPath) {
 		return store, ErrInvalidDatabasePath
 	}
 	if err := checkpointStore(ctx, store); err != nil {
@@ -201,7 +213,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 
 	candidate, err := executor.operations.buildCandidate(
 		ctx,
-		archivePath,
+		snapshotPath,
 		executor.stateDirectory,
 		stagingPath,
 		request.MigrationFS,
@@ -228,6 +240,13 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	}
 	if !archiveAfterBuild.matches(archiveIdentity.SHA256, archiveIdentity.Size) {
 		return reopenPrevious(fmt.Errorf("%w: archive changed while its candidate was being built", ErrRestoreSourceInvalid))
+	}
+	snapshotAfterBuild, err := readRestoreArchiveIdentity(snapshotPath)
+	if err != nil {
+		return reopenPrevious(err)
+	}
+	if !snapshotAfterBuild.matches(snapshotIdentity.SHA256, snapshotIdentity.Size) {
+		return reopenPrevious(fmt.Errorf("%w: extracted database snapshot changed while its candidate was being built", ErrRestoreSourceInvalid))
 	}
 	if err := ctx.Err(); err != nil {
 		return reopenPrevious(err)
