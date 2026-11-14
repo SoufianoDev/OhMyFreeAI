@@ -6,13 +6,24 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current verified code/test head:** `8f2999cc02d1ba803c6a0f3b5f1a8b22c912c0ef` on `foundation/bootstrap` (2026-11-14). StoreController integration is complete. The first isolated in-process Restore transaction executor slice is implemented and passes exact-head Root CI on Ubuntu/Windows, Wails platform proof, and the SQLite driver matrix. The Linux distribution matrix has one successful Fedora 44 job and seven jobs still queued at this update.
+**Current verified code/test head:** `10b8fa2c4f44ffd2184adb430317985868c3657a` on `foundation/bootstrap` (2026-11-14). The latest production-code change is `e538ba59a49eacdbf127feb69bbd10bad606570d`; deterministic boundary hooks were added in `8806eb0dcc5322610f75070839e9b558974aaee9`. StoreController integration is complete.
 
-The next gate is the complete Linux/Windows executor failure-injection and process-death/restart matrix. The executor is not wired into the app; startup recovery, GUI/CLI Restore and Restore enablement remain prohibited until restart reconciliation is implemented and verified. Do not touch or merge `main`.
+The latest exact-head CI results are Root CI 2/2, SQLite driver evaluation 4/4, and Wails platform proof 2/2. Linux distribution compatibility is 7/8, with Debian 12 legacy GTK3/WebKit41 still running at the last check. Root CI logs confirm the new process-death planning and journal-write fault tests pass on Ubuntu and Windows; Ubuntu race detection also passed.
+
+The executor now fails closed after the first prepared-journal publication attempt: any later error leaves StoreController without a live Store so SQLite cannot mutate the previous file after its journal identity has been recorded. The process-death matrix currently covers 19 child-process termination points and the journal-write matrix injects failures at nine write boundaries. These tests validate planner decisions after restart, not actual automatic recovery.
+
+The next gate is move-error injection for every no-replace boundary, including uncertain post-rename/directory-sync outcomes, and the missing staging-to-quarantine crash point. Then implement actual restart reconciliation. The executor is not wired to the app; startup recovery, GUI/CLI Restore and Restore enablement remain prohibited until the full Linux/Windows recovery matrix passes. Do not touch or merge `main`.
 
 Older dated sections below are historical checkpoints. This current status supersedes their earlier statements that journal qualification or the executor implementation had not yet been completed.
 
-### Current CI evidence
+### Latest exact-head CI evidence
+
+- Root CI [43606878844](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878844): 2/2 Ubuntu/Windows success; Ubuntu Go race detector passed.
+- SQLite driver evaluation [43606878840](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878840): 4/4 modernc/ncruces × Ubuntu/Windows.
+- Wails platform proof [43606878902](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878902): 2/2 Ubuntu/Windows; Linux WebView bridge and database reopen passed, Windows native executable/CLI smoke passed.
+- Linux distribution compatibility [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872): 7/8 completed successfully; Debian 12 legacy GTK3/WebKit41 remained in progress at the last check. Recheck before claiming the matrix complete.
+
+### Historical CI evidence
 
 The latest production-code head `1cde3c` passed all four workflow families:
 
