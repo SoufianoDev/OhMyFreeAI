@@ -254,9 +254,6 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if !snapshotAfterBuild.matches(snapshotIdentity.SHA256, snapshotIdentity.Size) {
 		return reopenPrevious(fmt.Errorf("%w: extracted database snapshot changed while its candidate was being built", ErrRestoreSourceInvalid))
 	}
-	if err := ensureNoSQLiteSidecars(snapshotPath); err != nil {
-		return reopenPrevious(fmt.Errorf("%w: extracted database snapshot acquired SQLite sidecars: %v", ErrRestoreSourceInvalid, err))
-	}
 	if err := ctx.Err(); err != nil {
 		return reopenPrevious(err)
 	}
