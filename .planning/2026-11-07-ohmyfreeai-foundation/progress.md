@@ -1868,3 +1868,18 @@ All four workflow families for exact test head 10b8fa2c4f44ffd2184adb43031798586
 - Restore remains disabled and the executor remains unwired to startup, Wails, GUI and CLI. No automatic cleanup of ambiguous artifacts was added.
 - Recheck Root CI 43609032459, inspect both OS jobs and logs, and fix any regression before proceeding. After the exact-head matrix passes, continue with actual restart reconciliation design/tests; do not add startup recovery or UI/CLI wiring until the full safety matrix passes.
 - foundation/bootstrap is 916 commits ahead and 0 behind main; main was not changed. No merge or force-push.
+
+
+### Exact-head Root CI closure — 2026-11-14
+- Root CI [43609032459](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43609032459) for code/test commit [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65497f9c853904badb286db111193320d168bc1) completed successfully: Ubuntu 1/1 and Windows 1/1 (2/2 total).
+- Ubuntu job [132489786599] completed every step successfully: module verification, vet, Go tests, race detector, build, Python compile/tests, frontend syntax and architecture check. Its SQLite package test passed (3.306s); the race run passed (16.402s).
+- Windows job [132489785632] completed every applicable step successfully: module verification, vet, Go tests, build, Python compile/tests, frontend syntax and architecture check. The SQLite package test passed (30.724s). The Linux-only race step was skipped as expected.
+- No failed steps or failure logs were present. The move-error and process-death tests are included in the successful SQLite package test run. No local test execution is claimed.
+- Wails, SQLite-driver evaluation and Linux-distribution workflows were not triggered by these internal SQLite-only changes. The preceding exact code/test head 10b8fa2 had already passed all 16 jobs across those four workflow families.
+- Latest code/test head: e65497f. Planning/documentation commits after it: 1f7fc30, f09f393, 5d81500. Latest branch HEAD: [5d81500](https://github.com/SoufianoDev/OhMyFreeAI/commit/5d81500655a2e2bf3f870f6658a0f29c9169117f).
+- Current branch comparison: foundation/bootstrap is 919 commits ahead and 0 behind main. main was not modified; no merge or force-push.
+
+### Next engineering unit
+- Design and implement an isolated restart-reconciliation executor, still not wired to application startup. It must acquire one journal lease, validate journal and all artifact identities through no-follow handles, apply only planner-approved idempotent no-replace operations, persist intent/completion in order, and keep the StoreController unavailable until a single verified target database is ready.
+- Add a fresh process-death matrix around every recovery move and journal transition on Linux and Windows. Preserve all mismatched, unreadable, colliding or otherwise ambiguous artifacts. Do not open SQLite before the target identity is verified.
+- Do not wire startup recovery, Wails, GUI or CLI Restore until the recovery executor and full platform matrix pass.
