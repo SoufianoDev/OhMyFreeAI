@@ -478,7 +478,7 @@ func TestRestoreTransactionExecutorJournalWriteFailuresPreserveRecoveryState(t *
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			executor, controller, root, archivePath, previous, _ := newRestoreExecutorFixture(t)
+			executor, controller, root, archivePath, _, _ := newRestoreExecutorFixture(t)
 			injected := errors.New("injected journal write failure at " + test.boundary)
 			realWrite := executor.operations.writeJournal
 			executor.operations.writeJournal = func(lease *restoreJournalLease, journal RestoreJournal, boundary string) error {
