@@ -1984,3 +1984,14 @@ The latest poll still does not establish a green exact-head CI result:
 - Linux distribution matrix [#43724588493](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588493): Arch and Ubuntu 24.04 are successful; openSUSE, Fedora 44 GTK4 and Debian 13 are `in_progress`; Debian 12, Ubuntu 22.04 and Fedora 44 legacy GTK3 remain queued. No failed steps reported in completed/running jobs.
 
 No code changes were made after `4214753`; the later commits `573fb42`, `5689027` and `7346f5b` update planning/architecture documentation only and are excluded from workflow path filters. The branch is now 944 commits ahead of `main`, 0 behind. The exact code/test commit remains the target of all four workflow runs above.
+
+
+### CI polling update — SQLite evaluation completed
+
+A later poll confirms:
+- SQLite driver evaluation [#43724588417](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588417): SUCCESS 4/4. ncruces and modernc both passed on Ubuntu and Windows; no failed steps.
+- Wails [#43724588405](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588405): Ubuntu and Windows remain in progress; no failed steps reported.
+- Linux distribution matrix [#43724588493](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588493): Arch and Ubuntu 24.04 succeeded; openSUSE, Fedora 44 GTK4, Fedora 44 legacy GTK3 and Debian 13 remain in progress; Debian 12 and Ubuntu 22.04 remain queued. No failed steps reported.
+- Root CI [#43724588470](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588470) remains pending with zero jobs exposed by the Actions jobs endpoint.
+
+The exact code/test head is still not fully CI-verified. In particular, the main Ubuntu/Windows Root CI result is unavailable, and Wails/Linux distribution jobs have not completed. Do not proceed to application-level Restore wiring until these runs finish and the remaining identity/provider gates are closed.
