@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -563,7 +562,7 @@ func TestRestoreTransactionExecutorMoveErrorsPreserveRecoveryState(t *testing.T)
 		{name: "staging to target", source: "staging", destination: "target", wantPhase: RestorePhasePublishing},
 		{name: "target to quarantine", source: "target", destination: "quarantine", wantPhase: RestorePhaseRestoringPrevious, failCandidateValidation: true},
 		{name: "staging to quarantine", source: "staging", destination: "quarantine", wantPhase: RestorePhaseRestoringPrevious, cancelBeforePublish: true},
-		{name: "rollback to target", source: "rollback", destination: "target", wantPhase: RestorePhaseRestoringPrevious, previousIdentity: true, failCandidateOpen: true},
+		{name: "rollback to target", source: "rollback", destination: "target", wantPhase: RestorePhaseRestoringPrevious, previousIdentity: true, failCandidateValidation: true},
 	}
 
 	for _, test := range tests {
