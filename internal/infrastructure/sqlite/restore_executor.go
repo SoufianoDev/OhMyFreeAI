@@ -2,9 +2,9 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"crypto/rand"
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -476,10 +476,10 @@ func (executor *RestoreTransactionExecutor) rollback(
 }
 
 func verifyRestoreDatabaseReadOnly(ctx context.Context, path string) error {
-	if err := verifyBackupDatabase(ctx, path); err != nil {
+	if err := verifyBackupDatabaseImmutable(ctx, path); err != nil {
 		return err
 	}
-	db, err := sql.Open(driverName, readOnlyDataSourceName(path))
+	db, err := sql.Open(driverName, readOnlyImmutableDataSourceName(path))
 	if err != nil {
 		return fmt.Errorf("open SQLite database for read-only configuration validation: %w", err)
 	}
@@ -498,10 +498,23 @@ func verifyRestoreDatabaseReadOnly(ctx context.Context, path string) error {
 }
 
 func openVerifiedRestoreStore(ctx context.Context, path string) (*Store, error) {
-	if err := verifyRestoreDatabaseReadOnly(ctx, path); err != nil {
+	if err := verifyBackupDatabase(ctx, path); err != nil {
 		return nil, err
 	}
-	return OpenExisting(ctx, path)
+	store, err := OpenExisting(ctx, path)
+	if err != nil {
+		return nil, err
+	}
+	configuration, err := store.Load(ctx)
+	if err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("load reopened SQLite configuration: %w", err)
+	}
+	if err := configuration.Validate(); err != nil {
+		_ = store.Close()
+		return nil, fmt.Errorf("validate reopened SQLite configuration: %w", err)
+	}
+	return store, nil
 }
 
 func readRestoreArchiveIdentity(path string) (RestoreContentIdentity, error) {

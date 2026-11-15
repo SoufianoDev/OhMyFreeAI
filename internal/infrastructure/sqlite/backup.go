@@ -170,6 +170,14 @@ func backupDataSourceName(absolutePath string) string {
 }
 
 func readOnlyDataSourceName(absolutePath string) string {
+	return readOnlyDataSourceNameWithImmutable(absolutePath, false)
+}
+
+func readOnlyImmutableDataSourceName(absolutePath string) string {
+	return readOnlyDataSourceNameWithImmutable(absolutePath, true)
+}
+
+func readOnlyDataSourceNameWithImmutable(absolutePath string, immutable bool) string {
 	uriPath := filepath.ToSlash(absolutePath)
 	if runtime.GOOS == "windows" && len(uriPath) >= 2 && uriPath[1] == ':' {
 		uriPath = "/" + uriPath
@@ -177,6 +185,9 @@ func readOnlyDataSourceName(absolutePath string) string {
 	u := &url.URL{Scheme: "file", Path: uriPath}
 	query := url.Values{}
 	query.Set("mode", "ro")
+	if immutable {
+		query.Set("immutable", "1")
+	}
 	query.Add("_pragma", "foreign_keys(1)")
 	query.Add("_pragma", fmt.Sprintf("busy_timeout(%d)", busyTimeoutMS))
 	u.RawQuery = query.Encode()
@@ -184,7 +195,15 @@ func readOnlyDataSourceName(absolutePath string) string {
 }
 
 func verifyBackupDatabase(ctx context.Context, path string) error {
-	db, err := sql.Open(driverName, readOnlyDataSourceName(path))
+	return verifyBackupDatabaseWithDataSource(ctx, readOnlyDataSourceName(path))
+}
+
+func verifyBackupDatabaseImmutable(ctx context.Context, path string) error {
+	return verifyBackupDatabaseWithDataSource(ctx, readOnlyImmutableDataSourceName(path))
+}
+
+func verifyBackupDatabaseWithDataSource(ctx context.Context, dataSourceName string) error {
+	db, err := sql.Open(driverName, dataSourceName)
 	if err != nil {
 		return fmt.Errorf("open SQLite backup for verification: %w", err)
 	}

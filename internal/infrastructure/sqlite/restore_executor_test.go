@@ -64,6 +64,31 @@ func restoreExecutorRequest(archivePath string) RestoreTransactionRequest {
 	}
 }
 
+func TestRestoreDatabaseReadOnlyValidationDoesNotCreateSidecars(t *testing.T) {
+	_, _, root, archivePath, _, _ := newRestoreExecutorFixture(t)
+	candidatePath := filepath.Join(root, "read-only-verified.sqlite")
+	candidate, err := BuildRestoreCandidateAtPath(context.Background(), archivePath, root, candidatePath, migrations.Files, ".")
+	if err != nil {
+		t.Fatalf("build candidate for read-only validation: %v", err)
+	}
+	if err := ensureNoSQLiteSidecars(candidatePath); err != nil {
+		t.Fatalf("candidate has sidecars before validation: %v", err)
+	}
+	if err := verifyRestoreDatabaseReadOnly(context.Background(), candidatePath); err != nil {
+		t.Fatalf("verify candidate read-only: %v", err)
+	}
+	if err := ensureNoSQLiteSidecars(candidatePath); err != nil {
+		t.Fatalf("read-only validation created SQLite sidecars: %v", err)
+	}
+	actual, err := readRestoreContentIdentityPlatform(candidatePath)
+	if err != nil {
+		t.Fatalf("read candidate identity after validation: %v", err)
+	}
+	if !actual.matches(candidate.Identity.SHA256, candidate.Identity.Size) {
+		t.Fatalf("candidate identity changed during read-only validation: got %#v, want %#v", actual, candidate.Identity)
+	}
+}
+
 func loadControllerConfiguration(t *testing.T, controller *StoreController) domainconfig.Config {
 	t.Helper()
 	var configuration domainconfig.Config
