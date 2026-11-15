@@ -267,3 +267,172 @@ func TestRestoreRecoveryExecutorPreservesStateOnJournalAndMoveFailures(t *testin
 		})
 	}
 }
+
+
+const (
+	restoreRecoveryCrashChildEnv = "OHMYFREEAI_RESTORE_RECOVERY_CRASH_CHILD"
+	restoreRecoveryCrashRootEnv = "OHMYFREEAI_RESTORE_RECOVERY_CRASH_ROOT"
+	restoreRecoveryCrashBoundaryEnv = "OHMYFREEAI_RESTORE_RECOVERY_CRASH_BOUNDARY"
+	restoreRecoveryCrashExitCode = 87
+)
+
+func TestRestoreRecoveryExecutorProcessDeathHelper(t *testing.T) {
+	if os.Getenv(restoreRecoveryCrashChildEnv) != "1" {
+		return
+	}
+	root := os.Getenv(restoreRecoveryCrashRootEnv)
+	boundary := os.Getenv(restoreRecoveryCrashBoundaryEnv)
+	executor, err := NewRestoreRecoveryExecutor(root)
+	if err != nil {
+		t.Fatalf("create child recovery executor: %v", err)
+	}
+	executor.operations.afterBoundary = func(actual string) {
+		if actual == boundary {
+			os.Exit(restoreRecoveryCrashExitCode)
+		}
+	}
+	store, err := executor.Recover(context.Background())
+	if err != nil {
+		t.Fatalf("child recovery failed before crash boundary %q: %v", boundary, err)
+	}
+	if store != nil {
+		if err := store.Close(); err != nil {
+			t.Fatalf("close child recovered Store without reaching boundary %q: %v", boundary, err)
+		}
+	}
+	t.Fatalf("child recovery completed without reaching boundary %q", boundary)
+}
+
+func crashRestoreRecoveryAtBoundary(t *testing.T, root, boundary string) {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
+	defer cancel()
+
+	command := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestRestoreRecoveryExecutorProcessDeathHelper$")
+	command.Env = append(os.Environ(),
+		restoreRecoveryCrashChildEnv+"=1",
+		restoreRecoveryCrashRootEnv+"="+root,
+		restoreRecoveryCrashBoundaryEnv+"="+boundary,
+	)
+	var output bytes.Buffer
+	command.Stdout = &output
+	command.Stderr = &output
+	err := command.Run()
+	if ctx.Err() != nil {
+		t.Fatalf("recovery crash child timed out at %q: %v\n%s", boundary, ctx.Err(), output.String())
+	}
+	exitError, ok := err.(*exec.ExitError)
+	if !ok || exitError.ExitCode() != restoreRecoveryCrashExitCode {
+		t.Fatalf("recovery crash child exit = %v, want deliberate exit %d at %q\n%s", err, restoreRecoveryCrashExitCode, boundary, output.String())
+	}
+}
+
+func TestRestoreRecoveryExecutorRestartsAfterEveryRecoveryBoundary(t *testing.T) {
+	tests := []struct {
+		name string
+		initialBoundary string
+		recoveryBoundary string
+		wantCandidate bool
+	}{
+		{
+			name: "previous preservation move",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			recoveryBoundary: restoreRecoveryBoundaryMoveTargetToRollback,
+		},
+		{
+			name: "previous preservation completion",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			recoveryBoundary: restoreRecoveryBoundaryJournalPreviousPreserved,
+		},
+		{
+			name: "rollback intent",
+			initialBoundary: restoreBoundaryJournalPublished,
+			recoveryBoundary: restoreRecoveryBoundaryJournalRestoringPrevious,
+		},
+		{
+			name: "candidate target quarantine",
+			initialBoundary: restoreBoundaryJournalPublished,
+			recoveryBoundary: restoreRecoveryBoundaryMoveTargetToQuarantine,
+		},
+		{
+			name: "staging candidate quarantine",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			recoveryBoundary: restoreRecoveryBoundaryMoveStagingToQuarantine,
+		},
+		{
+			name: "previous database restored",
+			initialBoundary: restoreBoundaryJournalPublished,
+			recoveryBoundary: restoreRecoveryBoundaryMoveRollbackToTarget,
+		},
+		{
+			name: "previous Store opened",
+			initialBoundary: restoreBoundaryJournalPublished,
+			recoveryBoundary: restoreRecoveryBoundaryStoreOpened,
+		},
+		{
+			name: "rollback completion journal",
+			initialBoundary: restoreBoundaryJournalPublished,
+			recoveryBoundary: restoreRecoveryBoundaryJournalRolledBack,
+		},
+		{
+			name: "committed Store opened",
+			initialBoundary: restoreBoundaryJournalCommitted,
+			recoveryBoundary: restoreRecoveryBoundaryStoreCommitted,
+			wantCandidate: true,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root, previous, candidate := crashRestoreTransactionForRecovery(t, test.initialBoundary, false)
+			crashRestoreRecoveryAtBoundary(t, root, test.recoveryBoundary)
+
+			executor, err := NewRestoreRecoveryExecutor(root)
+			if err != nil {
+				t.Fatalf("create restarted recovery executor: %v", err)
+			}
+			store, err := executor.Recover(context.Background())
+			if err != nil {
+				t.Fatalf("restart recovery after process death at %q: %v", test.recoveryBoundary, err)
+			}
+			if store == nil {
+				t.Fatalf("restart recovery at %q returned no validated Store", test.recoveryBoundary)
+			}
+			got, loadErr := store.Load(context.Background())
+			closeErr := store.Close()
+			if err := errors.Join(loadErr, closeErr); err != nil {
+				t.Fatalf("load or close restarted Store: %v", err)
+			}
+
+			want := previous
+			wantPhase := RestorePhaseRolledBack
+			wantAction := RestoreRecoveryVerifyRolledBack
+			if test.wantCandidate {
+				want = candidate
+				wantPhase = RestorePhaseCommitted
+				wantAction = RestoreRecoveryVerifyCommitted
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("restarted Store configuration = %#v, want %#v", got, want)
+			}
+			journal, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read journal after restarted recovery: %v", err)
+			}
+			if journal.Phase != wantPhase {
+				t.Fatalf("journal phase after restarted recovery = %q, want %q", journal.Phase, wantPhase)
+			}
+			files, err := inspectRestoreRecoveryFiles(root, journal)
+			if err != nil {
+				t.Fatalf("inspect artifacts after restarted recovery: %v", err)
+			}
+			plan, err := PlanRestoreRecovery(journal, files)
+			if err != nil {
+				t.Fatalf("plan terminal state after restarted recovery: %v", err)
+			}
+			if plan.Action != wantAction {
+				t.Fatalf("terminal action after restarted recovery = %q, want %q", plan.Action, wantAction)
+			}
+		})
+	}
+}
