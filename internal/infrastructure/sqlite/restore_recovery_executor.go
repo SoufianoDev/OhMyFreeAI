@@ -108,6 +108,9 @@ func (executor *RestoreRecoveryExecutor) reconcile(
 
 	switch journal.Phase {
 	case RestorePhaseCommitted:
+		if plan.Action == RestoreRecoveryPreserveForManualReview {
+			return nil, fmt.Errorf("%w: first-database candidate is preserved for manual review", ErrRestoreRecoveryManualReview)
+		}
 		if plan.Action != RestoreRecoveryVerifyCommitted {
 			return nil, fmt.Errorf("%w: committed journal did not produce a committed verification plan", ErrRestoreRecoveryAmbiguous)
 		}
