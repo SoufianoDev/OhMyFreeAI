@@ -29,6 +29,7 @@ type RestoreTransactionExecutor struct {
 
 type restoreTransactionOperations struct {
 	openStore     func(context.Context, string) (*Store, error)
+	verifyDatabase func(context.Context, string) error
 	move          func(string, string, RestoreContentIdentity) error
 	writeJournal  func(*restoreJournalLease, RestoreJournal, string) error
 	afterBoundary func(string)
@@ -102,6 +103,7 @@ func NewRestoreTransactionExecutor(controller *StoreController, stateDirectory s
 		stateDirectory: root,
 		operations: restoreTransactionOperations{
 			openStore: openVerifiedRestoreStore,
+			verifyDatabase: verifyRestoreDatabaseReadOnly,
 			move:      moveRestoreFileNoReplaceVerified,
 			writeJournal: func(lease *restoreJournalLease, journal RestoreJournal, _ string) error {
 				return lease.Write(journal)
@@ -340,7 +342,7 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 	if err := ensureNoSQLiteSidecars(target); err != nil {
 		return executor.rollback(lease, journal, err)
 	}
-	if err := verifyRestoreDatabaseReadOnly(ctx, target); err != nil {
+	if err := executor.operations.verifyDatabase(ctx, target); err != nil {
 		return executor.rollback(lease, journal, fmt.Errorf("verify published SQLite candidate before commit: %w", err))
 	}
 	if err := ensureNoSQLiteSidecars(target); err != nil {
