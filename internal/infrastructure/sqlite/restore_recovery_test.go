@@ -89,10 +89,10 @@ func TestPlanRestoreRecoveryConservativeDecisions(t *testing.T) {
 			wantAction: RestoreRecoveryVerifyCommitted, wantVerifyTarget: true,
 		},
 		{
-			name: "committed first database verifies candidate",
+			name: "committed first database preserves candidate for manual review",
 			phase: RestorePhaseCommitted, hadPrevious: false,
 			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
-			wantAction: RestoreRecoveryVerifyCommitted, wantVerifyTarget: true,
+			wantAction: RestoreRecoveryPreserveForManualReview,
 		},
 		{
 			name: "rolled back verifies previous target and retains candidate quarantine",
