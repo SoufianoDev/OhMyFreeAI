@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -681,5 +682,304 @@ func TestRestoreRecoveryExecutorRetriesAllInjectedFailureBoundaries(t *testing.T
 				t.Fatalf("terminal journal phase = %q, want %q", terminal.Phase, wantPhase)
 			}
 		})
+	}
+}
+
+
+func firstDatabaseRecoveryFixture(t *testing.T, phase RestorePhase) (string, RestoreJournal, []byte, string) {
+	t.Helper()
+	root := restoreTestDir(t)
+	target := filepath.Join(root, "state.db")
+	staging := filepath.Join(root, ".restore-stage-first-database.sqlite")
+	quarantine := filepath.Join(root, ".restore-quarantine-first-database.sqlite")
+	previousExists := false
+	journal := RestoreJournal{
+		Version:                 restoreJournalVersion,
+		TransactionID:           "first-database-manual-review",
+		Phase:                   RestorePhasePrepared,
+		TargetPath:              target,
+		StagingPath:             staging,
+		CandidateQuarantinePath: quarantine,
+		PreviousDatabaseExisted: &previousExists,
+		ArchiveSHA256:           strings.Repeat("a", 64),
+		ArchiveSize:             1,
+		UpdatedAt:               time.Now().UTC(),
+	}
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("write first-database prepared journal: %v", err)
+	}
+
+	candidate := []byte("first-database candidate evidence must be retained")
+	candidatePath := staging
+	if phase == RestorePhasePrepared {
+		return root, journal, candidate, candidatePath
+	}
+	if err := os.WriteFile(staging, candidate, 0o600); err != nil {
+		t.Fatalf("write first-database staging candidate: %v", err)
+	}
+	identity, err := readRestoreContentIdentityPlatform(staging)
+	if err != nil {
+		t.Fatalf("identify first-database staging candidate: %v", err)
+	}
+	journal.Phase = RestorePhaseStaging
+	journal.CandidateSHA256 = identity.SHA256
+	journal.CandidateSize = identity.Size
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("record first-database staging candidate: %v", err)
+	}
+	if phase == RestorePhaseStaging {
+		return root, journal, candidate, candidatePath
+	}
+
+	journal.Phase = RestorePhasePublishing
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("record first-database publication intent: %v", err)
+	}
+	if phase == RestorePhasePublishing {
+		return root, journal, candidate, candidatePath
+	}
+
+	if err := moveRestoreFileNoReplaceVerified(staging, target, identity); err != nil {
+		t.Fatalf("publish first-database candidate fixture: %v", err)
+	}
+	candidatePath = target
+	journal.Phase = RestorePhasePublished
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("record first-database publication: %v", err)
+	}
+	if phase == RestorePhasePublished {
+		return root, journal, candidate, candidatePath
+	}
+
+	journal.Phase = RestorePhaseReopening
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("record first-database reopen intent: %v", err)
+	}
+	if phase == RestorePhaseReopening {
+		return root, journal, candidate, candidatePath
+	}
+
+	if phase != RestorePhaseCommitted {
+		t.Fatalf("unsupported first-database fixture phase %q", phase)
+	}
+	journal.Phase = RestorePhaseCommitted
+	journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+	if err := WriteRestoreJournal(root, journal); err != nil {
+		t.Fatalf("record first-database commit: %v", err)
+	}
+	return root, journal, candidate, candidatePath
+}
+
+func TestRestoreRecoveryExecutorStopsOnFirstDatabaseStatesAndPreservesCandidate(t *testing.T) {
+	phases := []RestorePhase{
+		RestorePhasePrepared,
+		RestorePhaseStaging,
+		RestorePhasePublishing,
+		RestorePhasePublished,
+		RestorePhaseReopening,
+		RestorePhaseCommitted,
+	}
+	for _, phase := range phases {
+		t.Run(string(phase), func(t *testing.T) {
+			root, journal, candidate, candidatePath := firstDatabaseRecoveryFixture(t, phase)
+			executor, err := NewRestoreRecoveryExecutor(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			openCalls := 0
+			executor.operations.openStore = func(context.Context, string) (*Store, error) {
+				openCalls++
+				return nil, errors.New("unexpected SQLite open during first-database manual review")
+			}
+
+			store, err := executor.Recover(context.Background())
+			if store != nil {
+				_ = store.Close()
+				t.Fatal("first-database recovery returned a Store")
+			}
+			if !errors.Is(err, ErrRestoreRecoveryManualReview) {
+				t.Fatalf("Recover() error = %v, want ErrRestoreRecoveryManualReview", err)
+			}
+			if openCalls != 0 {
+				t.Fatalf("SQLite open calls = %d, want zero", openCalls)
+			}
+
+			after, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read first-database journal after manual review: %v", err)
+			}
+			if after.Phase != phase {
+				t.Fatalf("journal phase after manual review = %q, want %q", after.Phase, phase)
+			}
+			if phase == RestorePhasePrepared {
+				if _, err := os.Lstat(candidatePath); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("prepared phase unexpectedly has a candidate artifact: %v", err)
+				}
+			} else {
+				got, err := os.ReadFile(candidatePath)
+				if err != nil {
+					t.Fatalf("read preserved first-database candidate: %v", err)
+				}
+				if !bytes.Equal(got, candidate) {
+					t.Fatalf("first-database candidate changed: got %q, want %q", got, candidate)
+				}
+			}
+			for _, path := range []string{journal.TargetPath, journal.StagingPath, journal.CandidateQuarantinePath} {
+				if samePath(path, candidatePath) && phase != RestorePhasePrepared {
+					continue
+				}
+				if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
+					t.Fatalf("unexpected artifact %s after manual review: %v", path, err)
+				}
+			}
+		})
+	}
+}
+
+func TestRestoreRecoveryExecutorDetectsSourceLeafSubstitutionAfterMove(t *testing.T) {
+	root, _, _ := crashRestoreTransactionForRecovery(t, restoreBoundaryJournalPublished, false)
+	journal, err := ReadRestoreJournal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollbackBefore, err := os.ReadFile(journal.RollbackPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	substituted := []byte("untrusted replacement source leaf")
+	executor, err := NewRestoreRecoveryExecutor(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	openCalls := 0
+	executor.operations.openStore = func(context.Context, string) (*Store, error) {
+		openCalls++
+		return nil, errors.New("unexpected SQLite open after source substitution")
+	}
+	realMove := executor.operations.move
+	executor.operations.move = func(source, destination string, expected RestoreContentIdentity) error {
+		if samePath(source, journal.TargetPath) && samePath(destination, journal.CandidateQuarantinePath) {
+			if err := os.Remove(source); err != nil {
+				return err
+			}
+			if err := os.WriteFile(source, substituted, 0o600); err != nil {
+				return err
+			}
+		}
+		return realMove(source, destination, expected)
+	}
+
+	store, err := executor.Recover(context.Background())
+	if store != nil {
+		_ = store.Close()
+		t.Fatal("recovery returned a Store after source substitution")
+	}
+	if err == nil {
+		t.Fatal("recovery accepted a substituted source leaf")
+	}
+	if openCalls != 0 {
+		t.Fatalf("SQLite open calls = %d, want zero", openCalls)
+	}
+	after, err := ReadRestoreJournal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Phase != RestorePhaseRestoringPrevious {
+		t.Fatalf("journal phase = %q, want restoring-previous", after.Phase)
+	}
+	if _, err := os.Lstat(journal.TargetPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("substituted source unexpectedly remains at target: %v", err)
+	}
+	quarantined, err := os.ReadFile(journal.CandidateQuarantinePath)
+	if err != nil {
+		t.Fatalf("read preserved substituted artifact: %v", err)
+	}
+	if !bytes.Equal(quarantined, substituted) {
+		t.Fatalf("quarantined artifact = %q, want substituted bytes %q", quarantined, substituted)
+	}
+	rollbackAfter, err := os.ReadFile(journal.RollbackPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(rollbackAfter, rollbackBefore) {
+		t.Fatal("previous rollback database changed after source substitution")
+	}
+	actual, err := readRestoreContentIdentityPlatform(journal.CandidateQuarantinePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if actual.matches(journal.CandidateSHA256, journal.CandidateSize) {
+		t.Fatal("substituted quarantined artifact unexpectedly matches the journal identity")
+	}
+}
+
+func TestRestoreRecoveryExecutorDoesNotOverwriteRacedDestination(t *testing.T) {
+	root, _, _ := crashRestoreTransactionForRecovery(t, restoreBoundaryJournalPublished, false)
+	journal, err := ReadRestoreJournal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetBefore, err := os.ReadFile(journal.TargetPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rollbackBefore, err := os.ReadFile(journal.RollbackPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	collision := []byte("destination created after recovery inspection")
+	executor, err := NewRestoreRecoveryExecutor(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	openCalls := 0
+	executor.operations.openStore = func(context.Context, string) (*Store, error) {
+		openCalls++
+		return nil, errors.New("unexpected SQLite open after destination collision")
+	}
+	realMove := executor.operations.move
+	executor.operations.move = func(source, destination string, expected RestoreContentIdentity) error {
+		if samePath(source, journal.TargetPath) && samePath(destination, journal.CandidateQuarantinePath) {
+			if err := os.WriteFile(destination, collision, 0o600); err != nil {
+				return err
+			}
+		}
+		return realMove(source, destination, expected)
+	}
+
+	store, err := executor.Recover(context.Background())
+	if store != nil {
+		_ = store.Close()
+		t.Fatal("recovery returned a Store after destination collision")
+	}
+	if err == nil {
+		t.Fatal("recovery accepted a destination that appeared after inspection")
+	}
+	if openCalls != 0 {
+		t.Fatalf("SQLite open calls = %d, want zero", openCalls)
+	}
+	after, err := ReadRestoreJournal(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if after.Phase != RestorePhaseRestoringPrevious {
+		t.Fatalf("journal phase = %q, want restoring-previous", after.Phase)
+	}
+	for path, want := range map[string][]byte{
+		journal.TargetPath:             targetBefore,
+		journal.RollbackPath:           rollbackBefore,
+		journal.CandidateQuarantinePath: collision,
+	} {
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read preserved artifact %s: %v", path, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("artifact %s changed: got %q, want %q", path, got, want)
+		}
 	}
 }
