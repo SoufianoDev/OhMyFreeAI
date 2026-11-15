@@ -1973,3 +1973,14 @@ These workflows have not completed at the time of this update. Do not treat the 
 Branch status at code/test head: `foundation/bootstrap` is 941 commits ahead of `main`, 0 behind. No changes were made to `main`; no merge or force-push occurred.
 
 Restore remains disabled and the transaction/recovery executors remain isolated from startup, Wails, GUI and CLI. The next safety review is artifact hard-link identity and the remaining Linux/Windows no-follow/provider substitution cases. Only after the remaining safety matrix passes should the real backup archive inspector/candidate builder be connected through an isolated application-level service; no user action or startup wiring is authorized yet.
+
+
+### CI polling update — exact code/test head `42147530aca221e6144b7a0b700f0dc11dbce1eb`
+
+The latest poll still does not establish a green exact-head CI result:
+- Root CI [#43724588470](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588470) remains `pending`; GitHub exposes zero jobs for this run so far.
+- Wails [#43724588405](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588405): Ubuntu and Windows jobs are both `in_progress`; no failed steps reported.
+- SQLite evaluation [#43724588417](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588417): ncruces/Ubuntu is successful; ncruces/Windows and both modernc jobs remain `in_progress`; no failed steps reported.
+- Linux distribution matrix [#43724588493](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588493): Arch and Ubuntu 24.04 are successful; openSUSE, Fedora 44 GTK4 and Debian 13 are `in_progress`; Debian 12, Ubuntu 22.04 and Fedora 44 legacy GTK3 remain queued. No failed steps reported in completed/running jobs.
+
+No code changes were made after `4214753`; the later commits `573fb42`, `5689027` and `7346f5b` update planning/architecture documentation only and are excluded from workflow path filters. The branch is now 944 commits ahead of `main`, 0 behind. The exact code/test commit remains the target of all four workflow runs above.
