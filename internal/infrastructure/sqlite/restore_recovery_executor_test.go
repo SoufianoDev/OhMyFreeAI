@@ -828,3 +828,151 @@ func TestRestoreRecoveryExecutorDoesNotOverwriteRacedDestination(t *testing.T) {
 		}
 	}
 }
+
+
+
+func TestRestoreRecoveryExecutorStopsBeforeMutationForUnverifiedArtifacts(t *testing.T) {
+	tests := []struct {
+		name    string
+		prepare func(*testing.T, string)
+		verify  func(*testing.T, string)
+	}{
+		{
+			name: "mismatched regular file",
+			prepare: func(t *testing.T, target string) {
+				if err := os.WriteFile(target, []byte("unverified replacement bytes"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			},
+			verify: func(t *testing.T, target string) {
+				got, err := os.ReadFile(target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(got) != "unverified replacement bytes" {
+					t.Fatalf("mismatched target changed: %q", got)
+				}
+			},
+		},
+		{
+			name: "directory substituted for candidate",
+			prepare: func(t *testing.T, target string) {
+				if err := os.Remove(target); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(target, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			},
+			verify: func(t *testing.T, target string) {
+				info, err := os.Lstat(target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !info.IsDir() {
+					t.Fatalf("unreadable target mode = %v, want directory", info.Mode())
+				}
+			},
+		},
+		{
+			name: "symlink substituted for candidate",
+			prepare: func(t *testing.T, target string) {
+				external := target + ".external"
+				if err := os.WriteFile(external, []byte("external data must remain untouched"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Remove(target); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Symlink(external, target); err != nil {
+					t.Skipf("symlink creation is unavailable in this environment: %v", err)
+				}
+			},
+			verify: func(t *testing.T, target string) {
+				info, err := os.Lstat(target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if info.Mode()&os.ModeSymlink == 0 {
+					t.Fatalf("preserved target mode = %v, want symlink", info.Mode())
+				}
+				link, err := os.Readlink(target)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if link != target+".external" {
+					t.Fatalf("preserved symlink target = %q, want %q", link, target+".external")
+				}
+				got, err := os.ReadFile(target + ".external")
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(got) != "external data must remain untouched" {
+					t.Fatalf("external target changed: %q", got)
+				}
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root, _, _ := crashRestoreTransactionForRecovery(t, restoreBoundaryJournalPublished, false)
+			journal, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			rollbackBefore, err := os.ReadFile(journal.RollbackPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.prepare(t, journal.TargetPath)
+
+			executor, err := NewRestoreRecoveryExecutor(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			openCalls, moveCalls, journalWrites := 0, 0, 0
+			realWrite := executor.operations.writeJournal
+			executor.operations.openStore = func(context.Context, string) (*Store, error) {
+				openCalls++
+				return nil, errors.New("unverified recovery artifact must not open SQLite")
+			}
+			executor.operations.move = func(string, string, RestoreContentIdentity) error {
+				moveCalls++
+				return errors.New("unverified recovery artifact must not move")
+			}
+			executor.operations.writeJournal = func(lease *restoreJournalLease, next RestoreJournal, boundary string) error {
+				journalWrites++
+				return realWrite(lease, next, boundary)
+			}
+
+			store, err := executor.Recover(context.Background())
+			if store != nil {
+				_ = store.Close()
+				t.Fatal("recovery returned a Store for an unverified target")
+			}
+			if !errors.Is(err, ErrRestoreRecoveryAmbiguous) {
+				t.Fatalf("Recover() error = %v, want ErrRestoreRecoveryAmbiguous", err)
+			}
+			if openCalls != 0 || moveCalls != 0 || journalWrites != 0 {
+				t.Fatalf("recovery performed operations for an unverified target: open=%d move=%d journal-write=%d", openCalls, moveCalls, journalWrites)
+			}
+
+			after, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if after.Phase != RestorePhasePublished {
+				t.Fatalf("journal phase changed to %q, want %q", after.Phase, RestorePhasePublished)
+			}
+			rollbackAfter, err := os.ReadFile(journal.RollbackPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !bytes.Equal(rollbackAfter, rollbackBefore) {
+				t.Fatal("rollback database changed while rejecting an unverified target")
+			}
+			test.verify(t, journal.TargetPath)
+		})
+	}
+}
