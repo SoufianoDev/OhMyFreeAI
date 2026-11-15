@@ -278,6 +278,12 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 			files.Rollback != wantRollback || files.Quarantine != RestoreFileMissing {
 			return ambiguous("committed transaction has inconsistent verified file identities")
 		}
+		if !hadPrevious {
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryPreserveForManualReview,
+				Reason: "first-database candidate is retained for manual review",
+			}, nil
+		}
 		return RestoreRecoveryPlan{
 			Action: RestoreRecoveryVerifyCommitted,
 			VerifyTarget: true,
