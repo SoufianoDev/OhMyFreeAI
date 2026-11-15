@@ -47,17 +47,36 @@ func TestPlanRestoreRecoveryConservativeDecisions(t *testing.T) {
 		wantVerifyTarget bool
 	}{
 		{
+			name: "prepared first database requires manual review",
+			phase: RestorePhasePrepared, hadPrevious: false,
+			files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
+			wantAction: RestoreRecoveryPreserveForManualReview,
+		},
+		{
 			name: "prepared preserves previous database and removes verified stage",
 			phase: RestorePhasePrepared, hadPrevious: true,
 			files: recoveryFiles(RestoreFilePrevious, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
 			wantAction: RestoreRecoveryCleanupStaging, wantRemoveStaging: true,
 		},
 		{
-			name: "staging first database keeps target absent",
+			name: "staging first database preserves candidate for manual review",
 			phase: RestorePhaseStaging, hadPrevious: false,
 			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
-			wantAction: RestoreRecoveryCleanupStaging, wantRemoveStaging: true,
+			wantAction: RestoreRecoveryPreserveForManualReview,
 		},
+		{
+			name: "publishing first database before move requires manual review",
+			phase: RestorePhasePublishing, hadPrevious: false,
+			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
+			wantAction: RestoreRecoveryPreserveForManualReview,
+		},
+		{
+			name: "publishing first database after move requires manual review",
+			phase: RestorePhasePublishing, hadPrevious: false,
+			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
+			wantAction: RestoreRecoveryPreserveForManualReview,
+		},
+
 		{
 			name: "previous preserved retains stage before restoring rollback",
 			phase: RestorePhasePreviousPreserved, hadPrevious: true,
@@ -115,6 +134,37 @@ func TestPlanRestoreRecoveryConservativeDecisions(t *testing.T) {
 				plan.RestoreRollback != test.wantRestoreRollback ||
 				plan.VerifyTarget != test.wantVerifyTarget {
 				t.Fatalf("PlanRestoreRecovery() = %#v", plan)
+			}
+		})
+	}
+}
+
+
+func TestPlanRestoreRecoveryFirstDatabaseStatesAreManualReviewOnly(t *testing.T) {
+	tests := []struct {
+		name  string
+		phase RestorePhase
+		files RestoreRecoveryFiles
+	}{
+		{name: "prepared", phase: RestorePhasePrepared, files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing)},
+		{name: "staging", phase: RestorePhaseStaging, files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing)},
+		{name: "publishing before move", phase: RestorePhasePublishing, files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing)},
+		{name: "publishing after move", phase: RestorePhasePublishing, files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing)},
+		{name: "published at target", phase: RestorePhasePublished, files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing)},
+		{name: "published in quarantine", phase: RestorePhasePublished, files: recoveryFiles(RestoreFileMissing, RestoreFileMissing, RestoreFileMissing, RestoreFileCandidate)},
+		{name: "reopening", phase: RestorePhaseReopening, files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing)},
+		{name: "committed", phase: RestorePhaseCommitted, files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing)},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			plan, err := PlanRestoreRecovery(recoveryTestJournal(test.phase, false), test.files)
+			if err != nil {
+				t.Fatalf("PlanRestoreRecovery() error = %v", err)
+			}
+			if plan.Action != RestoreRecoveryPreserveForManualReview ||
+				plan.RemoveStaging || plan.PreserveStaging || plan.PreservePrevious ||
+				plan.PublishCandidate || plan.PreserveTarget || plan.RestoreRollback || plan.VerifyTarget {
+				t.Fatalf("first-database recovery returned an executable plan: %#v", plan)
 			}
 		})
 	}
@@ -314,17 +364,6 @@ func TestPlanRestoreRecoveryIntentPhaseTruthTables(t *testing.T) {
 			name: "publishing with previous database after move",
 			phase: RestorePhasePublishing, hadPrevious: true,
 			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFilePrevious, RestoreFileMissing),
-		},
-		{
-			name: "first publication before move",
-			phase: RestorePhasePublishing, hadPrevious: false,
-			files: recoveryFiles(RestoreFileMissing, RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing),
-			wantPublishCandidate: true,
-		},
-		{
-			name: "first publication after move",
-			phase: RestorePhasePublishing, hadPrevious: false,
-			files: recoveryFiles(RestoreFileCandidate, RestoreFileMissing, RestoreFileMissing, RestoreFileMissing),
 		},
 		{
 			name: "restoring previous before candidate quarantine",

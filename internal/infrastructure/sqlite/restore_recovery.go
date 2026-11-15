@@ -143,6 +143,12 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 			(files.Staging != RestoreFileMissing && files.Staging != RestoreFileCandidate) {
 			return ambiguous("verified file identities conflict with a pre-publication phase")
 		}
+		if !hadPrevious {
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryPreserveForManualReview,
+				Reason: "first-database transaction has no previous database; preserve candidate evidence for manual review",
+			}, nil
+		}
 		return RestoreRecoveryPlan{
 			Action: RestoreRecoveryCleanupStaging,
 			RemoveStaging: files.Staging == RestoreFileCandidate,
@@ -225,6 +231,12 @@ func PlanRestoreRecovery(journal RestoreJournal, files RestoreRecoveryFiles) (Re
 			!((files.Target == RestoreFileMissing && files.Staging == RestoreFileCandidate) ||
 				(files.Target == RestoreFileCandidate && files.Staging == RestoreFileMissing)) {
 			return ambiguous("publishing requires the candidate at exactly one of staging or target and the expected rollback state")
+		}
+		if !hadPrevious {
+			return RestoreRecoveryPlan{
+				Action: RestoreRecoveryPreserveForManualReview,
+				Reason: "first-database publication has no previous database to restore; preserve candidate evidence for manual review",
+			}, nil
 		}
 		return RestoreRecoveryPlan{
 			Action: RestoreRecoveryResumeIntent,

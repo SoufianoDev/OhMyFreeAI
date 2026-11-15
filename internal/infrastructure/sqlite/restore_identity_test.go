@@ -3,9 +3,9 @@
 package sqlite
 
 import (
-	"errors"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,6 +49,30 @@ func TestReadRestoreContentIdentityRejectsUnsafeEntries(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := readRestoreContentIdentityPlatform(link); err == nil { t.Fatal("followed a symbolic link") }
+	})
+	t.Run("hard-linked file", func(t *testing.T) {
+		directory := restoreTestDir(t)
+		target := filepath.Join(directory, "real.db")
+		link := filepath.Join(directory, "candidate.db")
+		content := []byte("a hard-linked restore artifact must be rejected")
+		if err := os.WriteFile(target, content, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Link(target, link); err != nil {
+			t.Fatalf("create hard-linked restore fixture: %v", err)
+		}
+		for _, path := range []string{target, link} {
+			if _, err := readRestoreContentIdentityPlatform(path); err == nil {
+				t.Fatalf("accepted hard-linked restore artifact %s", path)
+			}
+		}
+		got, err := os.ReadFile(target)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(got) != string(content) {
+			t.Fatalf("hard-linked source content changed: got %q, want %q", got, content)
+		}
 	})
 	t.Run("invalid leaf", func(t *testing.T) {
 		for _, path := range []string{"", ".", ".."} {

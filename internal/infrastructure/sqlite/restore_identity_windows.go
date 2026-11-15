@@ -79,8 +79,8 @@ func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, er
 	if err := windows.GetFileInformationByHandle(handle, &before); err != nil {
 		return identity, fmt.Errorf("inspect opened SQLite restore identity: %w", err)
 	}
-	if before.FileAttributes&(windows.FILE_ATTRIBUTE_DIRECTORY|windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DEVICE) != 0 {
-		return identity, fmt.Errorf("SQLite restore identity is not a regular non-reparse file")
+	if before.FileAttributes&(windows.FILE_ATTRIBUTE_DIRECTORY|windows.FILE_ATTRIBUTE_REPARSE_POINT|windows.FILE_ATTRIBUTE_DEVICE) != 0 || before.NumberOfLinks != 1 {
+		return identity, fmt.Errorf("SQLite restore identity is not a single-link regular non-reparse file")
 	}
 	size := uint64(before.FileSizeHigh)<<32 | uint64(before.FileSizeLow)
 	if size == 0 {
@@ -114,6 +114,7 @@ func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, er
 		after.VolumeSerialNumber != before.VolumeSerialNumber ||
 		after.FileIndexHigh != before.FileIndexHigh || after.FileIndexLow != before.FileIndexLow ||
 		afterSize != size || total != size ||
+		after.NumberOfLinks != before.NumberOfLinks || after.NumberOfLinks != 1 ||
 		after.LastWriteTime != before.LastWriteTime {
 		return identity, fmt.Errorf("SQLite restore identity changed while being read")
 	}

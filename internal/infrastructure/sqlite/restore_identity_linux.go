@@ -59,8 +59,8 @@ func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, er
 	if err := unix.Fstat(fd, &before); err != nil {
 		return identity, fmt.Errorf("inspect opened SQLite restore identity: %w", err)
 	}
-	if before.Mode&unix.S_IFMT != unix.S_IFREG || before.Size <= 0 {
-		return identity, fmt.Errorf("SQLite restore identity is not a non-empty regular file")
+	if before.Mode&unix.S_IFMT != unix.S_IFREG || before.Size <= 0 || before.Nlink != 1 {
+		return identity, fmt.Errorf("SQLite restore identity is not a non-empty single-link regular file")
 	}
 	hash := sha256.New()
 	count, err := io.Copy(hash, file)
@@ -72,7 +72,7 @@ func readRestoreContentIdentityPlatform(path string) (RestoreContentIdentity, er
 		return identity, fmt.Errorf("reinspect opened SQLite restore identity: %w", err)
 	}
 	if after.Mode&unix.S_IFMT != unix.S_IFREG || after.Dev != before.Dev || after.Ino != before.Ino ||
-		after.Size != before.Size || count != before.Size || after.Mtim != before.Mtim || after.Ctim != before.Ctim {
+		after.Size != before.Size || after.Nlink != before.Nlink || after.Nlink != 1 || count != before.Size || after.Mtim != before.Mtim || after.Ctim != before.Ctim {
 		return identity, fmt.Errorf("SQLite restore identity changed while being read")
 	}
 	identity.Size = uint64(count)
