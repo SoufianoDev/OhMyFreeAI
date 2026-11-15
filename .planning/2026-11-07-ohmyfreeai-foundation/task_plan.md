@@ -6,23 +6,40 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current verified code/test head:** `10b8fa2c4f44ffd2184adb430317985868c3657a` on `foundation/bootstrap` (2026-11-14). The latest production-code change is `e538ba59a49eacdbf127feb69bbd10bad606570d`; deterministic boundary hooks were added in `8806eb0dcc5322610f75070839e9b558974aaee9`. StoreController integration is complete.
+**Current branch HEAD:** `6ceaf9a0b58203c81582efa3faed22116bf1a031` on `foundation/bootstrap` (2026-11-15). The latest production-code change is `eeeae13fa272071c689f038eb04c28d31eedcedc`; the current head adds recovery fault-injection and retry tests only.
 
-The latest exact-head CI results are Root CI 2/2, SQLite driver evaluation 4/4, Wails platform proof 2/2, and Linux distribution compatibility 8/8. All four workflow families completed successfully (16/16 jobs total). Root CI logs confirm the new process-death planning and journal-write fault tests pass on Ubuntu and Windows; Ubuntu race detection also passed.
+The exact current-head CI matrix is green: 16/16 jobs across all four workflow families.
 
-The executor now fails closed after the first prepared-journal publication attempt: any later error leaves StoreController without a live Store so SQLite cannot mutate the previous file after its journal identity has been recorded. The process-death matrix currently covers 19 child-process termination points and the journal-write matrix injects failures at nine write boundaries. These tests validate planner decisions after restart, not actual automatic recovery.
+- Root CI [43692619191](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619191): 2/2 Ubuntu/Windows. Both passed Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks; Ubuntu race detection passed.
+- SQLite driver evaluation [43692619280](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619280): 4/4 modernc/ncruces × Ubuntu/Windows.
+- Wails platform proof [43692619207](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619207): 2/2. Ubuntu native build, CLI smoke, WebView-to-Go bridge and database reopen passed; Windows native build, CLI smoke and executable verification passed.
+- Linux distribution compatibility [43692619203](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619203): 8/8, including Ubuntu 22.04, Debian 12/13, Fedora GTK3/GTK4, Arch and openSUSE. Every lane built the desktop app and passed CLI/WebView smoke.
 
-The next gate is move-error injection for every no-replace boundary, including uncertain post-rename/directory-sync outcomes, and the missing staging-to-quarantine crash point. Then implement actual restart reconciliation. The executor is not wired to the app; startup recovery, GUI/CLI Restore and Restore enablement remain prohibited until the full Linux/Windows recovery matrix passes. Do not touch or merge `main`.
+The infrastructure now contains both `RestoreTransactionExecutor` and a separate `RestoreRecoveryExecutor`. Neither is called by startup or exposed through Wails, GUI or CLI. The recovery executor acquires the cross-process journal lease, inspects identities, follows only planner-approved no-replace transitions, verifies the final target before SQLite open, and returns a validated Store to a future startup coordinator.
 
-Older dated sections below are historical checkpoints. This current status supersedes their earlier statements that journal qualification or the executor implementation had not yet been completed.
+New exact-head test coverage:
+- Commit [3772708](https://github.com/SoufianoDev/OhMyFreeAI/commit/37727081fc895aa2fd1e3a9d4747794aedb78f15) adds subprocess termination/restart tests at nine recovery boundaries: previous preservation move/completion, rollback intent, target quarantine, staging quarantine, rollback restoration, previous Store open, rollback completion journal, and committed Store open.
+- Commit [6ceaf9a](https://github.com/SoufianoDev/OhMyFreeAI/commit/6ceaf9a0b58203c81582efa3faed22116bf1a031) adds 14 recovery error-injection cases: journal-write failures, pre-move failures, post-namespace failures for each recovery move, Store-open failures, artifact identity assertions, and successful retry. These tests pass on Ubuntu and Windows.
 
-### Latest exact-head CI evidence
+A real Root CI regression occurred on commit `71bfcfa` (run [43690040040](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43690040040)): read-only candidate validation opened SQLite in ordinary `mode=ro`, leaving WAL sidecars that blocked the next transaction boundary. The production fix in `eeeae13` uses SQLite's immutable read-only URI for the closed candidate validation path, then performs a separate existing-only open and configuration validation. The exact fixed code head passed all four workflow families before the new test-only commits; the current exact head also passes all 16 jobs.
 
-- Root CI [43606878844](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878844): 2/2 Ubuntu/Windows success; Ubuntu Go race detector passed.
-- SQLite driver evaluation [43606878840](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878840): 4/4 modernc/ncruces × Ubuntu/Windows.
-- Wails platform proof [43606878902](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878902): 2/2 Ubuntu/Windows; Linux WebView bridge and database reopen passed, Windows native executable/CLI smoke passed.
-- Linux distribution compatibility [43606878872](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43606878872): 8/8 successful, including Debian 12 legacy GTK3/WebKit41. Its log confirms CLI smoke, backup no-overwrite, two WebView bridge launches, and database reopen.
+The production journal remains the retained JSON ledger. SQLite PERSIST is rejected for production after the pinned driver sidecar symlink tests; do not reintroduce it or switch drivers to bypass the result.
 
+### Immediate remaining gate
+
+The recovery executor's restart and retry behavior is now exercised, but this is not the complete Restore safety matrix. Continue with:
+1. Remaining ambiguity/no-follow race cases: source substitution, destination collisions, unreadable/mismatched artifacts, reparse/symlink and unsupported filesystem behavior across the recovery executor.
+2. Verify first-database/no-previous-database states always stop for manual review and preserve all candidate evidence.
+3. Connect the real `.omfaibackup` inspector/builder callback to the transaction executor in an isolated application-level service, without exposing a Restore action.
+4. Only after the full Linux/Windows matrix passes, add a startup recovery coordinator that runs before the canonical Store is opened. Keep GUI/CLI Restore and user-facing enablement disabled until that coordinator is separately verified.
+5. Design a safe manual export/retention policy before the 256-record / 1 MiB journal cap can be reached. Never prune terminal evidence automatically.
+
+**Restore remains disabled and unwired. Do not merge to `main`.** The current branch is 934 commits ahead and 0 behind `main`; there are no open PRs or active workflows. The eventual delivery must be a selective, audited first-version commit, not a wholesale merge of the development branch.
+
+The November 16 first-testable-version target is at risk. CI proves native builds and container smoke tests, but real-host WebKit sandbox validation, packaging/uninstall, the live Colab/model/SSE policy revalidation, and the selective delivery audit remain open. Do not call the project release-ready based on CI alone.
+
+Older dated sections below are historical checkpoints. This current status supersedes their earlier statements that the transaction or recovery executor did not exist.
+ 
 ### Historical CI evidence
 
 The latest production-code head `1cde3c` passed all four workflow families:
@@ -193,7 +210,7 @@ Phase 4
   - [x] Add strict durable Restore journal v3 storage with bounded decoding, path confinement and paired content identities (low-level only)
   - [x] Evaluate SQLite PERSIST mode, synchronous FULL, sidecar reuse and explicit mode reapplication for modernc/ncruces on Linux/Windows
   - [x] Verify one abrupt-process-death rollback/reopen case for both SQLite drivers on Linux/Windows; this is not the full executor crash matrix
-  - [ ] Implement fail-closed no-follow preflight and durable pre-provisioning for any separate PERSIST control database; compare against retained JSON before choosing
+  - [x] Reject SQLite PERSIST for production after the pinned driver sidecar-symlink tests; retain the JSON ledger
   - [x] Add retained journal ledger v1 with bounded history, one-active-transaction enforcement, legacy v3 migration and terminal-record retention
   - [x] Add Linux/Windows sequential-transaction and orphan-temporary-journal regression tests
   - [x] Add a staging-only archive candidate builder that never mutates the live database
@@ -212,9 +229,9 @@ Phase 4
   - [x] Establish and document the Windows NTFS write-through metadata barrier for the retained-handle no-replace rename (Microsoft NtCreateFile/CreateFile contracts; Windows Root CI 42772101619)
   - [x] Add Linux parent-directory fsync after every durable no-replace namespace mutation (Ubuntu Root CI 42772101619)
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
-  - [ ] Implement the isolated collision-safe filesystem transaction executor (no startup/app wiring)
-  - [ ] Integrate journal phases with staged candidate publication, post-move identity checks, verified reopen and rollback
-  - [ ] Add Linux/Windows failure-injection and abrupt-process-death/restart coverage
+  - [x] Implement the isolated collision-safe filesystem transaction executor (no startup/app wiring)
+  - [x] Integrate journal phases with staged candidate publication, post-move identity checks, verified reopen and rollback
+  - [ ] Complete the remaining Linux/Windows failure-injection and abrupt-process-death/restart coverage
   - [ ] Add the startup recovery coordinator before canonical Store open only after the executor test matrix passes
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
 - [x] Revalidate the refactored two-stage bridge bootstrap on native Ubuntu; run 42405729902 passed with two GetSnapshot calls per launch and DB reopen
@@ -226,7 +243,7 @@ Phase 4
 - [x] Implement framework-independent GUI-default CLI parser with typed unknown-command/extra-argument errors and unit tests
 - [x] Verify the built native executable handles `--help`, `--version`, `doctor`, unknown commands and read-only doctor behavior on Ubuntu 24.04 and Windows (Wails run 42409974970)
 - [x] Verify native CLI smoke on all eight Linux distro lanes (run 42410214638)
-- [ ] Add abrupt-process crash/reopen recovery tests on Linux and Windows
+- [x] Add subprocess process-death/restart tests for nine recovery boundaries on Linux and Windows (Root CI 43692619191)
 - [x] Diagnose Windows 8.3/long-path mismatch in journal round-trip and normalize canonical paths
 - [x] Replace fixed Xvfb display :97 with dynamically allocated display numbers in the Linux WebView smoke helper
 - [x] Record exact pass/fail results; do not equate compilation with runtime certification
@@ -670,3 +687,25 @@ Code/test commit: [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65
 - [ ] Design and implement an isolated restart-reconciliation executor. Hold one journal lease, validate every artifact with no-follow handles, use only planner-approved no-replace operations, persist intent before mutation and completion after verification, and keep StoreController unavailable until the target database is verified.
 - [ ] Add process-death/restart coverage for each recovery move and journal transition on Linux and Windows.
 - [ ] Keep startup recovery and GUI/CLI Restore unwired until the full safety matrix passes.
+
+
+## 2026-11-15 — recovery restart and fault-injection qualification
+
+- [x] Recheck branch head `6ceaf9a0b58203c81582efa3faed22116bf1a031`; no open PRs, no other active workflow runs, and no conflicting active branch work were found.
+- [x] Add subprocess recovery restart tests at nine boundaries covering previous preservation, intent publication, candidate quarantine from target/staging, rollback restoration, Store open, rollback completion, and committed Store open.
+- [x] Add 14 recovery fault-injection/retry cases covering journal write failures, pre-move and post-namespace move failures for each recovery move, and Store-open failures. Verify journal phase and all four artifact identities before retry.
+- [x] Root CI [43692619191](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619191): Ubuntu and Windows passed (2/2); Ubuntu race detector passed.
+- [x] SQLite driver evaluation [43692619280](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619280): 4/4.
+- [x] Wails platform proof [43692619207](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619207): 2/2.
+- [x] Linux distribution compatibility [43692619203](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619203): 8/8. Native desktop build, CLI smoke and WebView-to-Go/database-reopen smoke passed across all configured lanes.
+- [x] Diagnose the Root CI failure on `71bfcfa`: ordinary read-only candidate validation left SQLite WAL sidecars, causing the following transaction step to reject the target. Fix at `eeeae13` uses immutable read-only validation for the closed candidate, then an existing-only open and configuration validation. Current exact-head CI is green.
+- [x] Update the current plan to reflect the implemented transaction and recovery executors; older dated checkpoints remain historical.
+- No Restore startup wiring, GUI/CLI Restore exposure, or main merge was added. Restore remains disabled.
+
+### Next
+
+- [ ] Finish the remaining ambiguity/no-follow race and unsupported-provider cases in the recovery executor.
+- [ ] Verify first-database/no-previous-database recovery remains manual-review-only and preserves candidate evidence.
+- [ ] Integrate the real backup archive inspector/candidate builder through an isolated application-level Restore service, without exposing a user action.
+- [ ] Add startup recovery before canonical Store open only after the full platform safety matrix is complete.
+- [ ] Design explicit safe export/retention before the bounded JSON ledger reaches its cap.
