@@ -108,21 +108,16 @@ func TestRestoreTransactionExecutorPublishesVerifiedCandidateAndRetainsRollback(
 	}
 }
 
-func TestRestoreTransactionExecutorQuarantinesCandidateWhenReopenFails(t *testing.T) {
+func TestRestoreTransactionExecutorQuarantinesCandidateWhenReadOnlyValidationFails(t *testing.T) {
 	executor, controller, root, archivePath, previous, _ := newRestoreExecutorFixture(t)
-	injected := errors.New("injected candidate reopen failure")
-	realOpen := executor.operations.openStore
-	var calls atomic.Int32
-	executor.operations.openStore = func(ctx context.Context, path string) (*Store, error) {
-		if calls.Add(1) == 1 {
-			return nil, injected
-		}
-		return realOpen(ctx, path)
+	injected := errors.New("injected candidate read-only validation failure")
+	executor.operations.verifyDatabase = func(context.Context, string) error {
+		return injected
 	}
 
 	err := executor.Execute(context.Background(), restoreExecutorRequest(archivePath))
 	if !errors.Is(err, injected) {
-		t.Fatalf("Execute() error = %v, want injected reopen failure", err)
+		t.Fatalf("Execute() error = %v, want injected read-only validation failure", err)
 	}
 	if got := loadControllerConfiguration(t, controller); !reflect.DeepEqual(got, previous) {
 		t.Fatalf("active configuration after rollback = %#v, want previous %#v", got, previous)
@@ -333,13 +328,8 @@ func TestRestoreTransactionExecutorProcessDeathHelper(t *testing.T) {
 		t.Fatalf("create Restore executor in crash child: %v", err)
 	}
 	if os.Getenv(restoreExecutorCrashRollbackEnv) == "1" {
-		realOpen := executor.operations.openStore
-		var calls atomic.Int32
-		executor.operations.openStore = func(ctx context.Context, path string) (*Store, error) {
-			if calls.Add(1) == 1 {
-				return nil, errors.New("injected candidate reopen failure for crash matrix")
-			}
-			return realOpen(ctx, path)
+		executor.operations.verifyDatabase = func(context.Context, string) error {
+			return errors.New("injected candidate validation failure for crash matrix")
 		}
 	}
 	crashContext, cancel := context.WithCancel(context.Background())
@@ -566,12 +556,12 @@ func TestRestoreTransactionExecutorMoveErrorsPreserveRecoveryState(t *testing.T)
 		destination         string
 		wantPhase           RestorePhase
 		previousIdentity    bool
-		failCandidateOpen   bool
+		failCandidateValidation bool
 		cancelBeforePublish bool
 	}{
 		{name: "previous to rollback", source: "target", destination: "rollback", wantPhase: RestorePhasePreservingPrevious, previousIdentity: true},
 		{name: "staging to target", source: "staging", destination: "target", wantPhase: RestorePhasePublishing},
-		{name: "target to quarantine", source: "target", destination: "quarantine", wantPhase: RestorePhaseRestoringPrevious, failCandidateOpen: true},
+		{name: "target to quarantine", source: "target", destination: "quarantine", wantPhase: RestorePhaseRestoringPrevious, failCandidateValidation: true},
 		{name: "staging to quarantine", source: "staging", destination: "quarantine", wantPhase: RestorePhaseRestoringPrevious, cancelBeforePublish: true},
 		{name: "rollback to target", source: "rollback", destination: "target", wantPhase: RestorePhaseRestoringPrevious, previousIdentity: true, failCandidateOpen: true},
 	}
@@ -597,14 +587,9 @@ func TestRestoreTransactionExecutorMoveErrorsPreserveRecoveryState(t *testing.T)
 				destinationPath := paths[test.destination]
 				injected := errors.New("injected no-replace move error at " + test.name + "/" + stage)
 
-				if test.failCandidateOpen {
-					realOpen := executor.operations.openStore
-					var calls atomic.Int32
-					executor.operations.openStore = func(ctx context.Context, path string) (*Store, error) {
-						if calls.Add(1) == 1 {
-							return nil, errors.New("injected candidate reopen failure")
-						}
-					return realOpen(ctx, path)
+				if test.failCandidateValidation {
+					executor.operations.verifyDatabase = func(context.Context, string) error {
+						return errors.New("injected candidate read-only validation failure")
 					}
 				}
 
