@@ -436,3 +436,250 @@ func TestRestoreRecoveryExecutorRestartsAfterEveryRecoveryBoundary(t *testing.T)
 		})
 	}
 }
+
+
+func TestRestoreRecoveryExecutorRetriesAllInjectedFailureBoundaries(t *testing.T) {
+	type failureCase struct {
+		name string
+		initialBoundary string
+		journalBoundary string
+		moveSource string
+		moveDestination string
+		moveAfterNamespace bool
+		failOpen bool
+		wantPhase RestorePhase
+		wantFiles RestoreRecoveryFiles
+		wantCandidate bool
+	}
+	tests := []failureCase{
+		{
+			name: "rollback intent journal",
+			initialBoundary: restoreBoundaryJournalPublished,
+			journalBoundary: restoreRecoveryBoundaryJournalRestoringPrevious,
+			wantPhase: RestorePhasePublished,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileCandidate, Staging: RestoreFileMissing, Rollback: RestoreFilePrevious, Quarantine: RestoreFileMissing},
+		},
+		{
+			name: "target quarantine pre-move",
+			initialBoundary: restoreBoundaryJournalPublished,
+			moveSource: "target",
+			moveDestination: "quarantine",
+			wantPhase: RestorePhaseRestoringPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileCandidate, Staging: RestoreFileMissing, Rollback: RestoreFilePrevious, Quarantine: RestoreFileMissing},
+		},
+		{
+			name: "target quarantine post-namespace",
+			initialBoundary: restoreBoundaryJournalPublished,
+			moveSource: "target",
+			moveDestination: "quarantine",
+			moveAfterNamespace: true,
+			wantPhase: RestorePhaseRestoringPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileMissing, Staging: RestoreFileMissing, Rollback: RestoreFilePrevious, Quarantine: RestoreFileCandidate},
+		},
+		{
+			name: "rollback target pre-move",
+			initialBoundary: restoreBoundaryJournalPublished,
+			moveSource: "rollback",
+			moveDestination: "target",
+			wantPhase: RestorePhaseRestoringPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileMissing, Staging: RestoreFileMissing, Rollback: RestoreFilePrevious, Quarantine: RestoreFileCandidate},
+		},
+		{
+			name: "rollback target post-namespace",
+			initialBoundary: restoreBoundaryJournalPublished,
+			moveSource: "rollback",
+			moveDestination: "target",
+			moveAfterNamespace: true,
+			wantPhase: RestorePhaseRestoringPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFilePrevious, Staging: RestoreFileMissing, Rollback: RestoreFileMissing, Quarantine: RestoreFileCandidate},
+		},
+		{
+			name: "rollback completion journal",
+			initialBoundary: restoreBoundaryJournalPublished,
+			journalBoundary: restoreRecoveryBoundaryJournalRolledBack,
+			wantPhase: RestorePhaseRestoringPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFilePrevious, Staging: RestoreFileMissing, Rollback: RestoreFileMissing, Quarantine: RestoreFileCandidate},
+		},
+		{
+			name: "rollback Store open",
+			initialBoundary: restoreBoundaryJournalPublished,
+			failOpen: true,
+			wantPhase: RestorePhaseRestoringPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFilePrevious, Staging: RestoreFileMissing, Rollback: RestoreFileMissing, Quarantine: RestoreFileCandidate},
+		},
+		{
+			name: "committed Store open",
+			initialBoundary: restoreBoundaryJournalCommitted,
+			failOpen: true,
+			wantPhase: RestorePhaseCommitted,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileCandidate, Staging: RestoreFileMissing, Rollback: RestoreFilePrevious, Quarantine: RestoreFileMissing},
+			wantCandidate: true,
+		},
+		{
+			name: "previous rollback pre-move",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			moveSource: "target",
+			moveDestination: "rollback",
+			wantPhase: RestorePhasePreservingPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFilePrevious, Staging: RestoreFileCandidate, Rollback: RestoreFileMissing, Quarantine: RestoreFileMissing},
+		},
+		{
+			name: "previous rollback post-namespace",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			moveSource: "target",
+			moveDestination: "rollback",
+			moveAfterNamespace: true,
+			wantPhase: RestorePhasePreservingPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileMissing, Staging: RestoreFileCandidate, Rollback: RestoreFilePrevious, Quarantine: RestoreFileMissing},
+		},
+		{
+			name: "previous-preserved journal",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			journalBoundary: restoreRecoveryBoundaryJournalPreviousPreserved,
+			wantPhase: RestorePhasePreservingPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileMissing, Staging: RestoreFileCandidate, Rollback: RestoreFilePrevious, Quarantine: RestoreFileMissing},
+		},
+		{
+			name: "restoring-previous journal",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			journalBoundary: restoreRecoveryBoundaryJournalRestoringPrevious,
+			wantPhase: RestorePhasePreviousPreserved,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileMissing, Staging: RestoreFileCandidate, Rollback: RestoreFilePrevious, Quarantine: RestoreFileMissing},
+		},
+		{
+			name: "staging quarantine pre-move",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			moveSource: "staging",
+			moveDestination: "quarantine",
+			wantPhase: RestorePhaseRestoringPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileMissing, Staging: RestoreFileCandidate, Rollback: RestoreFilePrevious, Quarantine: RestoreFileMissing},
+		},
+		{
+			name: "staging quarantine post-namespace",
+			initialBoundary: restoreBoundaryJournalPreservingPrevious,
+			moveSource: "staging",
+			moveDestination: "quarantine",
+			moveAfterNamespace: true,
+			wantPhase: RestorePhaseRestoringPrevious,
+			wantFiles: RestoreRecoveryFiles{Target: RestoreFileMissing, Staging: RestoreFileMissing, Rollback: RestoreFilePrevious, Quarantine: RestoreFileCandidate},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			root, previous, candidate := crashRestoreTransactionForRecovery(t, test.initialBoundary, false)
+			journal, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read interrupted transaction journal: %v", err)
+			}
+			executor, err := NewRestoreRecoveryExecutor(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			injected := errors.New("injected recovery boundary failure: " + test.name)
+
+			if test.journalBoundary != "" {
+				realWrite := executor.operations.writeJournal
+				executor.operations.writeJournal = func(lease *restoreJournalLease, next RestoreJournal, boundary string) error {
+					if boundary == test.journalBoundary {
+						return injected
+					}
+					return realWrite(lease, next, boundary)
+				}
+			}
+			if test.moveSource != "" {
+				sourcePath := journal.TargetPath
+				switch test.moveSource {
+				case "staging":
+					sourcePath = journal.StagingPath
+				case "rollback":
+					sourcePath = journal.RollbackPath
+				}
+				destinationPath := journal.TargetPath
+				switch test.moveDestination {
+				case "rollback":
+					destinationPath = journal.RollbackPath
+				case "quarantine":
+					destinationPath = journal.CandidateQuarantinePath
+				}
+				realMove := executor.operations.move
+				executor.operations.move = func(source, destination string, expected RestoreContentIdentity) error {
+					if samePath(source, sourcePath) && samePath(destination, destinationPath) {
+						if test.moveAfterNamespace {
+							return moveRestoreFileNoReplaceVerifiedWithHook(source, destination, expected, func() error {
+								return injected
+							})
+						}
+						return injected
+					}
+					return realMove(source, destination, expected)
+				}
+			}
+			if test.failOpen {
+				realOpen := executor.operations.openStore
+				executor.operations.openStore = func(ctx context.Context, path string) (*Store, error) {
+					if samePath(path, journal.TargetPath) {
+						return nil, injected
+					}
+					return realOpen(ctx, path)
+				}
+			}
+
+			store, err := executor.Recover(context.Background())
+			if store != nil {
+				_ = store.Close()
+				t.Fatal("Recover returned a Store after an injected failure")
+			}
+			if !errors.Is(err, injected) {
+				t.Fatalf("Recover() error = %v, want injected failure", err)
+			}
+			current, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read journal after injected failure: %v", err)
+			}
+			if current.Phase != test.wantPhase {
+				t.Fatalf("journal phase after injected failure = %q, want %q", current.Phase, test.wantPhase)
+			}
+			files, err := inspectRestoreRecoveryFiles(root, current)
+			if err != nil {
+				t.Fatalf("inspect artifacts after injected failure: %v", err)
+			}
+			if files != test.wantFiles {
+				t.Fatalf("artifact identities after injected failure = %#v, want %#v", files, test.wantFiles)
+			}
+
+			retry, err := NewRestoreRecoveryExecutor(root)
+			if err != nil {
+				t.Fatal(err)
+			}
+			recovered, err := retry.Recover(context.Background())
+			if err != nil {
+				t.Fatalf("retry recovery after %q: %v", test.name, err)
+			}
+			if recovered == nil {
+				t.Fatal("retry recovery returned no validated Store")
+			}
+			got, loadErr := recovered.Load(context.Background())
+			closeErr := recovered.Close()
+			if err := errors.Join(loadErr, closeErr); err != nil {
+				t.Fatalf("load or close recovered Store: %v", err)
+			}
+			want := previous
+			wantPhase := RestorePhaseRolledBack
+			if test.wantCandidate {
+				want = candidate
+				wantPhase = RestorePhaseCommitted
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Fatalf("recovered configuration = %#v, want %#v", got, want)
+			}
+			terminal, err := ReadRestoreJournal(root)
+			if err != nil {
+				t.Fatalf("read terminal recovery journal: %v", err)
+			}
+			if terminal.Phase != wantPhase {
+				t.Fatalf("terminal journal phase = %q, want %q", terminal.Phase, wantPhase)
+			}
+		})
+	}
+}
