@@ -12,8 +12,24 @@ func moveRestoreFileNoReplace(source, destination string) error {
 }
 
 func moveRestoreFileNoReplaceWithHook(source, destination string, afterNamespaceMutation func() error) error {
+	return moveRestoreFileNoReplaceWithHooks(source, destination, nil, afterNamespaceMutation)
+}
+
+// moveRestoreFileNoReplaceWithHooks exposes the pre-mutation boundary only to
+// package tests so they can replace a leaf after the common path preflight.
+// Production callers use nil hooks and never run arbitrary code in this window.
+func moveRestoreFileNoReplaceWithHooks(
+	source, destination string,
+	beforeNamespaceMutation func() error,
+	afterNamespaceMutation func() error,
+) error {
 	if err := validateRestoreMovePaths(source, destination); err != nil {
 		return err
+	}
+	if beforeNamespaceMutation != nil {
+		if err := beforeNamespaceMutation(); err != nil {
+			return fmt.Errorf("before SQLite restore namespace mutation: %w", err)
+		}
 	}
 	if err := moveRestoreFileNoReplacePlatformWithHook(source, destination, afterNamespaceMutation); err != nil {
 		return fmt.Errorf("move SQLite restore artifact without replacement: %w", err)
@@ -34,10 +50,19 @@ func moveRestoreFileNoReplaceVerifiedWithHook(
 	expected RestoreContentIdentity,
 	afterNamespaceMutation func() error,
 ) error {
+	return moveRestoreFileNoReplaceVerifiedWithHooks(source, destination, expected, nil, afterNamespaceMutation)
+}
+
+func moveRestoreFileNoReplaceVerifiedWithHooks(
+	source, destination string,
+	expected RestoreContentIdentity,
+	beforeNamespaceMutation func() error,
+	afterNamespaceMutation func() error,
+) error {
 	if err := validateRestoreContentIdentity(expected.SHA256, expected.Size, "restore move", true); err != nil {
 		return err
 	}
-	if err := moveRestoreFileNoReplaceWithHook(source, destination, afterNamespaceMutation); err != nil {
+	if err := moveRestoreFileNoReplaceWithHooks(source, destination, beforeNamespaceMutation, afterNamespaceMutation); err != nil {
 		return err
 	}
 
