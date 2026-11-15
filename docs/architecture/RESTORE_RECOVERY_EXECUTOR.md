@@ -1,6 +1,6 @@
 # Restore Recovery Executor — Design Constraints
 
-**Status:** isolated in-process transaction executor implemented and not wired to the application. Deterministic journal-write fault injection and a 19-point process-death/restart-planning matrix are present; move-error injection and actual restart reconciliation remain incomplete.  
+**Status:** isolated in-process transaction and restart-reconciliation executors are implemented and not wired to the application. The transaction executor has a 19-point process-death matrix; the recovery executor has restart-boundary and failure-injection coverage. First-database recovery is manual-review-only, including committed records. Remaining no-follow/provider qualification and the real backup-manager callback are still incomplete.  
 **Scope:** Linux and Windows desktop installations, with SQLite state files confined to the canonical application state directory.
 
 ## Why the executor is a separate safety boundary
@@ -87,9 +87,9 @@ Implemented as low-level primitives only:
 
 Not implemented:
 
-- Startup recovery coordinator and automatic reconciliation of journal intent phases after process death.
-- The full Linux/Windows failure-injection and abrupt-process-death/restart executor test matrix.
-- Application-level Restore orchestration and the production backup-manager callback wiring.
+- Startup recovery coordinator and automatic reconciliation before the ordinary application Store is opened.
+- The remaining Linux/Windows failure-injection and abrupt-process-death/restart cases, including hard-link and unsupported-provider qualification.
+- Application-level Restore orchestration and production backup-manager callback wiring.
 - Hardware-independent power-loss qualification.
 
 Threat and durability boundaries:
@@ -534,3 +534,14 @@ The in-process transaction executor is not a startup recovery coordinator. Imple
 7. Add subprocess crash/restart tests around every recovery journal write, move, post-move verification and database-open boundary on Linux and Windows.
 
 The executor remains isolated. Do not wire startup recovery, Wails, GUI or CLI Restore until the new recovery executor and complete platform matrix pass. Process-death tests are not power-loss tests; retain the fixed-local-NTFS and storage-controller flush limitations.
+
+
+## 2026-11-15 — first-database restart policy
+
+The restart recovery path now treats every first-database transaction (`previous_database_existed=false`) as manual-review-only, including a journal already marked `committed`. The planner returns `RestoreRecoveryPreserveForManualReview`; the recovery executor returns `ErrRestoreRecoveryManualReview` before SQLite open, artifact movement or journal mutation. Candidate bytes and their current target/staging/quarantine location remain unchanged.
+
+Regression tests cover prepared, staging, publishing, published, already-quarantined published, reopening and committed states. Exact code/test head: [4214753](https://github.com/SoufianoDev/OhMyFreeAI/commit/42147530aca221e6144b7a0b700f0dc11dbce1eb).
+
+CI for that exact head is still pending/queued at this note: Root [#43724588470](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588470), Wails [#43724588405](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588405), SQLite [#43724588417](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588417), Linux distributions [#43724588493](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588493). Do not treat this change as verified until the exact-head workflows finish and their jobs are inspected.
+
+The next identity audit must reject hard-linked artifacts if the filesystem exposes link counts, in addition to existing no-follow and content-hash checks. Restore remains disabled and no startup, Wails, GUI or CLI wiring is enabled.
