@@ -40,13 +40,11 @@ func crashRestoreTransactionForRecovery(t *testing.T, boundary string, rollback 
 	command.Stderr = &output
 	err := command.Run()
 	if ctx.Err() != nil {
-		t.Fatalf("transaction crash child timed out at %q: %v
-%s", boundary, ctx.Err(), output.String())
+		t.Fatalf("transaction crash child timed out at %q: %v\n%s", boundary, ctx.Err(), output.String())
 	}
 	exitError, ok := err.(*exec.ExitError)
 	if !ok || exitError.ExitCode() != 86 {
-		t.Fatalf("transaction crash child exit = %v, want deliberate exit 86 at %q
-%s", err, boundary, output.String())
+		t.Fatalf("transaction crash child exit = %v, want deliberate exit 86 at %q\n%s", err, boundary, output.String())
 	}
 	return root, previous, candidate
 }
