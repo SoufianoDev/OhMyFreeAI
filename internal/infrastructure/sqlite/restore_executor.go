@@ -2,6 +2,7 @@ package sqlite
 
 import (
 	"context"
+	"database/sql"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
@@ -47,6 +48,7 @@ const (
 	restoreBoundaryMoveStagingToTarget      = "move:staging-to-target"
 	restoreBoundaryJournalPublished         = "journal:published"
 	restoreBoundaryJournalReopening         = "journal:reopening"
+	restoreBoundaryCandidateVerified        = "candidate:verified-readonly"
 	restoreBoundaryStoreCandidateOpened     = "store:candidate-opened"
 	restoreBoundaryJournalCommitted         = "journal:committed"
 	restoreBoundaryJournalRestoringPrevious = "journal:restoring-previous"
@@ -335,20 +337,38 @@ func (executor *RestoreTransactionExecutor) executeLocked(
 		return executor.rollback(lease, journal, err)
 	}
 
+	if err := ensureNoSQLiteSidecars(target); err != nil {
+		return executor.rollback(lease, journal, err)
+	}
+	if err := verifyRestoreDatabaseReadOnly(ctx, target); err != nil {
+		return executor.rollback(lease, journal, fmt.Errorf("verify published SQLite candidate before commit: %w", err))
+	}
+	if err := ensureNoSQLiteSidecars(target); err != nil {
+		return executor.rollback(lease, journal, err)
+	}
+	actualCandidate, err := readRestoreContentIdentityPlatform(target)
+	if err != nil {
+		return executor.rollback(lease, journal, fmt.Errorf("recheck published SQLite candidate identity: %w", err))
+	}
+	if !actualCandidate.matches(candidate.Identity.SHA256, candidate.Identity.Size) {
+		return executor.rollback(lease, journal, fmt.Errorf("%w: published SQLite candidate changed during read-only verification", ErrRestoreRecoveryAmbiguous))
+	}
+	executor.reachBoundary(restoreBoundaryCandidateVerified)
+
+	journal.Phase = RestorePhaseCommitted
+	journal.UpdatedAt = time.Now().UTC()
+	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalCommitted); err != nil {
+		return nil, fmt.Errorf("persist committed SQLite Restore transaction: %w", err)
+	}
+
 	candidateStore, err := executor.operations.openStore(ctx, target)
 	if err != nil {
-		return executor.rollback(lease, journal, fmt.Errorf("open and validate published SQLite candidate: %w", err))
+		return nil, fmt.Errorf("open committed SQLite Restore candidate; startup recovery must retry: %w", err)
 	}
 	executor.reachBoundary(restoreBoundaryStoreCandidateOpened)
 	if err := ctx.Err(); err != nil {
 		_ = candidateStore.Close()
-		return executor.rollback(lease, journal, err)
-	}
-	journal.Phase = RestorePhaseCommitted
-	journal.UpdatedAt = time.Now().UTC()
-	if err := executor.persistJournal(lease, journal, restoreBoundaryJournalCommitted); err != nil {
-		_ = candidateStore.Close()
-		return nil, fmt.Errorf("persist committed SQLite Restore transaction: %w", err)
+		return nil, err
 	}
 	return candidateStore, nil
 }
@@ -453,24 +473,33 @@ func (executor *RestoreTransactionExecutor) rollback(
 	return restoredStore, cause
 }
 
-func openVerifiedRestoreStore(ctx context.Context, path string) (*Store, error) {
+func verifyRestoreDatabaseReadOnly(ctx context.Context, path string) error {
 	if err := verifyBackupDatabase(ctx, path); err != nil {
-		return nil, err
+		return err
 	}
-	store, err := OpenExisting(ctx, path)
+	db, err := sql.Open(driverName, readOnlyDataSourceName(path))
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("open SQLite database for read-only configuration validation: %w", err)
 	}
-	configuration, err := store.Load(ctx)
-	if err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("load reopened SQLite configuration: %w", err)
+	db.SetMaxOpenConns(1)
+	db.SetMaxIdleConns(1)
+	readOnlyStore := &Store{db: db, path: path}
+	configuration, loadErr := readOnlyStore.Load(ctx)
+	closeErr := db.Close()
+	if err := errors.Join(loadErr, closeErr); err != nil {
+		return fmt.Errorf("load SQLite configuration for read-only validation: %w", err)
 	}
 	if err := configuration.Validate(); err != nil {
-		_ = store.Close()
-		return nil, fmt.Errorf("validate reopened SQLite configuration: %w", err)
+		return fmt.Errorf("validate SQLite configuration before Restore commit: %w", err)
 	}
-	return store, nil
+	return nil
+}
+
+func openVerifiedRestoreStore(ctx context.Context, path string) (*Store, error) {
+	if err := verifyRestoreDatabaseReadOnly(ctx, path); err != nil {
+		return nil, err
+	}
+	return OpenExisting(ctx, path)
 }
 
 func readRestoreArchiveIdentity(path string) (RestoreContentIdentity, error) {
