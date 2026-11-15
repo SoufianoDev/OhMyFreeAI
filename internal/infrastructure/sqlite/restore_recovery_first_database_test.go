@@ -61,20 +61,22 @@ func TestRestoreRecoveryExecutorPreservesFirstDatabaseForManualReview(t *testing
 					t.Fatalf("write staging first-database journal: %v", err)
 				}
 
-				transitions := []RestorePhase{
-					RestorePhasePublishing,
-					RestorePhasePublished,
-					RestorePhaseReopening,
-					RestorePhaseCommitted,
-				}
-				for _, phase := range transitions {
-					if phase == test.phase {
-						break
+				if test.phase != RestorePhaseStaging {
+					transitions := []RestorePhase{
+						RestorePhasePublishing,
+						RestorePhasePublished,
+						RestorePhaseReopening,
+						RestorePhaseCommitted,
 					}
-					journal.Phase = phase
-					journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
-					if err := WriteRestoreJournal(root, journal); err != nil {
-						t.Fatalf("advance first-database journal to %q: %v", phase, err)
+					for _, phase := range transitions {
+						journal.Phase = phase
+						journal.UpdatedAt = journal.UpdatedAt.Add(time.Second)
+						if err := WriteRestoreJournal(root, journal); err != nil {
+							t.Fatalf("advance first-database journal to %q: %v", phase, err)
+						}
+						if phase == test.phase {
+							break
+						}
 					}
 				}
 			}
