@@ -1935,3 +1935,41 @@ All four workflow families completed successfully on exact test head `6ceaf9a0b5
 - Integrate the actual backup archive inspector/candidate builder through an isolated application-level Restore service, without exposing a user-facing Restore action.
 - Add the startup recovery coordinator before canonical Store open only after the complete Linux/Windows safety matrix is closed.
 - Design safe manual ledger export/retention before the 256-record / 1 MiB cap is reached; never prune terminal evidence automatically.
+
+
+## 2026-11-15 — first-database recovery manual-review gate
+
+The requested historical Root CI run was rechecked through GitHub Actions:
+- [Root CI #42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009), commit `f5396ee592b9b9756779f67aeabd6d7167520c40`: SUCCESS 2/2.
+- Ubuntu and Windows jobs both completed successfully. Every step in both jobs was successful, including Go vet/tests/build, Python tooling/tests, frontend syntax and architecture checks.
+
+StoreController was re-reviewed on `foundation/bootstrap`:
+- 16 controller tests cover shared/exclusive lease ordering, writer preference, cancellation, safe replacement, close/drain, stale-store prevention, panic handling, concurrency stress and config repository operations.
+- The backup integration test `TestManagerCreateWithStoreControllerDrainsBeforeClose` confirms that close waits for backup archive publication.
+- Wails composition root and AppService continue to use the single StoreController; config and backup operations retain shared leases for their complete operation. This phase is already complete and was not reimplemented.
+
+A recovery policy gap was found: the planner allowed a `committed` first-database transaction (`previous_database_existed=false`) to proceed to SQLite open during restart recovery, while all other first-database interrupted phases were manual-review-only. That contradicted the conservative first-database policy and could publish a database automatically when no previous state exists.
+
+The policy is now consistent:
+- `PlanRestoreRecovery` returns `RestoreRecoveryPreserveForManualReview` for a committed first-database record.
+- `RestoreRecoveryExecutor` returns `ErrRestoreRecoveryManualReview` before opening SQLite, moving any artifact or writing another journal phase.
+- New executor tests cover prepared, staging, publishing, published, already-quarantined published, reopening and committed first-database states. They assert that the journal phase and candidate bytes/locations remain unchanged and that open/move/journal-write callbacks are never called.
+
+Code/test commits:
+- [57f6329](https://github.com/SoufianoDev/OhMyFreeAI/commit/57f63297bf843ef3e9604b20e146b4fb5ac06341) — planner manual-review decision.
+- [cfe5faa](https://github.com/SoufianoDev/OhMyFreeAI/commit/cfe5faa55c4c5e901c09764e70e7eda461fe7f3d) — executor stops before SQLite open.
+- [3ad088f](https://github.com/SoufianoDev/OhMyFreeAI/commit/3ad088f767645593d72f30a964e9790969890a4e) — planner regression expectation.
+- [d40b144](https://github.com/SoufianoDev/OhMyFreeAI/commit/d40b144720527e4277fe0984223ba143ca4f61ef) — first-database evidence-preservation tests.
+- [4214753](https://github.com/SoufianoDev/OhMyFreeAI/commit/42147530aca221e6144b7a0b700f0dc11dbce1eb) — corrected phase-transition fixture setup.
+
+Exact code/test head `42147530aca221e6144b7a0b700f0dc11dbce1eb` has four workflow runs:
+- Root CI [#43724588470](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588470): pending, no jobs exposed yet.
+- Wails proof [#43724588405](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588405): queued, Ubuntu and Windows jobs queued.
+- SQLite driver evaluation [#43724588417](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588417): queued, four driver/OS jobs queued.
+- Linux distribution compatibility [#43724588493](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588493): queued; three matrix jobs had started and five remained queued at the last check.
+
+These workflows have not completed at the time of this update. Do not treat the new code/tests as CI-verified yet. No local Go tests were run in this execution. Intermediate runs from the sequential file commits were cancelled by the workflow concurrency policy; the final run set above targets the corrected exact head.
+
+Branch status at code/test head: `foundation/bootstrap` is 941 commits ahead of `main`, 0 behind. No changes were made to `main`; no merge or force-push occurred.
+
+Restore remains disabled and the transaction/recovery executors remain isolated from startup, Wails, GUI and CLI. The next safety review is artifact hard-link identity and the remaining Linux/Windows no-follow/provider substitution cases. Only after the remaining safety matrix passes should the real backup archive inspector/candidate builder be connected through an isolated application-level service; no user action or startup wiring is authorized yet.
