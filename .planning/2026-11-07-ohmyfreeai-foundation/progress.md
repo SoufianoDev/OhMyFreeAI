@@ -1883,3 +1883,55 @@ All four workflow families for exact test head 10b8fa2c4f44ffd2184adb43031798586
 - Design and implement an isolated restart-reconciliation executor, still not wired to application startup. It must acquire one journal lease, validate journal and all artifact identities through no-follow handles, apply only planner-approved idempotent no-replace operations, persist intent/completion in order, and keep the StoreController unavailable until a single verified target database is ready.
 - Add a fresh process-death matrix around every recovery move and journal transition on Linux and Windows. Preserve all mismatched, unreadable, colliding or otherwise ambiguous artifacts. Do not open SQLite before the target identity is verified.
 - Do not wire startup recovery, Wails, GUI or CLI Restore until the recovery executor and full platform matrix pass.
+
+
+## 2026-11-15 — recovery executor restart and failure-injection qualification
+
+### Repository and workflow inspection
+- Confirmed the active branch is `foundation/bootstrap`, current code/test head before this session's test commits was `eeeae13fa272071c689f038eb04c28d31eedcedc`.
+- Confirmed there were no open pull requests and no active workflow runs from other branches. Other feature/foundation branches remain separate; no merge or branch rewrite was performed.
+- The branch was 934 commits ahead and 0 behind `main` before this session's documentation updates. `main` remained at `a1b12fb`.
+- Re-read the active task plan, progress log, Restore lifecycle and recovery-executor architecture, plus the current transaction executor, recovery executor, planner and tests.
+
+### Failure diagnosis carried forward
+- Inspected the failed Root CI run [43690040040](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43690040040) on `71bfcfa`. Both Ubuntu and Windows failed during Restore tests because ordinary read-only candidate validation left SQLite `-wal` sidecars; the next move boundary correctly rejected the target as still in use.
+- The production fix in [eeeae13](https://github.com/SoufianoDev/OhMyFreeAI/commit/eeeae13fa272071c689f038eb04c28d31eedcedc) uses SQLite's immutable read-only URI for validation of the closed candidate, then separately opens the existing database and validates the loaded configuration. This avoids creating sidecars during the pre-commit read-only identity check.
+- The fixed production-code head passed all four workflow families before the new test commits.
+
+### Test work added
+- Commit [3772708](https://github.com/SoufianoDev/OhMyFreeAI/commit/37727081fc895aa2fd1e3a9d4747794aedb78f15) adds subprocess process-death/restart coverage at nine recovery boundaries:
+  - previous-to-rollback move and previous-preserved journal completion;
+  - rollback-intent journal publication;
+  - target-to-quarantine and staging-to-quarantine moves;
+  - rollback-to-target move;
+  - previous Store open;
+  - rolled-back journal completion;
+  - committed Store open.
+- Commit [6ceaf9a](https://github.com/SoufianoDev/OhMyFreeAI/commit/6ceaf9a0b58203c81582efa3faed22116bf1a031) adds 14 recovery failure-injection cases:
+  - journal write failures at rollback-intent, previous-preserved and rolled-back boundaries;
+  - pre-move and post-namespace-mutation errors for target-to-rollback, target-to-quarantine, staging-to-quarantine and rollback-to-target;
+  - rollback and committed Store-open failures;
+  - exact journal-phase and target/staging/rollback/quarantine identity assertions;
+  - retry after each injected failure, proving the recovery executor can resume from the retained state.
+- The post-namespace hook models process-visible namespace mutation followed by an injected error. It is not a power-loss simulation and does not establish hardware-level durability.
+
+### Exact-head CI verification
+All four workflow families completed successfully on exact test head `6ceaf9a0b58203c81582efa3faed22116bf1a031`:
+
+- Root CI [43692619191](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619191): 2/2 Ubuntu/Windows. Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks passed; Ubuntu race detector passed.
+- SQLite driver evaluation [43692619280](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619280): 4/4 modernc/ncruces × Ubuntu/Windows.
+- Wails platform proof [43692619207](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619207): 2/2. Native desktop builds and CLI smoke passed on Ubuntu/Windows; Ubuntu WebView-to-Go bridge passed twice and database reopen passed.
+- Linux distribution compatibility [43692619203](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619203): 8/8. All configured distro lanes built the actual desktop application and passed native CLI plus WebView-to-Go/database-reopen smoke.
+
+### Scope and safety
+- Updated the active task plan to reflect that both transaction and restart-recovery executors now exist. Historical checkpoints remain as dated history.
+- No production source was changed in this session; the code changes were confined to `restore_recovery_executor_test.go`. The immutable-read-only production fix was already present in `eeeae13` and was verified through current CI.
+- Restore remains disabled and unexposed. The recovery executor is not wired before canonical Store open; no GUI/CLI Restore action or application-level Restore service was added.
+- No changes were made to `main`; no merge, force-push or destructive cleanup was performed.
+
+### Next
+- Complete remaining ambiguity/no-follow race cases: source substitution, destination collisions, unreadable/mismatched artifacts, symlink/reparse substitution and unsupported filesystem behavior in recovery.
+- Verify first-database/no-previous-database states always stop for manual review and preserve all candidate evidence.
+- Integrate the actual backup archive inspector/candidate builder through an isolated application-level Restore service, without exposing a user-facing Restore action.
+- Add the startup recovery coordinator before canonical Store open only after the complete Linux/Windows safety matrix is closed.
+- Design safe manual ledger export/retention before the 256-record / 1 MiB cap is reached; never prune terminal evidence automatically.
