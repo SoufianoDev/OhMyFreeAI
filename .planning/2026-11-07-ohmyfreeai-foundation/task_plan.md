@@ -709,3 +709,16 @@ Code/test commit: [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65
 - [ ] Integrate the real backup archive inspector/candidate builder through an isolated application-level Restore service, without exposing a user action.
 - [ ] Add startup recovery before canonical Store open only after the full platform safety matrix is complete.
 - [ ] Design explicit safe export/retention before the bounded JSON ledger reaches its cap.
+
+
+## 2026-11-15 — first-database restart policy
+
+- [x] Recheck the requested historical Root CI run `42419106009`; Ubuntu and Windows both completed with all steps successful.
+- [x] Re-review StoreController/Wails/AppService/config/backup lease integration and its 16 controller tests plus backup drain test; this phase is already complete.
+- [x] Make committed first-database restart recovery manual-review-only, consistent with earlier first-database phases.
+- [x] Add executor regression coverage for prepared, staging, publishing, published, quarantined, reopening and committed first-database artifacts; assert no SQLite open, no move, no journal write, and no evidence change.
+- [ ] Verify exact code/test head `42147530aca221e6144b7a0b700f0dc11dbce1eb` through all triggered GitHub workflows. Current runs: Root `43724588470` pending; Wails `43724588405` queued; SQLite `43724588417` queued; Linux distributions `43724588493` queued/in progress. Inspect Ubuntu/Windows jobs and logs when available; fix any failures before proceeding.
+- [ ] Audit hard-link handling in both no-follow identity readers. The current readers reject symlink/reparse and non-regular files, but the reviewed implementations do not currently enforce a single-link invariant for database artifacts. Add cross-platform hard-link tests and reject multi-link artifacts if the platform metadata supports it.
+- [ ] Complete remaining source-leaf substitution, destination-collision, unreadable/mismatched artifact and unsupported-provider tests on Linux and Windows. Keep Linux's post-move content verification boundary explicit; do not claim all same-user races are eliminated.
+- [ ] Only after the safety matrix passes, wire the real backup archive inspector/candidate builder through an isolated application-level Restore service without exposing a GUI/CLI action.
+- [ ] Keep startup recovery and all Restore user entry points disabled until the full recovery matrix and app-level integration are independently verified on Linux and Windows.
