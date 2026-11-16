@@ -21,7 +21,7 @@ func inspectRestoreRecoveryFiles(stateDirectory string, journal RestoreJournal) 
 	if err != nil {
 		return ambiguous("resolve canonical state directory", err)
 	}
-	journal, err = canonicalizeRestoreJournal(root, journal)
+	journal, err = canonicalizeRestoreJournalForRead(root, journal)
 	if err != nil {
 		return ambiguous("validate recovery journal and transaction paths", err)
 	}
