@@ -90,6 +90,9 @@ func TestMoveRestoreFileNoReplaceRejectsNonPrivateContainingDirectory(t *testing
 func TestMoveRestoreFileNoReplaceVerifiedOnTmpfs(t *testing.T) {
 	directory, err := os.MkdirTemp("/dev/shm", ".ohmyfreeai-restore-tmpfs-")
 	if err != nil {
+		if os.Getenv("CI") == "true" {
+			t.Fatalf("GitHub CI must provide the tmpfs fixture: %v", err)
+		}
 		t.Skipf("private tmpfs fixture is unavailable: %v", err)
 	}
 	t.Cleanup(func() { _ = os.RemoveAll(directory) })
@@ -102,6 +105,9 @@ func TestMoveRestoreFileNoReplaceVerifiedOnTmpfs(t *testing.T) {
 		t.Fatalf("inspect tmpfs fixture filesystem: %v", err)
 	}
 	if uint64(filesystem.Type) != uint64(unix.TMPFS_MAGIC) {
+		if os.Getenv("CI") == "true" {
+			t.Fatalf("GitHub CI /dev/shm must be tmpfs (filesystem magic 0x%x)", uint64(filesystem.Type))
+		}
 		t.Skipf("/dev/shm is not tmpfs (filesystem magic 0x%x)", uint64(filesystem.Type))
 	}
 
