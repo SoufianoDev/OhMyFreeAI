@@ -86,6 +86,73 @@ func TestMoveRestoreFileNoReplaceRejectsNonPrivateContainingDirectory(t *testing
 }
 
 
+
+func TestMoveRestoreFileNoReplaceVerifiedOnTmpfs(t *testing.T) {
+	directory, err := os.MkdirTemp("/dev/shm", ".ohmyfreeai-restore-tmpfs-")
+	if err != nil {
+		t.Skipf("private tmpfs fixture is unavailable: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(directory) })
+	if err := os.Chmod(directory, 0o700); err != nil {
+		t.Fatalf("restrict tmpfs fixture directory: %v", err)
+	}
+
+	var filesystem unix.Statfs_t
+	if err := unix.Statfs(directory, &filesystem); err != nil {
+		t.Fatalf("inspect tmpfs fixture filesystem: %v", err)
+	}
+	if uint64(filesystem.Type) != uint64(unix.TMPFS_MAGIC) {
+		t.Skipf("/dev/shm is not tmpfs (filesystem magic 0x%x)", uint64(filesystem.Type))
+	}
+
+	source := filepath.Join(directory, "candidate.staging")
+	destination := filepath.Join(directory, "candidate.db")
+	content := []byte("verified candidate on a distinct tmpfs provider")
+	if err := os.WriteFile(source, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := moveRestoreFileNoReplaceVerified(source, destination, restoreIdentityForTest(content)); err != nil {
+		t.Fatalf("verified no-replace move on tmpfs: %v", err)
+	}
+	got, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatalf("read verified tmpfs destination: %v", err)
+	}
+	if !bytes.Equal(got, content) {
+		t.Fatalf("tmpfs destination = %q, want %q", got, content)
+	}
+	if _, err := os.Lstat(source); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("tmpfs source remains after move: %v", err)
+	}
+
+	collisionSource := filepath.Join(directory, "collision-source.staging")
+	collisionDestination := filepath.Join(directory, "collision-destination.db")
+	sourceContent := []byte("source must remain after tmpfs collision")
+	destinationContent := []byte("existing destination must not be replaced")
+	if err := os.WriteFile(collisionSource, sourceContent, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(collisionDestination, destinationContent, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err = moveRestoreFileNoReplaceVerified(collisionSource, collisionDestination, restoreIdentityForTest(sourceContent))
+	if !errors.Is(err, os.ErrExist) {
+		t.Fatalf("tmpfs collision error = %v, want os.ErrExist", err)
+	}
+	for path, want := range map[string][]byte{
+		collisionSource:      sourceContent,
+		collisionDestination: destinationContent,
+	} {
+		got, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("read preserved tmpfs artifact %s: %v", path, readErr)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("tmpfs artifact %s = %q, want %q", path, got, want)
+		}
+	}
+}
+
 func TestMoveRestoreFileNoReplaceFailsClosedWhenRenameat2IsUnsupported(t *testing.T) {
 	tests := []struct {
 		name string
