@@ -68,7 +68,7 @@ func TestInspectRestoreRecoveryFilesRejectsIndistinguishableCandidateAndPrevious
 	}
 }
 
-func TestInspectRestoreRecoveryFilesRejectsSymlinkWithoutChangingIt(t *testing.T) {
+func TestInspectRestoreRecoveryFilesMarksSymlinkUnreadableWithoutFollowingIt(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("creating symlinks may require elevated privileges on Windows")
 	}
@@ -82,8 +82,12 @@ func TestInspectRestoreRecoveryFilesRejectsSymlinkWithoutChangingIt(t *testing.T
 		t.Fatal(err)
 	}
 
-	if _, err := inspectRestoreRecoveryFiles(root, journal); !errors.Is(err, ErrRestoreRecoveryAmbiguous) {
-		t.Fatalf("inspectRestoreRecoveryFiles() error = %v, want ErrRestoreRecoveryAmbiguous", err)
+	files, err := inspectRestoreRecoveryFiles(root, journal)
+	if err != nil {
+		t.Fatalf("inspectRestoreRecoveryFiles() error = %v", err)
+	}
+	if files.Target != RestoreFileUnreadable {
+		t.Fatalf("target identity = %q, want %q", files.Target, RestoreFileUnreadable)
 	}
 	info, err := os.Lstat(journal.TargetPath)
 	if err != nil || info.Mode()&os.ModeSymlink == 0 {
