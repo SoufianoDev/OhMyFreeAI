@@ -14,6 +14,20 @@ func moveRestoreFileNoReplacePlatform(source, destination string) error {
 }
 
 func moveRestoreFileNoReplacePlatformWithHook(source, destination string, afterNamespaceMutation func() error) error {
+	return moveRestoreFileNoReplacePlatformWithRenameat2(source, destination, unix.Renameat2, afterNamespaceMutation)
+}
+
+// moveRestoreFileNoReplacePlatformWithRenameat2 keeps the unsupported-syscall
+// behavior injectable so tests can prove that no overwrite-capable fallback is
+// attempted when the filesystem or kernel rejects RENAME_NOREPLACE.
+func moveRestoreFileNoReplacePlatformWithRenameat2(
+	source, destination string,
+	renameat2 func(int, string, int, string, uint) error,
+	afterNamespaceMutation func() error,
+) error {
+	if renameat2 == nil {
+		return fmt.Errorf("SQLite restore no-replace rename operation is unavailable")
+	}
 	directory := filepath.Dir(source)
 	// Pin the containing directory and reject symlinks in every path component.
 	// If openat2 is unavailable, fail closed rather than falling back to a
@@ -32,7 +46,7 @@ func moveRestoreFileNoReplacePlatformWithHook(source, destination string, afterN
 
 	sourceName := filepath.Base(source)
 	destinationName := filepath.Base(destination)
-	if err := unix.Renameat2(dirfd, sourceName, dirfd, destinationName, unix.RENAME_NOREPLACE); err != nil {
+	if err := renameat2(dirfd, sourceName, dirfd, destinationName, unix.RENAME_NOREPLACE); err != nil {
 		return err
 	}
 	// This seam models an error after the namespace changed but before the

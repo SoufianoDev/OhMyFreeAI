@@ -83,3 +83,65 @@ func TestMoveRestoreFileNoReplaceRejectsNonPrivateContainingDirectory(t *testing
 		t.Fatalf("destination unexpectedly exists: %v", err)
 	}
 }
+
+
+func TestMoveRestoreFileNoReplaceFailsClosedWhenRenameat2IsUnsupported(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+	}{
+		{name: "filesystem does not support RENAME_NOREPLACE", err: unix.EOPNOTSUPP},
+		{name: "filesystem rejects RENAME_NOREPLACE flag", err: unix.EINVAL},
+		{name: "kernel does not provide renameat2", err: unix.ENOSYS},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			directory := restoreTestDir(t)
+			source := filepath.Join(directory, "candidate.staging")
+			destination := filepath.Join(directory, "candidate.db")
+			content := []byte("candidate must remain untouched when no-replace is unsupported")
+			if err := os.WriteFile(source, content, 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			renameCalls := 0
+			afterNamespaceCalls := 0
+			err := moveRestoreFileNoReplacePlatformWithRenameat2(
+				source,
+				destination,
+				func(oldDirFD int, oldPath string, newDirFD int, newPath string, flags uint) error {
+					renameCalls++
+					if flags != unix.RENAME_NOREPLACE {
+						t.Fatalf("rename flags = %d, want RENAME_NOREPLACE", flags)
+					}
+					return test.err
+				},
+				func() error {
+					afterNamespaceCalls++
+					return nil
+				},
+			)
+			if !errors.Is(err, test.err) {
+				t.Fatalf("move error = %v, want %v", err, test.err)
+			}
+			if renameCalls != 1 {
+				t.Fatalf("renameat2 calls = %d, want exactly one", renameCalls)
+			}
+			if afterNamespaceCalls != 0 {
+				t.Fatalf("post-namespace hook calls = %d, want zero after a rejected rename", afterNamespaceCalls)
+			}
+
+			got, err := os.ReadFile(source)
+			if err != nil {
+				t.Fatalf("read preserved source: %v", err)
+			}
+			if !bytes.Equal(got, content) {
+				t.Fatalf("source changed: got %q, want %q", got, content)
+			}
+			if _, err := os.Lstat(destination); !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("destination exists after unsupported no-replace operation: %v", err)
+			}
+		})
+	}
+}
