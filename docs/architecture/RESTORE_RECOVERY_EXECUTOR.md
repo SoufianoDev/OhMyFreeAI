@@ -98,7 +98,7 @@ Threat and durability boundaries:
 - Automatic journal deletion is unsupported on both platforms. Do not delete, prune or replace retained terminal records in a way that loses rollback/quarantine evidence.
 - The exported legacy `RestoreDatabase` helper remains a separate path-based implementation. Do not call it from the journal executor or expose it through GUI/CLI.
 
-Restore remains disabled. Do not add startup recovery, GUI/CLI Restore, or application-level Restore service until the executor's identity, no-replace, journal, rollback, process-death and restart tests pass on Linux and Windows.
+Restore remains disabled. The isolated application-level service is not wired to any user-facing or startup entry point. Do not add startup recovery or GUI/CLI Restore until the executor's identity, no-replace, journal, rollback, process-death and restart tests pass on Linux and Windows and the remaining host/provider qualification is complete.
 
 ## Application-level Restore service — isolated and not exposed (2026-11-16)
 
@@ -111,6 +111,8 @@ The infrastructure adapter in `internal/infrastructure/restore` composes:
 The integration test creates a real `.omfaibackup`, runs the actual candidate builder and transaction executor, verifies the replacement StoreController configuration, checks the committed journal, and confirms the previous database remains in rollback storage.
 
 This service is intentionally not registered in the Wails composition root and is not exposed through GUI, CLI or startup recovery. It is an internal integration boundary only; it does not enable Restore. The legacy path-based `backup.Manager.Restore` / `sqlite.RestoreDatabase` path is not used by this service and must not be wired into the application.
+
+Exact-head verification: Root CI [43828456208](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456208) passed 2/2 on Ubuntu/Windows; the new service and integration packages passed on both, and Ubuntu race detection passed. Wails [43828456186](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456186) passed 2/2, and Linux distribution compatibility [43828456181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456181) passed 8/8. This confirms CI behavior, not external filesystem-provider or hardware-independent power-loss qualification.
 
 ## Retained journal ledger lifecycle — implemented 2026-11-10
 

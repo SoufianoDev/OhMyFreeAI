@@ -6,32 +6,31 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current verified code head:** `fabd6d778efa578bfae9d4170eb1d291215639a3` on `foundation/bootstrap` (2026-11-16). This commit fixes the missing `bytes` import in the Linux no-replace unsupported-operation regression test.
+**Current verified code head:** `944e99ac297c5e42bdea511eb0cd6f08ee49a0ec` on `foundation/bootstrap` (2026-11-16). The isolated application-level Restore service and real archive-to-transaction integration test are now implemented.
 
-The exact-head CI matrix is green: 16/16 jobs across all four workflow families.
+The workflows triggered by this code commit completed successfully: 12/12 jobs.
 
-- Root CI [43827194285](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194285): 2/2 Ubuntu/Windows. Both passed `go vet ./...`, `go test ./...`, build, Python compile/tests (16/16), frontend syntax and architecture checks. Ubuntu also passed `go test -race ./...`; the SQLite package passed under race detection.
-- SQLite driver evaluation [43827194323](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194323): 4/4 modernc/ncruces × Ubuntu/Windows.
-- Wails platform proof [43827194276](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194276): 2/2 Ubuntu/Windows.
-- Linux distribution compatibility [43827194241](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194241): 8/8, including Ubuntu 22.04, Debian 12/13, Fedora GTK3/GTK4, Arch and openSUSE. All jobs completed successfully.
+- Root CI [43828456208](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456208): 2/2 Ubuntu/Windows. Both passed `go vet ./...`, `go test ./...` and `go build ./...`. Ubuntu also passed `go test -race ./...`; both new Restore packages passed normal tests on both operating systems, and the infrastructure integration test passed under Linux race detection.
+- Wails platform proof [43828456186](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456186): 2/2 Ubuntu/Windows native builds and smoke checks.
+- Linux distribution compatibility [43828456181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456181): 8/8, including Ubuntu 22.04, Debian 12/13, Fedora GTK3/GTK4, Arch and openSUSE. All eight lanes passed desktop build and CLI/WebView smoke.
+- SQLite driver evaluation [43827194323](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194323): 4/4 modernc/ncruces × Ubuntu/Windows on parent code head `fabd6d7`. It was not re-triggered for `944e99a` because this change did not modify the SQLite driver evaluation or SQLite implementation paths.
 
-A Root CI failure on the preceding head `e5ab1fc` was a compile-time test defect, not a production defect: `restore_move_linux_test.go` used `bytes.Equal` without importing `bytes`. Commit `fabd6d7` adds the missing standard-library import. The exact fixed head passed Root CI on both platforms, including Linux race detection.
+The earlier Root CI regression on `e5ab1fc` was a missing `bytes` import in `restore_move_linux_test.go`; it was fixed by `fabd6d7`, and the exact fixed head passed Root CI, race detection, SQLite driver evaluation, Wails and all eight Linux distro lanes.
 
-The preceding recovery-inspection changes are now covered by the exact green head:
-- `ee6fe97` separates journal path metadata validation from no-follow artifact inspection.
-- `ab292f7` decodes retained journal paths without following substituted leaf objects.
-- `e048789` routes recovery inspection through read-only canonicalization.
-- `94589b6` verifies symlink artifacts are classified as unreadable and left unchanged.
-- `e5ab1fc` adds injected `renameat2` unsupported cases (`EOPNOTSUPP`, `EINVAL`, `ENOSYS`) and asserts that the source is preserved and no overwrite-capable fallback is attempted.
-- Existing identity tests reject hard-linked artifacts on Linux and Windows; recovery tests cover source-leaf substitution, destination collision, mismatched/directory/symlink artifacts, and first-database manual-review preservation.
+The recovery identity and ambiguity audit is now represented in code/tests:
+- Linux and Windows no-follow identity readers reject hard-linked files (`Nlink/NumberOfLinks != 1`), symlinks/reparse points, directories, empty files and content changes during hashing.
+- Recovery tests cover source-leaf substitution after a move, raced destination collisions without overwrite, mismatched/directory/symlink artifacts stopping before SQLite open or journal mutation, and first-database manual-review-only behavior.
+- The Linux no-replace unsupported-operation test injects `EOPNOTSUPP`, `EINVAL` and `ENOSYS`, verifies one `RENAME_NOREPLACE` attempt, preserves the source, leaves the destination absent, and proves no overwrite-capable fallback is attempted.
 
-The isolated transaction and recovery executors remain infrastructure-only. First-database recovery is manual-review-only. The application-level adapter added in the current implementation slice composes the real `.omfaibackup` builder with the transaction executor, but it is not wired to Wails, GUI, CLI or startup.
+The new application layer contract in `internal/application/restore` coordinates a candidate-builder port with a transaction-executor port. The infrastructure adapter in `internal/infrastructure/restore` composes the real `backup.Manager.BuildRestoreCandidateAtPath` implementation with `sqlite.RestoreTransactionExecutor`. The integration test creates a real `.omfaibackup`, builds and migrates its candidate, executes the transaction, verifies the replacement StoreController configuration and committed journal, and confirms the previous database remains in rollback storage. This test passed on Ubuntu and Windows; Ubuntu race detection also passed.
 
-**Immediate remaining gate:** qualify the application-level adapter with a real archive-to-candidate-to-transaction integration test, then re-run the full exact-head CI matrix. After that, continue the external filesystem/provider and real-host validation. Do not add startup recovery or user-facing Restore until the complete Linux/Windows safety matrix and host qualification are closed.
+**The service remains isolated.** It is not registered in the Wails composition root and is not exposed through GUI, CLI or startup recovery. Restore remains disabled. Do not wire the legacy path-based `backup.Manager.Restore` / `sqlite.RestoreDatabase` path.
 
-**Restore remains disabled and unwired. Do not merge to `main`.** At `fabd6d7`, the branch was 956 commits ahead and 0 behind `main`. The first-testable-version target date is 2026-11-16; it has not been met. Real-host WebView sandbox validation, packaging/uninstall, live Colab/model/SSE policy revalidation, and the selective delivery audit remain open. CI success is not release readiness.
+**Next gate:** external filesystem/provider qualification and real-host validation. Current evidence covers Linux CI/container filesystems and fixed local NTFS; it does not certify every Linux filesystem, remote Windows provider, storage controller or power-loss behavior. Complete real-host WebView sandbox validation, packaging/uninstall, live Colab/model/SSE policy revalidation and selective delivery audit. Only after the full Linux/Windows safety matrix and host qualification are closed should a startup recovery coordinator be considered.
 
-Older dated sections below are historical checkpoints. This current status supersedes their earlier statements about missing transaction/recovery executors or unfinished hard-link identity checks.
+**Do not merge to `main`.** Branch head `944e99a` is 957 commits ahead and 0 behind `main` at `a1b12fb`; there are no open PRs. The 2026-11-16 first-testable target date has been reached but the target has not been met. The application Restore service is not user-facing, and the outstanding host, packaging, model-policy and selective-delivery work prevents calling this a real-world testable release. CI success is not release readiness.
+
+Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.
 
 ### Historical CI evidence
 

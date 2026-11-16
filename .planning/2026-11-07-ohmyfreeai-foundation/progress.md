@@ -2035,3 +2035,26 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - The 16/16 CI result applies to `fabd6d7`, before the new application-service files in this commit. The new integration test and service still require their own exact-head CI run.
 - Next: close the service integration CI on Ubuntu and Windows plus Wails/Linux distro smoke, then complete external filesystem/provider and real-host validation. Only then consider a startup recovery coordinator; do not expose a user-facing Restore action.
 - The 2026-11-16 first-testable target has not been met. Real-host WebView sandbox validation, packaging/uninstall, live Colab/model/SSE policy revalidation and selective delivery audit remain open.
+
+
+## 2026-11-16 — application Restore service integration verified
+
+### Exact-head verification
+- Code head: `944e99ac297c5e42bdea511eb0cd6f08ee49a0ec`.
+- Root CI [43828456208](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456208): Ubuntu and Windows 2/2. Both passed vet, all Go tests and build. Ubuntu passed `go test -race ./...`.
+- Wails [43828456186](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456186): Ubuntu and Windows 2/2.
+- Linux distributions [43828456181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456181): 8/8, including Ubuntu 22.04, Debian 12/13, Fedora GTK3/GTK4, Arch and openSUSE.
+- New packages `internal/application/restore` and `internal/infrastructure/restore` passed on both Windows and Ubuntu. The real archive-to-transaction integration test passed on both; the infrastructure restore package also passed under Ubuntu race detection.
+- SQLite driver evaluation [43827194323](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194323) remains 4/4 on parent code head `fabd6d7`. It was not triggered by the service-only change because the driver evaluation and SQLite implementation paths were unchanged.
+- No active workflows remain for the code commit; all 12 triggered jobs completed successfully.
+
+### Integration result
+- The application service requires both a candidate builder and transaction executor, rejects empty archive paths and invalid candidate identities, honors cancellation, and requires the executor to invoke the candidate callback exactly once.
+- The infrastructure adapter uses the actual backup manager's `BuildRestoreCandidateAtPath` and the existing `RestoreTransactionExecutor`.
+- The integration test creates a real `.omfaibackup`, runs candidate extraction/migration, commits the transaction, checks the new StoreController configuration, verifies a committed journal and verifies the old database remains as a non-empty rollback artifact.
+- The service is not wired to Wails, GUI, CLI or startup recovery. Restore remains disabled.
+
+### Delivery and next work
+- Branch `foundation/bootstrap` is 957 commits ahead and 0 behind `main`; `main` remains `a1b12fb`; no open PRs were found.
+- The 2026-11-16 first-testable target date was reached but not met. Real-host WebView sandbox validation, packaging/uninstall, live Colab/model/SSE policy revalidation, external filesystem/provider qualification and selective delivery audit remain open.
+- Next: complete external provider and real-host qualification. Do not add startup recovery or user-facing Restore until the complete Linux/Windows safety matrix and host qualification are closed. Do not merge the development branch wholesale.
