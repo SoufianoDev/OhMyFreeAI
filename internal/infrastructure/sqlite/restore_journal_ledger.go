@@ -34,7 +34,7 @@ func readRestoreJournalLedger(root string) (restoreJournalLedger, error) {
 		if err := decodeStrictRestoreJournal(data, &legacy); err != nil {
 			return empty, fmt.Errorf("%w: decode legacy journal: %v", ErrRestoreJournalInvalid, err)
 		}
-		legacy, err = canonicalizeRestoreJournal(root, legacy)
+		legacy, err = canonicalizeRestoreJournalForRead(root, legacy)
 		if err != nil {
 			return empty, err
 		}
@@ -79,7 +79,7 @@ func validateRestoreJournalLedger(root string, ledger restoreJournalLedger) (res
 	targetPath := ""
 	activeTransactions := 0
 	for i := range ledger.Transactions {
-		journal, err := canonicalizeRestoreJournal(root, ledger.Transactions[i])
+		journal, err := canonicalizeRestoreJournalForRead(root, ledger.Transactions[i])
 		if err != nil {
 			return restoreJournalLedger{}, err
 		}
