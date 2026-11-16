@@ -252,6 +252,23 @@ func canonicalStateDirectory(path string) (string, error) {
 }
 
 func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJournal, error) {
+	return canonicalizeRestoreJournalWithLeafValidation(root, journal, true)
+}
+
+// canonicalizeRestoreJournalForRead validates journal metadata and confines
+// every persisted path without treating the current leaf object as journal
+// metadata. Recovery must inspect each leaf through no-follow handles so a
+// substituted symlink, directory, or other non-regular object is reported as
+// ambiguous recovery state and preserved for manual review.
+func canonicalizeRestoreJournalForRead(root string, journal RestoreJournal) (RestoreJournal, error) {
+	return canonicalizeRestoreJournalWithLeafValidation(root, journal, false)
+}
+
+func canonicalizeRestoreJournalWithLeafValidation(
+	root string,
+	journal RestoreJournal,
+	validateLeaf bool,
+) (RestoreJournal, error) {
 	if journal.Version != restoreJournalVersion ||
 		strings.TrimSpace(journal.TransactionID) == "" ||
 		len(journal.TransactionID) > 128 ||
@@ -265,11 +282,11 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 	if err != nil || len(digest) != sha256.Size || strings.ToLower(journal.ArchiveSHA256) != journal.ArchiveSHA256 {
 		return RestoreJournal{}, fmt.Errorf("%w: archive SHA-256 is invalid", ErrRestoreJournalInvalid)
 	}
-	journal.TargetPath, err = canonicalStatePath(root, journal.TargetPath)
+	journal.TargetPath, err = canonicalStatePathWithLeafValidation(root, journal.TargetPath, validateLeaf)
 	if err != nil {
 		return RestoreJournal{}, err
 	}
-	journal.StagingPath, err = canonicalStatePath(root, journal.StagingPath)
+	journal.StagingPath, err = canonicalStatePathWithLeafValidation(root, journal.StagingPath, validateLeaf)
 	if err != nil {
 		return RestoreJournal{}, err
 	}
@@ -284,7 +301,7 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 		return RestoreJournal{}, fmt.Errorf("%w: rollback path is unexpected when no previous database exists", ErrRestoreJournalInvalid)
 	}
 	if journal.RollbackPath != "" {
-		journal.RollbackPath, err = canonicalStatePath(root, journal.RollbackPath)
+		journal.RollbackPath, err = canonicalStatePathWithLeafValidation(root, journal.RollbackPath, validateLeaf)
 		if err != nil {
 			return RestoreJournal{}, err
 		}
@@ -292,7 +309,7 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 			return RestoreJournal{}, fmt.Errorf("%w: rollback path collides with another transaction path", ErrRestoreJournalInvalid)
 		}
 	}
-	journal.CandidateQuarantinePath, err = canonicalStatePath(root, journal.CandidateQuarantinePath)
+	journal.CandidateQuarantinePath, err = canonicalStatePathWithLeafValidation(root, journal.CandidateQuarantinePath, validateLeaf)
 	if err != nil {
 		return RestoreJournal{}, err
 	}
@@ -338,6 +355,10 @@ func canonicalizeRestoreJournal(root string, journal RestoreJournal) (RestoreJou
 }
 
 func canonicalStatePath(root, path string) (string, error) {
+	return canonicalStatePathWithLeafValidation(root, path, true)
+}
+
+func canonicalStatePathWithLeafValidation(root, path string, validateLeaf bool) (string, error) {
 	if strings.TrimSpace(path) == "" {
 		return "", fmt.Errorf("%w: transaction path is empty", ErrRestoreJournalInvalid)
 	}
@@ -371,15 +392,17 @@ func canonicalStatePath(root, path string) (string, error) {
 			return "", fmt.Errorf("%w: transaction path collides with a reserved Restore journal artifact", ErrRestoreJournalInvalid)
 		}
 	}
-	if info, statErr := os.Lstat(absolute); statErr == nil {
-		if info.Mode()&os.ModeSymlink != 0 {
-			return "", fmt.Errorf("%w: transaction path must not be a symbolic link", ErrRestoreJournalInvalid)
+	if validateLeaf {
+		if info, statErr := os.Lstat(absolute); statErr == nil {
+			if info.Mode()&os.ModeSymlink != 0 {
+				return "", fmt.Errorf("%w: transaction path must not be a symbolic link", ErrRestoreJournalInvalid)
+			}
+			if !info.Mode().IsRegular() {
+				return "", fmt.Errorf("%w: existing transaction path must be a regular file", ErrRestoreJournalInvalid)
+			}
+		} else if !errors.Is(statErr, os.ErrNotExist) {
+			return "", fmt.Errorf("%w: inspect transaction path: %v", ErrRestoreJournalInvalid, statErr)
 		}
-		if !info.Mode().IsRegular() {
-			return "", fmt.Errorf("%w: existing transaction path must be a regular file", ErrRestoreJournalInvalid)
-		}
-	} else if !errors.Is(statErr, os.ErrNotExist) {
-		return "", fmt.Errorf("%w: inspect transaction path: %v", ErrRestoreJournalInvalid, statErr)
 	}
 	relative, err := filepath.Rel(resolvedRoot, resolvedCandidate)
 	if err != nil || relative == "." || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.IsAbs(relative) {
