@@ -1,6 +1,6 @@
 # Restore Recovery Executor — Design Constraints
 
-**Status:** isolated in-process transaction and restart-reconciliation executors are implemented and not wired to the application. The transaction executor has a 19-point process-death matrix; the recovery executor has restart-boundary and failure-injection coverage. First-database recovery is manual-review-only, including committed records. Remaining no-follow/provider qualification and the real backup-manager callback are still incomplete.  
+**Status:** isolated in-process transaction and restart-reconciliation executors plus an application-layer Restore service are implemented and tested. The service composes the real `.omfaibackup` candidate builder with the transaction executor, but remains unwired to Wails, GUI, CLI and startup recovery. The transaction executor has a 19-point process-death matrix; the recovery executor has restart-boundary, failure-injection, source-substitution and destination-collision coverage. First-database recovery is manual-review-only, including committed records. Linux no-replace unsupported errors fail closed; Windows remains qualified only for fixed local NTFS with persistent ACLs. External provider and real-host qualification remain incomplete.  
 **Scope:** Linux and Windows desktop installations, with SQLite state files confined to the canonical application state directory.
 
 ## Why the executor is a separate safety boundary
@@ -88,9 +88,8 @@ Implemented as low-level primitives only:
 Not implemented:
 
 - Startup recovery coordinator and automatic reconciliation before the ordinary application Store is opened.
-- The remaining Linux/Windows failure-injection and abrupt-process-death/restart cases, including hard-link and unsupported-provider qualification.
-- Application-level Restore orchestration and production backup-manager callback wiring.
-- Hardware-independent power-loss qualification.
+- Qualification on additional Linux filesystems and Windows providers beyond the current fail-closed Linux `RENAME_NOREPLACE` path and fixed local NTFS policy.
+- Hardware-independent power-loss qualification; process-death tests and CI do not certify storage-controller or device flush behavior.
 
 Threat and durability boundaries:
 
@@ -100,6 +99,18 @@ Threat and durability boundaries:
 - The exported legacy `RestoreDatabase` helper remains a separate path-based implementation. Do not call it from the journal executor or expose it through GUI/CLI.
 
 Restore remains disabled. Do not add startup recovery, GUI/CLI Restore, or application-level Restore service until the executor's identity, no-replace, journal, rollback, process-death and restart tests pass on Linux and Windows.
+
+## Application-level Restore service — isolated and not exposed (2026-11-16)
+
+The application layer now has an isolated `restore.Service` contract. It accepts a candidate-builder port and a transaction-executor port, passes the builder callback into the executor, requires the callback to run synchronously exactly once, and rejects empty or malformed candidate identities before the executor can proceed.
+
+The infrastructure adapter in `internal/infrastructure/restore` composes:
+- `backup.Manager.BuildRestoreCandidateAtPath`, which validates the real `.omfaibackup` manifest, extracts the database into isolated temporary storage, and builds/migrates the candidate at the exact journal-selected path;
+- `sqlite.RestoreTransactionExecutor`, which retains the journal and StoreController leases, persists transaction intents, uses verified no-replace moves, and preserves rollback/quarantine evidence.
+
+The integration test creates a real `.omfaibackup`, runs the actual candidate builder and transaction executor, verifies the replacement StoreController configuration, checks the committed journal, and confirms the previous database remains in rollback storage.
+
+This service is intentionally not registered in the Wails composition root and is not exposed through GUI, CLI or startup recovery. It is an internal integration boundary only; it does not enable Restore. The legacy path-based `backup.Manager.Restore` / `sqlite.RestoreDatabase` path is not used by this service and must not be wired into the application.
 
 ## Retained journal ledger lifecycle — implemented 2026-11-10
 

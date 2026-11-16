@@ -1995,3 +1995,43 @@ A later poll confirms:
 - Root CI [#43724588470](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43724588470) remains pending with zero jobs exposed by the Actions jobs endpoint.
 
 The exact code/test head is still not fully CI-verified. In particular, the main Ubuntu/Windows Root CI result is unavailable, and Wails/Linux distribution jobs have not completed. Do not proceed to application-level Restore wiring until these runs finish and the remaining identity/provider gates are closed.
+
+
+## 2026-11-16 — recovery identity audit and CI repair
+
+### Repository and workflow review
+- Branch: `foundation/bootstrap`.
+- Starting code head: `e5ab1fcf102a7cc156662e2c1129d6a4b5d20c2b`.
+- Compared against `main` at `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`: 956 commits ahead, 0 behind at the starting head.
+- Reviewed the active task plan, progress log, Restore lifecycle and recovery-executor architecture, transaction/recovery executor code, identity readers, and current recovery tests.
+- No workflow was active before the repair.
+
+### CI regression and repair
+- Latest Root CI before repair: [43822573181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43822573181), commit `e5ab1fc`. Ubuntu failed in `go vet` because `restore_move_linux_test.go` used `bytes.Equal` without importing `bytes`; Windows passed. This was a test compile defect.
+- Added the missing standard-library `bytes` import in commit [`fabd6d7`](https://github.com/SoufianoDev/OhMyFreeAI/commit/fabd6d778efa578bfae9d4170eb1d291215639a3).
+- Verified Root CI logs: Ubuntu and Windows passed `go vet`, `go test`, and build; Ubuntu passed `go test -race`, including the SQLite package. Python tooling passed 16/16, frontend syntax and architecture checks passed.
+- Exact-head workflow results:
+  - Root CI [43827194285](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194285): 2/2.
+  - SQLite driver evaluation [43827194323](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194323): 4/4.
+  - Wails platform proof [43827194276](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194276): 2/2.
+  - Linux distribution compatibility [43827194241](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194241): 8/8.
+- All 16 jobs completed successfully with no failed steps.
+
+### Recovery safety audit
+- Confirmed the Linux and Windows no-follow identity readers reject hard-linked files (`Nlink/NumberOfLinks != 1`), in addition to symlinks/reparse points, directories, empty files and content changes during hashing.
+- Confirmed recovery tests cover source-leaf substitution after a move, raced destination collision without overwrite, mismatched/directory/symlink artifacts stopping before SQLite open or journal mutation, and first-database manual-review-only behavior.
+- Confirmed the latest no-replace unsupported test injects `EOPNOTSUPP`, `EINVAL` and `ENOSYS`, checks exactly one `RENAME_NOREPLACE` call, preserves source bytes, leaves destination absent and proves no fallback is attempted.
+- The exact fixed head passed the Linux/Windows and distro CI matrix. This is CI/process-death evidence, not hardware-independent power-loss certification or qualification of unsupported Windows providers.
+
+### Work performed
+- Added an application-layer Restore service contract and an infrastructure adapter that composes `backup.Manager.BuildRestoreCandidateAtPath` with `sqlite.RestoreTransactionExecutor`.
+- Added service tests for callback ordering/count, cancellation, invalid candidate identity and error propagation.
+- Added a real integration test that creates a `.omfaibackup`, builds/migrates its candidate through the actual backup manager, executes the isolated transaction, verifies the new StoreController configuration, confirms a committed journal, and checks the previous database remains in rollback storage.
+- Updated the task plan and Restore recovery architecture to record the exact-head CI evidence and the new isolated service.
+- The service is intentionally not wired to Wails, GUI, CLI or startup recovery. Restore remains disabled.
+- No changes were made to `main`; no merge, force-push or destructive cleanup was performed.
+
+### Verification boundary and next step
+- The 16/16 CI result applies to `fabd6d7`, before the new application-service files in this commit. The new integration test and service still require their own exact-head CI run.
+- Next: close the service integration CI on Ubuntu and Windows plus Wails/Linux distro smoke, then complete external filesystem/provider and real-host validation. Only then consider a startup recovery coordinator; do not expose a user-facing Restore action.
+- The 2026-11-16 first-testable target has not been met. Real-host WebView sandbox validation, packaging/uninstall, live Colab/model/SSE policy revalidation and selective delivery audit remain open.

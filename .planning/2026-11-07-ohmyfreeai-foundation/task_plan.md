@@ -6,40 +6,33 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current branch HEAD:** `6ceaf9a0b58203c81582efa3faed22116bf1a031` on `foundation/bootstrap` (2026-11-15). The latest production-code change is `eeeae13fa272071c689f038eb04c28d31eedcedc`; the current head adds recovery fault-injection and retry tests only.
+**Current verified code head:** `fabd6d778efa578bfae9d4170eb1d291215639a3` on `foundation/bootstrap` (2026-11-16). This commit fixes the missing `bytes` import in the Linux no-replace unsupported-operation regression test.
 
-The exact current-head CI matrix is green: 16/16 jobs across all four workflow families.
+The exact-head CI matrix is green: 16/16 jobs across all four workflow families.
 
-- Root CI [43692619191](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619191): 2/2 Ubuntu/Windows. Both passed Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks; Ubuntu race detection passed.
-- SQLite driver evaluation [43692619280](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619280): 4/4 modernc/ncruces × Ubuntu/Windows.
-- Wails platform proof [43692619207](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619207): 2/2. Ubuntu native build, CLI smoke, WebView-to-Go bridge and database reopen passed; Windows native build, CLI smoke and executable verification passed.
-- Linux distribution compatibility [43692619203](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43692619203): 8/8, including Ubuntu 22.04, Debian 12/13, Fedora GTK3/GTK4, Arch and openSUSE. Every lane built the desktop app and passed CLI/WebView smoke.
+- Root CI [43827194285](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194285): 2/2 Ubuntu/Windows. Both passed `go vet ./...`, `go test ./...`, build, Python compile/tests (16/16), frontend syntax and architecture checks. Ubuntu also passed `go test -race ./...`; the SQLite package passed under race detection.
+- SQLite driver evaluation [43827194323](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194323): 4/4 modernc/ncruces × Ubuntu/Windows.
+- Wails platform proof [43827194276](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194276): 2/2 Ubuntu/Windows.
+- Linux distribution compatibility [43827194241](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194241): 8/8, including Ubuntu 22.04, Debian 12/13, Fedora GTK3/GTK4, Arch and openSUSE. All jobs completed successfully.
 
-The infrastructure now contains both `RestoreTransactionExecutor` and a separate `RestoreRecoveryExecutor`. Neither is called by startup or exposed through Wails, GUI or CLI. The recovery executor acquires the cross-process journal lease, inspects identities, follows only planner-approved no-replace transitions, verifies the final target before SQLite open, and returns a validated Store to a future startup coordinator.
+A Root CI failure on the preceding head `e5ab1fc` was a compile-time test defect, not a production defect: `restore_move_linux_test.go` used `bytes.Equal` without importing `bytes`. Commit `fabd6d7` adds the missing standard-library import. The exact fixed head passed Root CI on both platforms, including Linux race detection.
 
-New exact-head test coverage:
-- Commit [3772708](https://github.com/SoufianoDev/OhMyFreeAI/commit/37727081fc895aa2fd1e3a9d4747794aedb78f15) adds subprocess termination/restart tests at nine recovery boundaries: previous preservation move/completion, rollback intent, target quarantine, staging quarantine, rollback restoration, previous Store open, rollback completion journal, and committed Store open.
-- Commit [6ceaf9a](https://github.com/SoufianoDev/OhMyFreeAI/commit/6ceaf9a0b58203c81582efa3faed22116bf1a031) adds 14 recovery error-injection cases: journal-write failures, pre-move failures, post-namespace failures for each recovery move, Store-open failures, artifact identity assertions, and successful retry. These tests pass on Ubuntu and Windows.
+The preceding recovery-inspection changes are now covered by the exact green head:
+- `ee6fe97` separates journal path metadata validation from no-follow artifact inspection.
+- `ab292f7` decodes retained journal paths without following substituted leaf objects.
+- `e048789` routes recovery inspection through read-only canonicalization.
+- `94589b6` verifies symlink artifacts are classified as unreadable and left unchanged.
+- `e5ab1fc` adds injected `renameat2` unsupported cases (`EOPNOTSUPP`, `EINVAL`, `ENOSYS`) and asserts that the source is preserved and no overwrite-capable fallback is attempted.
+- Existing identity tests reject hard-linked artifacts on Linux and Windows; recovery tests cover source-leaf substitution, destination collision, mismatched/directory/symlink artifacts, and first-database manual-review preservation.
 
-A real Root CI regression occurred on commit `71bfcfa` (run [43690040040](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43690040040)): read-only candidate validation opened SQLite in ordinary `mode=ro`, leaving WAL sidecars that blocked the next transaction boundary. The production fix in `eeeae13` uses SQLite's immutable read-only URI for the closed candidate validation path, then performs a separate existing-only open and configuration validation. The exact fixed code head passed all four workflow families before the new test-only commits; the current exact head also passes all 16 jobs.
+The isolated transaction and recovery executors remain infrastructure-only. First-database recovery is manual-review-only. The application-level adapter added in the current implementation slice composes the real `.omfaibackup` builder with the transaction executor, but it is not wired to Wails, GUI, CLI or startup.
 
-The production journal remains the retained JSON ledger. SQLite PERSIST is rejected for production after the pinned driver sidecar symlink tests; do not reintroduce it or switch drivers to bypass the result.
+**Immediate remaining gate:** qualify the application-level adapter with a real archive-to-candidate-to-transaction integration test, then re-run the full exact-head CI matrix. After that, continue the external filesystem/provider and real-host validation. Do not add startup recovery or user-facing Restore until the complete Linux/Windows safety matrix and host qualification are closed.
 
-### Immediate remaining gate
+**Restore remains disabled and unwired. Do not merge to `main`.** At `fabd6d7`, the branch was 956 commits ahead and 0 behind `main`. The first-testable-version target date is 2026-11-16; it has not been met. Real-host WebView sandbox validation, packaging/uninstall, live Colab/model/SSE policy revalidation, and the selective delivery audit remain open. CI success is not release readiness.
 
-The recovery executor's restart and retry behavior is now exercised, but this is not the complete Restore safety matrix. Continue with:
-1. Remaining ambiguity/no-follow race cases: source substitution, destination collisions, unreadable/mismatched artifacts, reparse/symlink and unsupported filesystem behavior across the recovery executor.
-2. Verify first-database/no-previous-database states always stop for manual review and preserve all candidate evidence.
-3. Connect the real `.omfaibackup` inspector/builder callback to the transaction executor in an isolated application-level service, without exposing a Restore action.
-4. Only after the full Linux/Windows matrix passes, add a startup recovery coordinator that runs before the canonical Store is opened. Keep GUI/CLI Restore and user-facing enablement disabled until that coordinator is separately verified.
-5. Design a safe manual export/retention policy before the 256-record / 1 MiB journal cap can be reached. Never prune terminal evidence automatically.
+Older dated sections below are historical checkpoints. This current status supersedes their earlier statements about missing transaction/recovery executors or unfinished hard-link identity checks.
 
-**Restore remains disabled and unwired. Do not merge to `main`.** The current branch is 934 commits ahead and 0 behind `main`; there are no open PRs or active workflows. The eventual delivery must be a selective, audited first-version commit, not a wholesale merge of the development branch.
-
-The November 16 first-testable-version target is at risk. CI proves native builds and container smoke tests, but real-host WebKit sandbox validation, packaging/uninstall, the live Colab/model/SSE policy revalidation, and the selective delivery audit remain open. Do not call the project release-ready based on CI alone.
-
-Older dated sections below are historical checkpoints. This current status supersedes their earlier statements that the transaction or recovery executor did not exist.
- 
 ### Historical CI evidence
 
 The latest production-code head `1cde3c` passed all four workflow families:
