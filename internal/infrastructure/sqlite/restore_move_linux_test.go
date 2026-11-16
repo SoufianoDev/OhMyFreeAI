@@ -3,6 +3,7 @@
 package sqlite
 
 import (
+	"bytes"
 	"errors"
 	"os"
 	"path/filepath"
