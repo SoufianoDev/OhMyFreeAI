@@ -2058,3 +2058,41 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Branch `foundation/bootstrap` is 957 commits ahead and 0 behind `main`; `main` remains `a1b12fb`; no open PRs were found.
 - The 2026-11-16 first-testable target date was reached but not met. Real-host WebView sandbox validation, packaging/uninstall, live Colab/model/SSE policy revalidation, external filesystem/provider qualification and selective delivery audit remain open.
 - Next: complete external provider and real-host qualification. Do not add startup recovery or user-facing Restore until the complete Linux/Windows safety matrix and host qualification are closed. Do not merge the development branch wholesale.
+
+
+## 2026-11-17 — CI closure, documentation-link validation, and host-readiness review
+
+### Starting state
+- Remote branch: `foundation/bootstrap`.
+- Starting head: `f0090357767bfad20ffa452ba1289e9d47556dfa`; no newer branch commit existed when this run began.
+- Compared with `main` at `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`: 960 commits ahead, 0 behind at the starting head.
+- Reviewed the current task plan, progress history, Restore lifecycle and executor architecture, native desktop build/smoke scripts, CI workflows, executor/service source and current Actions jobs.
+- No active workflows or open PRs existed before this run.
+
+### Exact-head CI review
+- Production-code/test head `f009035` passed all four workflow families, 16/16 jobs:
+  - Root CI [43975095320](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095320): Ubuntu/Windows 2/2.
+  - SQLite driver evaluation [43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316): modernc/ncruces × Ubuntu/Windows, 4/4.
+  - Wails platform proof [43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477): Ubuntu/Windows 2/2.
+  - Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8.
+- Root logs confirmed Go vet/tests/build, Ubuntu race detection, and Python/frontend/architecture checks. Wails Linux logs confirmed native launch, CLI dispatch, live WebView-to-Go bridge and second-launch database reopen. The eight distro lanes built the actual app and passed CLI/WebView smoke.
+- Important limit: the Linux WebView smoke explicitly sets `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` inside the child process because the CI runner cannot create WebKit's required network namespace. The Windows Wails lane builds the native executable and checks CLI dispatch; it does not launch WebView2. Neither is real-host GUI/sandbox qualification.
+
+### Work performed
+- Added `scripts/docs_check.py`, a standard-library-only checker for repository-local Markdown links. It handles inline links/images, reference definitions, HTML `href`/`src`, URL-encoded paths, root-relative paths, code fences and inline code. It excludes vendored agent-skill Markdown and does not make network requests.
+- Added the `docs-check` developer command, six focused unit tests, and a Root CI step.
+- First run [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) exposed two Windows-only test portability defects: a short 8.3 temporary path versus its resolved long path, and native backslash diagnostics. Corrected the test root with `Path.resolve()` and normalized diagnostics with `Path.as_posix()`.
+- Exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed 2/2. Both platforms passed all 22 Python tests and checked 48 Markdown files; Ubuntu also passed `go test -race ./...`. The local-link checker does not validate external URLs or heading fragments.
+- Updated `RESTORE_LIFECYCLE.md` so it no longer says the transaction/recovery executors and application Restore service are missing. It now records the implemented isolated service, the 19-point process-death matrix, current CI evidence and remaining host/provider gates.
+- Updated `DESKTOP_BUILD.md` with explicit real-host Linux sandbox, Windows WebView2, packaging and uninstall acceptance criteria.
+- No production Restore code changed. Restore remains disabled and unwired. `main` was not changed; no merge, force-push or destructive cleanup occurred.
+
+### Current state and blockers
+- Current code/docs tooling head: `0a542ec3511d3c722b4b51ef449873e0f0ad177a`.
+- Current branch comparison: 962 commits ahead, 0 behind `main`; no open PRs and no active workflows.
+- The first-testable target date 2026-11-16 was missed.
+- Remaining blockers are real-host Linux WebKit sandbox validation, actual app-state filesystem/provider qualification, Windows WebView2 runtime validation, installer/upgrade/uninstall, safe journal export/retention before its cap, live Colab/model/SSE and policy revalidation, and selective delivery audit.
+- No local desktop host or self-hosted runner is attached to this execution. GitHub-hosted CI cannot close those host-specific gates. Do not mark them complete from container/Xvfb or build-only evidence.
+
+### Next action
+- Obtain real Linux desktop-session evidence with WebKit sandbox enabled and real Windows WebView2 evidence. Then qualify the actual state-directory filesystem/provider using the no-replace and identity tests. Keep Restore disabled and do not add startup recovery or merge to `main` before those gates and the remaining delivery checks pass.

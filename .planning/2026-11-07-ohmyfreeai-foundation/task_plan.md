@@ -6,29 +6,32 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current verified code head:** `944e99ac297c5e42bdea511eb0cd6f08ee49a0ec` on `foundation/bootstrap` (2026-11-16). The isolated application-level Restore service and real archive-to-transaction integration test are now implemented.
+**Current branch head:** `0a542ec3511d3c722b4b51ef449873e0f0ad177a` on `foundation/bootstrap` (2026-11-17). The production-code/test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`; commits after it add the local documentation checker and correct its cross-platform test diagnostics.
 
-The workflows triggered by this code commit completed successfully: 12/12 jobs.
+**Current exact-head CI:**
+- Root CI [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984): 2/2 Ubuntu/Windows on `0a542ec`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks, and local Markdown link validation across 48 files. Ubuntu also passed `go test -race ./...`.
+- The full production-code matrix on parent code/test head `f009035` passed 16/16:
+  - Root CI [43975095320](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095320): 2/2.
+  - SQLite driver evaluation [43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316): 4/4 modernc/ncruces × Ubuntu/Windows.
+  - Wails platform proof [43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477): 2/2.
+  - Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8.
+- The first docs-check attempt [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) failed only in two Windows-specific test assertions: the temporary root was not canonicalized (8.3 path versus long path), and diagnostic paths used native backslashes. The test now resolves its temporary root and diagnostics use POSIX relative paths. Exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed both platforms. No failure is hidden.
 
-- Root CI [43828456208](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456208): 2/2 Ubuntu/Windows. Both passed `go vet ./...`, `go test ./...` and `go build ./...`. Ubuntu also passed `go test -race ./...`; both new Restore packages passed normal tests on both operating systems, and the infrastructure integration test passed under Linux race detection.
-- Wails platform proof [43828456186](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456186): 2/2 Ubuntu/Windows native builds and smoke checks.
-- Linux distribution compatibility [43828456181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43828456181): 8/8, including Ubuntu 22.04, Debian 12/13, Fedora GTK3/GTK4, Arch and openSUSE. All eight lanes passed desktop build and CLI/WebView smoke.
-- SQLite driver evaluation [43827194323](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43827194323): 4/4 modernc/ncruces × Ubuntu/Windows on parent code head `fabd6d7`. It was not re-triggered for `944e99a` because this change did not modify the SQLite driver evaluation or SQLite implementation paths.
+**Repository state:** `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; `foundation/bootstrap` is 962 commits ahead and 0 behind. No open PRs and no active workflows. No merge was performed.
 
-The earlier Root CI regression on `e5ab1fc` was a missing `bytes` import in `restore_move_linux_test.go`; it was fixed by `fabd6d7`, and the exact fixed head passed Root CI, race detection, SQLite driver evaluation, Wails and all eight Linux distro lanes.
+**Completed in this run:** added `scripts/docs_check.py`, the `python scripts/dev.py docs-check` command, six focused unit tests, and a Root CI step. It checks local Markdown path targets, reference links and HTML `href`/`src` attributes across 48 repository Markdown files. It deliberately does not fetch external URLs or validate heading fragments. Updated Restore lifecycle and desktop-build docs to distinguish implemented executors/service from still-open host, sandbox, packaging, retention and power-loss gates.
 
-The recovery identity and ambiguity audit is now represented in code/tests:
-- Linux and Windows no-follow identity readers reject hard-linked files (`Nlink/NumberOfLinks != 1`), symlinks/reparse points, directories, empty files and content changes during hashing.
-- Recovery tests cover source-leaf substitution after a move, raced destination collisions without overwrite, mismatched/directory/symlink artifacts stopping before SQLite open or journal mutation, and first-database manual-review-only behavior.
-- The Linux no-replace unsupported-operation test injects `EOPNOTSUPP`, `EINVAL` and `ENOSYS`, verifies one `RENAME_NOREPLACE` attempt, preserves the source, leaves the destination absent, and proves no overwrite-capable fallback is attempted.
+**Current gate:** real-host qualification, not another CI-only code change:
+1. Run the Linux desktop binary from a normal logged-in session with WebKit sandboxing enabled; CI cannot prove this because its Xvfb subprocess sets `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1`.
+2. Qualify no-replace behavior on the actual Linux application-state filesystem and on a real Windows host using fixed local NTFS and persistent ACLs. GitHub CI covers its runner filesystem, tmpfs, and Windows CI; it does not qualify every user's provider.
+3. Exercise the Windows WebView2 runtime on a real desktop. Current Windows CI builds the executable and tests CLI dispatch; it does not launch the WebView2 UI.
+4. Define and test installer, upgrade and clean-uninstall behavior without deleting user data or Restore evidence.
+5. Design explicit safe journal export/retention before the 256-record / 1 MiB cap; automatic pruning remains forbidden.
+6. Revalidate the live Colab/model/SSE flow and current Colab Free policy before enabling remote inference.
 
-The new application layer contract in `internal/application/restore` coordinates a candidate-builder port with a transaction-executor port. The infrastructure adapter in `internal/infrastructure/restore` composes the real `backup.Manager.BuildRestoreCandidateAtPath` implementation with `sqlite.RestoreTransactionExecutor`. The integration test creates a real `.omfaibackup`, builds and migrates its candidate, executes the transaction, verifies the replacement StoreController configuration and committed journal, and confirms the previous database remains in rollback storage. This test passed on Ubuntu and Windows; Ubuntu race detection also passed.
+The isolated Restore service and transaction/recovery executors remain unwired to Wails, GUI, CLI and startup. Restore remains disabled. Do not add the startup coordinator or user-facing Restore until the complete safety matrix and real-host/provider gates are closed.
 
-**The service remains isolated.** It is not registered in the Wails composition root and is not exposed through GUI, CLI or startup recovery. Restore remains disabled. Do not wire the legacy path-based `backup.Manager.Restore` / `sqlite.RestoreDatabase` path.
-
-**Next gate:** external filesystem/provider qualification and real-host validation. Current evidence covers Linux CI/container filesystems and fixed local NTFS; it does not certify every Linux filesystem, remote Windows provider, storage controller or power-loss behavior. Complete real-host WebView sandbox validation, packaging/uninstall, live Colab/model/SSE policy revalidation and selective delivery audit. Only after the full Linux/Windows safety matrix and host qualification are closed should a startup recovery coordinator be considered.
-
-**Do not merge to `main`.** Branch head `944e99a` is 957 commits ahead and 0 behind `main` at `a1b12fb`; there are no open PRs. The 2026-11-16 first-testable target date has been reached but the target has not been met. The application Restore service is not user-facing, and the outstanding host, packaging, model-policy and selective-delivery work prevents calling this a real-world testable release. CI success is not release readiness.
+The 2026-11-16 first-testable target was missed. The repository is not yet a real-world testable release. CI green is not release readiness, and no wholesale merge to `main` is authorized.
 
 Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.
 
@@ -179,7 +182,8 @@ Phase 4
 - [x] Build the complete Wails application on Ubuntu and Windows; generate 1 service, 2 methods and 7 models, produce the Vite production bundle and verify the native executable
 - [x] Pin and verify Go dependency lockfiles in CI
 - [x] Upgrade GitHub Actions to Node 24-compatible releases; latest core, SQLite and Wails workflows pass without the Node 20 deprecation warning
-- [ ] Run documentation/link validation and review all source changes
+- [x] Add and run repository-local Markdown link validation on Ubuntu and Windows CI across 48 Markdown files (external URLs and heading fragments are intentionally not checked)
+- [ ] Complete full source review and selective delivery audit
 - [x] Perform a read-only static audit of the supplied prototype archives and Python patch/monitor scripts; record hashes, preserved invariants and risks in docs/architecture/PROTOTYPE_AUDIT.md
 - [ ] Revalidate current Colab /props and /v1/models behavior, model-specific Q8_0/262144 compatibility and the live SSE path before enabling remote inference
 - [ ] Reassess the Colab Free policy gate against the official MCP runtime API; distinguish notebook/runtime management from authorization to serve model inference to OpenCode. Keep remote inference disabled until the exact flow is confirmed permitted.
@@ -198,7 +202,7 @@ Phase 4
   - [x] Add concurrent configuration Load/Save and backup-export drain tests covering complete operations
   - [x] Add concurrent StoreController lease stress test and canceled-shutdown regression test
   - [x] Run the Go race detector in Linux CI; the Windows workflow skips the race step
-  - [ ] Add failure-injection coverage across Restore publication, reopen, journal commit and rollback
+  - [x] Add failure-injection coverage across Restore publication, reopen, journal commit and rollback
   - [x] Add strict durable Restore journal v3 storage with bounded decoding, path confinement and paired content identities (low-level only)
   - [x] Evaluate SQLite PERSIST mode, synchronous FULL, sidecar reuse and explicit mode reapplication for modernc/ncruces on Linux/Windows
   - [x] Verify one abrupt-process-death rollback/reopen case for both SQLite drivers on Linux/Windows; this is not the full executor crash matrix
@@ -223,8 +227,12 @@ Phase 4
   - [x] Extend restoring-previous planning to preserve a candidate still at staging before restoring rollback
   - [x] Implement the isolated collision-safe filesystem transaction executor (no startup/app wiring)
   - [x] Integrate journal phases with staged candidate publication, post-move identity checks, verified reopen and rollback
-  - [ ] Complete the remaining Linux/Windows failure-injection and abrupt-process-death/restart coverage
+  - [x] Complete the Linux/Windows failure-injection and abrupt-process-death/restart coverage
   - [ ] Add the startup recovery coordinator before canonical Store open only after the executor test matrix passes
+  - [ ] Qualify no-replace behavior on the actual Linux application-state filesystem and a real Windows fixed-local-NTFS host
+  - [ ] Verify WebKit sandbox operation on a real Linux desktop and WebView2 operation on a real Windows desktop
+  - [ ] Define and test installer, upgrade, and clean-uninstall behavior while preserving user data
+  - [ ] Define explicit safe journal export/retention before the bounded ledger reaches its cap
 - [x] Previous native Ubuntu 24.04 WebView-to-Go and two-launch DB reopen smoke passed (Wails run 42404058636)
 - [x] Revalidate the refactored two-stage bridge bootstrap on native Ubuntu; run 42405729902 passed with two GetSnapshot calls per launch and DB reopen
 - [x] Complete the same WebView-to-Go and two-launch DB reopen smoke on all eight Linux distro jobs (run 42405827037)
