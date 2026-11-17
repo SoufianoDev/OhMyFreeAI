@@ -88,3 +88,6 @@ jobs:
 
       - name: Check architecture boundaries
         run: python scripts/dev.py arch-check
+
+      - name: Check repository-local Markdown links
+        run: python scripts/dev.py docs-check

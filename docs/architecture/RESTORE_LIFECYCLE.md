@@ -2,23 +2,28 @@
 
 ## Status
 
-Archive restore is **disabled and not exposed** in the GUI or CLI.
+Archive Restore remains **disabled and not exposed** in the GUI, CLI, or startup recovery.
 
 The repository now contains:
-- An application-lifetime `sqlite.StoreController` with shared/exclusive leases. Configuration persistence and GUI/CLI backup export use shared leases; an exclusive operation drains active readers and prevents new ones.
-- Strict durable restore journal v3 transaction records in a retained ledger envelope v1. It records candidate and previous-database SHA-256/size identities, a fixed candidate-quarantine path, canonical state-directory-confined paths, and explicit intent/completion phases. The ledger permits one active transaction, retains terminal records, migrates legacy single-record v3 journals on write, and is bounded to 256 records / 1 MiB.
-- An identity-aware, pure `PlanRestoreRecovery` planner. It receives verified identities for target, staging, rollback and quarantine. Mismatches, unreadable/unverified files, and contradictory states fail closed with an empty plan.
-- A platform-specific no-replace move primitive. Linux pins the directory with `openat2` and uses `renameat2(RENAME_NOREPLACE)`. Windows uses retained directory/source handles and native `NtSetInformationFile(FileRenameInformationEx)` semantics without a replace flag. The Windows operation is provider-dependent and currently qualified only by the repository's CI environment; do not infer support for ReFS, SMB, removable media, or other providers.
-- A staging-only candidate builder: `backup.Manager.BuildRestoreCandidate` validates and extracts the archive into an isolated temporary source directory; `sqlite.BuildRestoreCandidate` creates a private same-filesystem candidate, applies migrations, verifies SQLite integrity and configuration, checkpoints/closes it, syncs the file, and returns its measured size/SHA-256 identity. It does not mutate the live Store or execute journaled moves. Failed candidate artifacts are returned and preserved for inspection.
+- An application-lifetime `sqlite.StoreController` with shared/exclusive leases. Configuration persistence and backup export use shared leases; exclusive operations drain active readers and prevent new ones.
+- Strict durable Restore journal v3 records in a retained JSON ledger v1, with candidate/previous SHA-256 and size identities, canonical state-directory confinement, explicit intent/completion phases, one-active-transaction enforcement, terminal-history retention, and a 256-record / 1 MiB fail-closed cap.
+- An identity-aware `PlanRestoreRecovery` planner that fails closed on mismatched, unreadable, unverified, or contradictory artifact states.
+- Linux and Windows no-follow identity readers and verified no-replace moves. Linux uses pinned-directory `openat2` plus `renameat2(RENAME_NOREPLACE)`; Windows uses retained handles and native `NtSetInformationFile(FileRenameInformationEx)` without a replacement flag. Windows remains qualified only for fixed local NTFS with persistent ACLs.
+- A staging-only candidate builder that validates and extracts `.omfaibackup`, builds/migrates a same-filesystem candidate, verifies SQLite integrity and configuration, and returns a measured size/SHA-256 identity without touching the live Store.
+- An isolated in-process `RestoreTransactionExecutor` and restart-reconciliation `RestoreRecoveryExecutor`. They retain the journal and StoreController leases, persist intent before mutation, verify moved identities before SQLite open, use only no-replace moves, and preserve ambiguous artifacts.
+- An isolated application-level `restore.Service` and infrastructure adapter that connect the real archive candidate builder to the transaction executor. A real `.omfaibackup` integration test verifies the replacement Store, committed journal, and retained rollback database.
+
+The transaction executor has a 19-point process-death matrix. The recovery executor has restart-boundary, failure-injection, source-substitution, destination-collision, and first-database manual-review tests. These tests run in Ubuntu/Windows CI; they do not certify arbitrary filesystem providers or hardware-independent power-loss behavior.
 
 Still missing:
-- A filesystem transaction executor that consumes the verified candidate, inspects file identities from safely opened handles, acquires the StoreController exclusive lease, and executes the planner.
-- Durable journal phase orchestration around every filesystem mutation.
-- A startup recovery coordinator that runs before the canonical Store is opened.
-- A shared application-level restore transaction used by both CLI and GUI.
-- Process-death, race, failure-injection and filesystem-provider qualification for the complete transaction.
+- A startup recovery coordinator that runs before the canonical Store opens. It remains intentionally unwired until host/provider qualification is complete.
+- Real-host WebKit sandbox validation. The current CI smoke disables WebKit's sandbox only inside its test subprocess because GitHub-hosted/container runners cannot create the required network namespace.
+- Qualification on the actual Linux application-state filesystem and real Windows host. Linux CI covers the runner filesystem and a required tmpfs case; Windows Restore remains limited to fixed local NTFS. ReFS, SMB, removable media, and unknown providers must fail closed.
+- Installer/package, upgrade, and clean-uninstall verification. The current build script produces a native executable, not an installer.
+- A safe manual export/retention protocol before the bounded ledger reaches 256 records or 1 MiB. Automatic pruning/deletion remains forbidden.
+- Hardware/storage-controller power-loss qualification. Process-death tests and write-through requests are not power-loss certification.
 
-The detailed implementation gate is [Restore Recovery Executor](RESTORE_RECOVERY_EXECUTOR.md). The executor design is authoritative for platform-specific no-replace and race constraints. Do not implement a weaker `os.Rename` fallback.
+The detailed implementation constraints and remaining gates are in [Restore Recovery Executor](RESTORE_RECOVERY_EXECUTOR.md). Never add an overwrite-capable `os.Rename`, `MoveFileExW`, or fallback path to the transaction executor.
 
 ## Retained journal storage lifecycle
 
@@ -101,7 +106,17 @@ Unknown, malformed, contradictory, unreadable or identity-mismatched states must
 - Verify CLI and GUI see the new repository only after commit.
 - Keep Restore disabled until every required case passes.
 
-## Current verification evidence — 2026-11-08
+## Current verification evidence — 2026-11-16
+
+All four workflow families passed on exact branch head `f0090357767bfad20ffa452ba1289e9d47556dfa` (16/16 jobs):
+- Root CI [43975095320](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095320): Ubuntu and Windows 2/2. Both passed Go vet/tests/build, Python compile/tests, frontend syntax and architecture checks; Ubuntu also passed the race detector.
+- SQLite driver evaluation [43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316): modernc and ncruces on Ubuntu and Windows, 4/4.
+- Wails platform proof [43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477): Ubuntu and Windows 2/2. Ubuntu built and launched the native app, passed CLI dispatch, WebView-to-Go bridge, and database reopen; Windows passed native build and CLI smoke.
+- Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8. All configured distro lanes built the actual app and passed CLI and two-launch WebView bridge/reopen smoke.
+
+The Linux no-replace test now requires the CI `/dev/shm` fixture to exist and be tmpfs; it may skip only in non-CI local environments. This prevents the tmpfs case from silently disappearing from CI coverage. The CI WebView smoke still disables WebKit sandboxing in its subprocess and is not real-host sandbox evidence. These results do not certify arbitrary filesystems, ReFS/SMB, power-loss behavior, packaging, or clean uninstall.
+
+## Historical verification evidence — 2026-11-08
 
 The corrected handle-bound no-replace implementation is covered by:
 - Root CI run [42496659593](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42496659593): Ubuntu and Windows passed; Ubuntu race detector passed.

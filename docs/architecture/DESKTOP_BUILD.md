@@ -66,3 +66,27 @@ The Xvfb smoke test sets `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1` and `GTK_A
 
 
 The smoke marker is a monotonic call counter scoped to the test process: the generated entry point calls `GetSnapshot` once before dynamically importing the UI module, then calls it a second time after that module resolves and dispatches the returned snapshot to the UI. CI requires count=2. This distinguishes a native bridge failure from a frontend-module/bootstrap failure.
+
+
+## Required real-host qualification before delivery
+
+The GitHub Actions evidence is not a substitute for running the application on an ordinary desktop session.
+
+### Linux WebKit sandbox
+
+- Launch the built application from a real logged-in desktop session, not a container or Xvfb.
+- Ensure `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS` is absent from the application and WebKit process environments. Do not copy the CI smoke-test environment into a launcher or user configuration.
+- Verify the WebKit web process starts with the distribution's supported sandbox mechanism. The presence of `bwrap` alone is not proof; capture the host's WebKit sandbox diagnostics and the actual process/namespace evidence.
+- Confirm the native `GetSnapshot` bridge works and that a second launch reopens the same application database.
+- Record the distribution/release, kernel, GTK/WebKit versions, sandbox mechanism, and filesystem type/mount options of the actual application state directory.
+
+### Windows desktop
+
+- Run the native executable as a normal user with the supported WebView2 runtime installed; do not infer WebView behavior from a successful compile.
+- Verify the native bridge, clean exit, and second-launch database reopen.
+- Record the Windows build, WebView2 runtime version, and the state-directory volume/filesystem and ACL qualification.
+- Restore remains unsupported outside fixed local NTFS with persistent ACLs; ReFS, SMB, removable and unknown providers must remain fail-closed.
+
+### Packaging and uninstall
+
+The current build script emits `dist/OhMyFreeAI` or `dist/OhMyFreeAI.exe`; it does not produce an installer. Installer creation, upgrade behavior, user-data preservation, and clean uninstall must be designed and tested separately. Uninstall must never remove user data or retained Restore evidence implicitly.

@@ -10,6 +10,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+try:
+    from .docs_check import find_broken_local_links, markdown_files
+except ImportError:
+    from docs_check import find_broken_local_links, markdown_files
+
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_DOCS = (
     "docs/architecture/PROJECT_SPEC.md",
@@ -104,6 +109,21 @@ def arch_check(_: argparse.Namespace) -> int:
     return 0
 
 
+def docs_check(_: argparse.Namespace) -> int:
+    files = markdown_files(ROOT)
+    errors = find_broken_local_links(ROOT, files)
+    if errors:
+        print("Local Markdown link check failed:", file=sys.stderr)
+        for error in errors:
+            print(f"- {error}", file=sys.stderr)
+        return 1
+    print(
+        f"Local Markdown link check passed: {len(files)} files checked. "
+        "External URLs are not fetched."
+    )
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -112,6 +132,7 @@ def main() -> int:
     sub.add_parser("build", help="compile Go packages without producing a release package").set_defaults(func=lambda a: go_command("build", a))
     sub.add_parser("fmt", help="format Go source files with gofmt").set_defaults(func=fmt)
     sub.add_parser("arch-check", help="check required docs and domain import boundaries").set_defaults(func=arch_check)
+    sub.add_parser("docs-check", help="validate repository-local Markdown links without network access").set_defaults(func=docs_check)
     args = parser.parse_args()
     return args.func(args)
 
