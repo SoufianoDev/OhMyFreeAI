@@ -2096,3 +2096,29 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 
 ### Next action
 - Obtain real Linux desktop-session evidence with WebKit sandbox enabled and real Windows WebView2 evidence. Then qualify the actual state-directory filesystem/provider using the no-replace and identity tests. Keep Restore disabled and do not add startup recovery or merge to `main` before those gates and the remaining delivery checks pass.
+
+## 2026-11-17 — scheduled follow-up: CI and StoreController re-verification
+
+### Historical run requested by the user
+- GitHub Actions Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) targets commit `f5396ee592b9b9756779f67aeabd6d7167520c40`.
+- The GitHub connector returned two completed jobs: `Validate (ubuntu-latest)` and `Validate (windows-latest)`.
+- Both jobs concluded `success`; all 18 reported steps in each job succeeded. No failed step or failure log was present.
+- This run is historical evidence for `f5396ee`, not a claim about later commits.
+
+### Current branch and CI evidence
+- Re-read `foundation/bootstrap`; current docs/tooling tip at the start of this follow-up was `0a542ec3511d3c722b4b51ef449873e0f0ad177a`, with production-code/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`.
+- Root CI [#44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) on `0a542ec` completed successfully: Ubuntu and Windows 2/2. Both jobs have no failed steps. The run includes the docs-check additions; the task plan records Python 22/22 and 48 Markdown files checked. Ubuntu also ran the Go race detector.
+- The production-code/test head `f009035` has the full workflow matrix recorded in the task plan: Root CI 2/2 [#43975095320](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095320), SQLite drivers 4/4 [#43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316), Wails 2/2 [#43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477), and Linux distributions 8/8 [#43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377). These 16 jobs target `f009035`; the docs-only follow-up does not change that attribution.
+
+### StoreController review
+- Re-read `store_controller.go` and all 16 tests in `store_controller_test.go`: shared/exclusive drain, writer preference, cancellation, nil Store rejection, replacement under exclusive lease, close/drain, verified replacement on error, fail-closed nil/panic handling, shared-lease release on panic, concurrency stress, config round-trip and Load/Save drain.
+- Re-read `desktop-src/main.go.tmpl`: the Wails composition root creates one StoreController after open/migration and closes through it with a bounded shutdown context.
+- Re-read `desktop-src/app_service.go.tmpl`: AppService retains the controller, not a raw Store; backup export calls `CreateWithStoreController`.
+- Re-read the CLI composition path and backup adapter: export uses a StoreController and the manager holds its shared lease through archive creation and publication. The dedicated backup test proves controller close waits at the publication barrier.
+- The requested StoreController integration stage is already complete. No duplicate implementation was added.
+
+### Work and remaining gate
+- No production code was changed and no new workflow was launched in this follow-up; the relevant exact-head CI results above were already complete.
+- The current project gate remains real-host qualification: Linux WebKit sandbox with the sandbox enabled, real Windows WebView2 runtime, and the actual application-state filesystem/provider. This execution has GitHub connector access but no attached Linux/Windows desktop host or live Google Colab Free runtime, so those host/runtime checks cannot be performed here. GitHub-hosted Xvfb evidence explicitly disables WebKit sandboxing in the child process and is not a substitute.
+- Installer/upgrade/uninstall behavior and safe manual journal export/retention before the 256-record / 1 MiB cap also remain open.
+- Restore remains disabled and is not wired to Wails, GUI, CLI or startup recovery. `main` was not modified; no merge, force-push or destructive cleanup occurred.
