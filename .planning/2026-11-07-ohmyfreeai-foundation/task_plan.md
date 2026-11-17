@@ -6,7 +6,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current branch head:** `0a542ec3511d3c722b4b51ef449873e0f0ad177a` on `foundation/bootstrap` (2026-11-17). The production-code/test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`; commits after it add the local documentation checker and correct its cross-platform test diagnostics.
+**Current production-code/test head:** `f0090357767bfad20ffa452ba1289e9d47556dfa` on `foundation/bootstrap`. The branch tip may be newer because planning/documentation commits are added after code verification; the latest docs/tooling head rechecked on 2026-11-17 was `0a542ec3511d3c722b4b51ef449873e0f0ad177a`.
 
 **Current exact-head CI:**
 - Root CI [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984): 2/2 Ubuntu/Windows on `0a542ec`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks, and local Markdown link validation across 48 files. Ubuntu also passed `go test -race ./...`.
@@ -34,6 +34,14 @@ The isolated Restore service and transaction/recovery executors remain unwired t
 The 2026-11-16 first-testable target was missed. The repository is not yet a real-world testable release. CI green is not release readiness, and no wholesale merge to `main` is authorized.
 
 Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.
+
+### 2026-11-17 scheduled follow-up
+
+- Rechecked the requested historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee592b9b9756779f67aeabd6d7167520c40`: Ubuntu and Windows both completed successfully, with all 18 reported steps successful in each job.
+- Rechecked the current docs/tooling head `0a542ec3511d3c722b4b51ef449873e0f0ad177a`: Root CI [#44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed Ubuntu and Windows 2/2. The full 16-job production-code matrix remains attributed to parent code/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`, as listed above.
+- Re-reviewed StoreController, its 16 tests, Wails composition root, AppService, CLI backup composition and archive publication lease test. This integration stage is complete; no duplicate code was added.
+- The next gate is real-host qualification (Linux WebKit sandbox enabled, Windows WebView2, actual state-directory filesystem/provider), plus packaging/uninstall and bounded-ledger export/retention. This GitHub-only execution has no attached desktop host or live Colab Free runtime, so those checks remain open and are not inferred from CI.
+- No production code changed and no CI was launched in this follow-up. Restore remains disabled and unwired; `main` remains untouched.
 
 ### Historical CI evidence
 
