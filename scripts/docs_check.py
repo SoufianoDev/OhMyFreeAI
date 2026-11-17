@@ -125,7 +125,7 @@ def find_broken_local_links(root: Path, files: list[Path] | None = None) -> list
         try:
             text = source.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as error:
-            errors.append(f"{source.relative_to(root)}: cannot read Markdown file: {error}")
+            errors.append(f"{source.relative_to(root).as_posix()}: cannot read Markdown file: {error}")
             continue
 
         cleaned = _without_code(text)
@@ -159,7 +159,7 @@ def find_broken_local_links(root: Path, files: list[Path] | None = None) -> list
 
             line = cleaned.count("\n", 0, offset) + 1
             errors.append(
-                f"{source.relative_to(root)}:{line}: {reason}: {destination!r}"
+                f"{source.relative_to(root).as_posix()}:{line}: {reason}: {destination!r}"
             )
 
     return errors
