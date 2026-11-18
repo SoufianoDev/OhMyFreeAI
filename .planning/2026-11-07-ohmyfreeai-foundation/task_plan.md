@@ -6,11 +6,12 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Latest host-qualification docs/CI commit:** `549006b758465d59f9673ab59562406f62fd7f3f` on `foundation/bootstrap`.
+**Current verified branch tip:** `78cfcfc620f6a74aeef785223652d9edf930972c` on `foundation/bootstrap` (documentation/progress update after the host-qualification runbook).
 
-**Current production-code/test head:** `f0090357767bfad20ffa452ba1289e9d47556dfa`. **Latest docs/tooling head with exact CI:** `0a542ec3511d3c722b4b51ef449873e0f0ad177a`.
+**Current production-code/test head:** `f0090357767bfad20ffa452ba1289e9d47556dfa`. **Latest docs/tooling head with exact CI:** `78cfcfc620f6a74aeef785223652d9edf930972c`.
 
 **Current exact-head CI:**
+- Root CI [44252721602](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252721602): 2/2 Ubuntu/Windows on `78cfcfc`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks and the 48-file local Markdown link check. Ubuntu passed the race detector; Windows skipped only that Linux-specific step.
 - Root CI [44252184579](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252184579): 2/2 Ubuntu/Windows on `549006b`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks and the expanded 48-file local Markdown link check. Ubuntu also passed `go test -race ./...`.
 - Root CI [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984): 2/2 Ubuntu/Windows on `0a542ec`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks, and local Markdown link validation across 48 files. Ubuntu also passed `go test -race ./...`.
 - The full production-code matrix on parent code/test head `f009035` passed 16/16:
@@ -20,7 +21,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
   - Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8.
 - The first docs-check attempt [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) failed only in two Windows-specific test assertions: the temporary root was not canonicalized (8.3 path versus long path), and diagnostic paths used native backslashes. The test now resolves its temporary root and diagnostics use POSIX relative paths. Exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed both platforms. No failure is hidden.
 
-**Repository state:** `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; `foundation/bootstrap` was 966 commits ahead and 0 behind at host-qualification commit `549006b`. No open PRs and no active workflows. No merge was performed.
+**Repository state (2026-11-18 verification):** `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; `foundation/bootstrap` is 967 commits ahead and 0 behind. The current branch tip `78cfcfc` is one documentation-only commit after `549006b`. No open PRs were returned by GitHub search. No merge was performed.
 
 **Completed in this run:** added `scripts/docs_check.py`, the `python scripts/dev.py docs-check` command, six focused unit tests, and a Root CI step. It checks local Markdown path targets, reference links and HTML `href`/`src` attributes across 48 repository Markdown files. It deliberately does not fetch external URLs or validate heading fragments. Updated Restore lifecycle and desktop-build docs to distinguish implemented executors/service from still-open host, sandbox, packaging, retention and power-loss gates.
 
@@ -755,3 +756,16 @@ Code/test commit: [e65497f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e65
 - [ ] Complete remaining source-leaf substitution, destination-collision, unreadable/mismatched artifact and unsupported-provider tests on Linux and Windows. Keep Linux's post-move content verification boundary explicit; do not claim all same-user races are eliminated.
 - [ ] Only after the safety matrix passes, wire the real backup archive inspector/candidate builder through an isolated application-level Restore service without exposing a GUI/CLI action.
 - [ ] Keep startup recovery and all Restore user entry points disabled until the full recovery matrix and app-level integration are independently verified on Linux and Windows.
+
+
+## 2026-11-18 14:36 UTC — historical CI, StoreController and latest branch recheck
+
+- Rechecked the user-requested historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) through the GitHub connector. The Ubuntu and Windows jobs are both completed with conclusion `success`; all 18 reported steps in each job succeeded. Job logs report 15 Python tests on each platform. This is evidence for commit `f5396ee592b9b9756779f67aeabd6d7167520c40`, not for the current branch tip.
+- Re-read `store_controller.go` and all 16 tests in `store_controller_test.go`: shared/exclusive drain, writer preference, cancellation, nil Store rejection, replacement under exclusive lease, close/drain, verified replacement on operation error, fail-closed nil/panic handling, shared-lease release on panic, concurrent stress, config round-trip and Load/Save drain.
+- Re-read the Wails composition root, AppService, configuration service, CLI backup composition, and `CreateWithStoreController`. The Wails composition root creates one controller after open/migration and closes through it; AppService retains the controller; config uses it as the repository; CLI/Wails backup export holds the shared lease around the complete archive creation and publication. `TestManagerCreateWithStoreControllerDrainsBeforeClose` covers the publication barrier. This integration phase is already complete; no duplicate code was added.
+- Current branch tip is `78cfcfc620f6a74aeef785223652d9edf930972c` (`docs(progress): record host qualification CI and platform commands`). Compared with `main`, the branch is 967 commits ahead and 0 behind. `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; GitHub search returned no open PRs.
+- Root CI [#44252721602](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252721602) targets the exact current branch tip and completed successfully: Ubuntu and Windows 2/2. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks and local Markdown links across 48 files. Ubuntu passed `go test -race ./...`; Windows skipped only the Linux-specific race step. Both job logs were inspected; no failed steps.
+- The only commit after host-qualification runbook commit `549006b` changes `progress.md`, `task_plan.md` and `DESKTOP_BUILD.md`; no production code changed. No new code workflow or local test was run in this follow-up.
+- The remaining next gate is still real-host qualification: Linux WebKit sandbox enabled in a logged-in desktop session, Windows WebView2 on fixed local NTFS with ACL evidence, and tests on the actual state-directory filesystem. No desktop host or live Google Colab Free runtime is attached to this execution. GitHub Xvfb evidence is not a substitute because its smoke process disables the WebKit sandbox. Colab Free is not a substitute for either desktop GUI host.
+- After host qualification, continue with installer/upgrade/uninstall safety and explicit manual journal export/retention before the 256-record / 1 MiB cap. Do not prune evidence automatically.
+- Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery. No production code changed, no merge or force-push was performed, and `main` was not modified.
