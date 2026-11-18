@@ -2161,3 +2161,29 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Both logs confirm `Local Markdown link check passed: 48 files checked`. All job steps completed successfully; no failure was hidden.
 - The workflow is complete and there are no active jobs. This is CI evidence only. No real Linux or Windows desktop host was attached, so the host qualification commands have not been run.
 - No production code changed; Restore remains disabled/unwired and `main` was not modified.
+
+
+## 2026-11-18 14:36 UTC — scheduled follow-up verification
+
+### Requested historical workflow
+- GitHub connector inspection of Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009), commit `f5396ee592b9b9756779f67aeabd6d7167520c40`, returned two completed jobs: Ubuntu and Windows.
+- Both jobs concluded `success`; all 18 reported steps in each job succeeded. Downloaded job logs report 15 Python tests on each platform. No failed steps were found.
+
+### StoreController re-review
+- Re-read `internal/infrastructure/sqlite/store_controller.go` and all 16 tests in `store_controller_test.go`.
+- Reconfirmed writer-preferred shared/exclusive leases, drain, cancellation, replacement under exclusive lease, fail-closed behavior after nil/panic, close/drain and configuration Load/Save coverage.
+- Re-read `desktop-src/main.go.tmpl`, `desktop-src/app_service.go.tmpl`, `internal/application/config/service.go`, CLI backup composition and `internal/infrastructure/backup/archive.go`.
+- Wails composition creates one controller after opening/migrating the Store and closes it through the controller. AppService retains the controller, configuration delegates through it, and backup export holds the shared lease around archive creation and publication. `TestManagerCreateWithStoreControllerDrainsBeforeClose` verifies Close waits at the publication barrier.
+- StoreController integration is already complete; no duplicate implementation was made.
+
+### Current branch and CI
+- Current branch tip: [`78cfcfc`](https://github.com/SoufianoDev/OhMyFreeAI/commit/78cfcfc620f6a74aeef785223652d9edf930972c), message: `docs(progress): record host qualification CI and platform commands`.
+- Branch comparison: 967 commits ahead, 0 behind `main`. Main SHA remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`. GitHub search returned no open PRs.
+- Root CI [#44252721602](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252721602) ran on the exact branch tip and completed successfully, Ubuntu + Windows 2/2.
+- Both jobs passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks and the 48-file local Markdown link check. Ubuntu passed the race detector; Windows skipped the Linux-only race step. Both complete job step lists and logs were inspected; no failed steps.
+- The only commit after `549006b` is documentation-only (`progress.md`, `task_plan.md`, `DESKTOP_BUILD.md`). No production code changed in this follow-up and no local tests were run.
+
+### Gate and next action
+- Real-host Linux WebKit sandbox evidence, Windows WebView2 + fixed-local-NTFS/ACL evidence, and actual state-filesystem qualification remain outstanding. No desktop host or live Google Colab Free runtime is attached here. GitHub Xvfb smoke tests disable the WebKit sandbox and cannot close that gate; Colab Free is not a desktop GUI host.
+- After real-host qualification, proceed with installer/upgrade/uninstall safety and explicit journal export/retention before the 256-record / 1 MiB cap. Automatic pruning remains prohibited.
+- Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery. No merge, force-push or main change occurred.
