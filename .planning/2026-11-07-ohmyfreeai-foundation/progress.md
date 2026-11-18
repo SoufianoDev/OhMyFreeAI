@@ -2150,3 +2150,14 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - No local shell checkout was available; CI evidence above is from actual GitHub Actions job logs.
 - The next required evidence is the Linux desktop run with WebKit sandbox enabled and the Windows desktop run with WebView2 on fixed local NTFS. After those, review the actual filesystem test output and then proceed to packaging/uninstall and safe Journal export/retention design.
 - The target date 2026-11-16 was missed. Do not label the project release-ready based on green CI alone.
+
+
+## 2026-11-18 — host-qualification runbook commit and exact CI result
+
+- Created commit [`549006b`](https://github.com/SoufianoDev/OhMyFreeAI/commit/549006b758465d59f9673ab59562406f62fd7f3f) with four changes: real-host qualification procedures in `DESKTOP_BUILD.md`, corrected current branch/ahead-count snapshot, a detailed progress entry, and `**/*.md` in Root CI path filters.
+- Root CI [44252184579](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252184579) on that exact commit completed successfully, 2/2 jobs.
+- Windows job `134625266127`: Go vet/tests/build passed; Python 22/22; frontend syntax, architecture and local Markdown link checks passed; the Linux-only race step was skipped as designed.
+- Ubuntu job `134625266558`: Go vet/tests/build and race detector passed; Python 22/22; frontend syntax, architecture and local Markdown link checks passed.
+- Both logs confirm `Local Markdown link check passed: 48 files checked`. All job steps completed successfully; no failure was hidden.
+- The workflow is complete and there are no active jobs. This is CI evidence only. No real Linux or Windows desktop host was attached, so the host qualification commands have not been run.
+- No production code changed; Restore remains disabled/unwired and `main` was not modified.

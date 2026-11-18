@@ -6,11 +6,12 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current branch tip:** `a8aa38899d01f7f7b057964f1e5bd646e419e7f2` on `foundation/bootstrap` (planning/progress documentation only).
+**Latest host-qualification docs/CI commit:** `549006b758465d59f9673ab59562406f62fd7f3f` on `foundation/bootstrap`.
 
 **Current production-code/test head:** `f0090357767bfad20ffa452ba1289e9d47556dfa`. **Latest docs/tooling head with exact CI:** `0a542ec3511d3c722b4b51ef449873e0f0ad177a`.
 
 **Current exact-head CI:**
+- Root CI [44252184579](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252184579): 2/2 Ubuntu/Windows on `549006b`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks and the expanded 48-file local Markdown link check. Ubuntu also passed `go test -race ./...`.
 - Root CI [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984): 2/2 Ubuntu/Windows on `0a542ec`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks, and local Markdown link validation across 48 files. Ubuntu also passed `go test -race ./...`.
 - The full production-code matrix on parent code/test head `f009035` passed 16/16:
   - Root CI [43975095320](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095320): 2/2.
@@ -19,7 +20,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
   - Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8.
 - The first docs-check attempt [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) failed only in two Windows-specific test assertions: the temporary root was not canonicalized (8.3 path versus long path), and diagnostic paths used native backslashes. The test now resolves its temporary root and diagnostics use POSIX relative paths. Exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed both platforms. No failure is hidden.
 
-**Repository state:** `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; `foundation/bootstrap` is 965 commits ahead and 0 behind. No open PRs and no active workflows. No merge was performed.
+**Repository state:** `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; `foundation/bootstrap` was 966 commits ahead and 0 behind at host-qualification commit `549006b`. No open PRs and no active workflows. No merge was performed.
 
 **Completed in this run:** added `scripts/docs_check.py`, the `python scripts/dev.py docs-check` command, six focused unit tests, and a Root CI step. It checks local Markdown path targets, reference links and HTML `href`/`src` attributes across 48 repository Markdown files. It deliberately does not fetch external URLs or validate heading fragments. Updated Restore lifecycle and desktop-build docs to distinguish implemented executors/service from still-open host, sandbox, packaging, retention and power-loss gates.
 
@@ -58,6 +59,14 @@ Older dated sections below are historical checkpoints. This current status super
 - Updated Root CI path filters to include Markdown files. The local-link checker previously ran only when code/tooling paths changed, so ordinary documentation edits could bypass the new check.
 - No real desktop host is attached to this GitHub-only execution. Therefore no Linux WebKit sandbox or Windows WebView2 host result is claimed. The new procedures prepare the next run; they do not substitute for it.
 - Restore remains disabled/unwired, and `main` remains untouched. The 2026-11-16 target was missed; release readiness is still blocked on real-host/provider evidence, packaging/uninstall, bounded-ledger export/retention and live Colab/model/SSE policy revalidation.
+
+### Host-qualification preparation commit and CI result
+
+- Committed the reproducible Linux/Windows host-qualification runbook and the Markdown workflow path filter in [`549006b`](https://github.com/SoufianoDev/OhMyFreeAI/commit/549006b758465d59f9673ab59562406f62fd7f3f).
+- Exact commit CI [44252184579](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252184579) completed successfully: Ubuntu and Windows 2/2.
+- Inspected both complete job step lists and logs. Both platforms passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks and the 48-file local Markdown link check. Ubuntu passed the race detector; Windows skipped only that Linux-specific step.
+- The workflow run is complete and no active Actions jobs remain. No production source was changed by this commit.
+- The manual host commands are not host-test results. Linux sandbox/namespace evidence and Windows WebView2/NTFS/ACL evidence remain outstanding.
 
 ### Historical CI evidence
 

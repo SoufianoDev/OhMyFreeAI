@@ -180,7 +180,26 @@ Run the following in PowerShell from the repository root. It refuses non-local/n
     if ($driveRoot -notmatch '^[A-Za-z]:\\$') { throw 'Restore qualification requires a local drive.' }
     $volume = Get-Volume -DriveLetter $driveRoot.Substring(0, 1)
     if ($volume.FileSystem -ne 'NTFS') { throw "Unsupported state volume: $($volume.FileSystem)" }
+    $stateItem = Get-Item -LiteralPath $stateRoot -Force
+    if (($stateItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'The state directory is a reparse point.' }
     Get-Acl -LiteralPath $stateRoot | Format-List Owner,AreAccessRulesProtected,Access
+    Get-CimInstance Win32_OperatingSystem | Select-Object Caption,Version,BuildNumber
+
+    $webview2Roots = @(
+      'HKLM:\SOFTWARE\Microsoft\EdgeUpdate\Clients',
+      'HKLM:\SOFTWARE\WOW6432Node\Microsoft\EdgeUpdate\Clients',
+      'HKCU:\Software\Microsoft\EdgeUpdate\Clients'
+    )
+    $webview2 = foreach ($root in $webview2Roots) {
+      if (Test-Path -LiteralPath $root) {
+        Get-ChildItem -LiteralPath $root | ForEach-Object {
+          Get-ItemProperty -LiteralPath $_.PSPath
+        } | Where-Object {
+          $_.name -like '*WebView2 Runtime*' -or $_.DisplayName -like '*WebView2 Runtime*'
+        } | Select-Object -First 1 name,pv,DisplayName
+      }
+    }
+    $webview2 | Format-List
 
     $testRoot = Join-Path $stateRoot ('.host-qualification-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $testRoot | Out-Null
