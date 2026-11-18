@@ -90,3 +90,130 @@ The GitHub Actions evidence is not a substitute for running the application on a
 ### Packaging and uninstall
 
 The current build script emits `dist/OhMyFreeAI` or `dist/OhMyFreeAI.exe`; it does not produce an installer. Installer creation, upgrade behavior, user-data preservation, and clean uninstall must be designed and tested separately. Uninstall must never remove user data or retained Restore evidence implicitly.
+
+
+## Reproducible real-host qualification
+
+These checks must run on ordinary logged-in desktop sessions. Do not run them in GitHub Actions, Xvfb, containers, SSH-only sessions or as root. They use a disposable application profile nested under the real application-state directory, so the live user database is not opened or migrated. The disposable directory is removed after the commands finish.
+
+### Linux desktop (GTK/WebKitGTK)
+
+Build on the target Linux host first:
+
+    python scripts/build_desktop.py
+
+Then run from the repository root in the logged-in desktop session:
+
+    set -eu
+    state_root="${XDG_CONFIG_HOME:-$HOME/.config}/OhMyFreeAI"
+    mkdir -p -- "$state_root"
+    state_root="$(realpath -e -- "$state_root")"
+    test_root="$(mktemp -d "$state_root/.host-qualification.XXXXXX")"
+    chmod 700 "$test_root"
+    marker="$test_root/bridge.marker"
+    trap 'rm -rf -- "$test_root"' EXIT
+
+    printf 'State filesystem:\n'
+    findmnt -T "$state_root" -o TARGET,FSTYPE,OPTIONS
+    printf 'Test filesystem:\n'
+    findmnt -T "$test_root" -o TARGET,FSTYPE,OPTIONS
+    printf 'OS and kernel:\n'
+    cat /etc/os-release
+    uname -r
+    printf 'GTK/WebKit versions:\n'
+    for package in gtk4 webkitgtk-6.0 gtk+-3.0 webkit2gtk-4.1; do
+      pkg-config --modversion "$package" 2>/dev/null || true
+    done
+    bwrap --version
+
+    TMPDIR="$test_root" go test ./internal/infrastructure/sqlite -run 'Restore|Journal|NoReplace' -count=1 -v
+
+    for attempt in 1 2; do
+      rm -f -- "$marker"
+      printf 'Close the OhMyFreeAI window after the bridge becomes ready (launch %s/2).\n' "$attempt"
+      env -u WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS \
+        XDG_CONFIG_HOME="$test_root" \
+        OMFAI_WEBVIEW_SMOKE_MARKER="$marker" \
+        ./dist/OhMyFreeAI
+      actual="$(cat "$marker" 2>/dev/null || true)"
+      if [ "$actual" != "GetSnapshot success count=2" ]; then
+        printf 'Expected two native bridge calls; got: %s\n' "$actual" >&2
+        exit 1
+      fi
+    done
+
+The application creates its test database below `$test_root/OhMyFreeAI`; it does not use the live `$state_root/state.db`. The two launches prove the native WebView-to-Go bridge and database reopen on the host. The Go test selection creates temporary test files under the same filesystem because `TMPDIR` is set to `$test_root`.
+
+While the window is open, use a second terminal to identify the application and its WebKit web-process PIDs:
+
+    ps -eo pid,ppid,comm | grep -E 'OhMyFreeAI|WebKitWebProcess|WebKitNetworkProcess|bwrap'
+
+Set `app_pid` and `webkit_pid` to the matching PIDs from that output, then capture the isolation evidence:
+
+    for namespace in user mnt net pid; do
+      printf '%s app=' "$namespace"
+      readlink "/proc/$app_pid/ns/$namespace"
+      printf '%s webkit=' "$namespace"
+      readlink "/proc/$webkit_pid/ns/$namespace"
+    done
+    grep -E '^(NoNewPrivs|Seccomp|Seccomp_filters):' "/proc/$webkit_pid/status"
+    if tr '\0' '\n' < "/proc/$webkit_pid/environ" | grep -q '^WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS='; then
+      echo 'FAIL: WebKit sandbox-disable variable is present'
+    else
+      echo 'PASS: WebKit sandbox-disable variable is absent'
+    fi
+
+Record the namespace IDs and seccomp values; do not infer sandbox success merely from `bwrap` being installed. Preserve the full process listing and WebKit diagnostics for review.
+
+### Windows desktop (WebView2 / NTFS)
+
+Build on the target Windows host first:
+
+    python scripts/build_desktop.py
+
+Run the following in PowerShell from the repository root. It refuses non-local/non-NTFS state volumes, captures the inherited ACL, uses a disposable profile below the real state directory, and restores the original environment variables afterwards:
+
+    $stateRoot = Join-Path $env:APPDATA 'OhMyFreeAI'
+    New-Item -ItemType Directory -Force -Path $stateRoot | Out-Null
+    $stateRoot = (Resolve-Path -LiteralPath $stateRoot).Path
+    $driveRoot = [System.IO.Path]::GetPathRoot($stateRoot)
+    if ($driveRoot -notmatch '^[A-Za-z]:\\$') { throw 'Restore qualification requires a local drive.' }
+    $volume = Get-Volume -DriveLetter $driveRoot.Substring(0, 1)
+    if ($volume.FileSystem -ne 'NTFS') { throw "Unsupported state volume: $($volume.FileSystem)" }
+    Get-Acl -LiteralPath $stateRoot | Format-List Owner,AreAccessRulesProtected,Access
+
+    $testRoot = Join-Path $stateRoot ('.host-qualification-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $testRoot | Out-Null
+    $oldAppData = $env:APPDATA
+    $oldTemp = $env:TEMP
+    $oldTmp = $env:TMP
+    $oldMarker = $env:OMFAI_WEBVIEW_SMOKE_MARKER
+    try {
+      $env:APPDATA = $testRoot
+      $env:TEMP = $testRoot
+      $env:TMP = $testRoot
+      $env:OMFAI_WEBVIEW_SMOKE_MARKER = Join-Path $testRoot 'bridge.marker'
+
+      go test ./internal/infrastructure/sqlite -run 'Restore|Journal|NoReplace' -count=1 -v
+
+      for ($attempt = 1; $attempt -le 2; $attempt++) {
+        Remove-Item -LiteralPath $env:OMFAI_WEBVIEW_SMOKE_MARKER -ErrorAction SilentlyContinue
+        Write-Host "Close the OhMyFreeAI window after the bridge becomes ready (launch $attempt/2)."
+        & .\dist\OhMyFreeAI.exe
+        if ($LASTEXITCODE -ne 0) { throw "Desktop process exited with code $LASTEXITCODE" }
+        $actual = (Get-Content -Raw -LiteralPath $env:OMFAI_WEBVIEW_SMOKE_MARKER).Trim()
+        if ($actual -ne 'GetSnapshot success count=2') { throw "Expected two native bridge calls; got: $actual" }
+      }
+    }
+    finally {
+      $env:APPDATA = $oldAppData
+      $env:TEMP = $oldTemp
+      $env:TMP = $oldTmp
+      $env:OMFAI_WEBVIEW_SMOKE_MARKER = $oldMarker
+      Remove-Item -LiteralPath $testRoot -Recurse -Force
+    }
+
+Also record the Windows build number and the installed Microsoft Edge WebView2 Runtime version. The native GUI launch and two-call marker must succeed on both launches. This test does not qualify ReFS, SMB, removable or unknown providers; Restore must continue to fail closed on them.
+
+These commands do not enable Restore or test startup recovery. They qualify the desktop bridge and the existing no-replace/identity/Journal tests on the host's actual state-volume provider. Preserve the output and report any failure without retrying blindly.
+

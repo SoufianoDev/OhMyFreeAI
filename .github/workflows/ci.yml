@@ -11,6 +11,7 @@ on:
       - '**/*.js'
       - '**/*.html'
       - '**/*.css'
+      - '**/*.md'
       - 'go.mod'
       - 'go.sum'
       - 'migrations/**'

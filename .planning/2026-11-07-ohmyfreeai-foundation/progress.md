@@ -2122,3 +2122,31 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - The current project gate remains real-host qualification: Linux WebKit sandbox with the sandbox enabled, real Windows WebView2 runtime, and the actual application-state filesystem/provider. This execution has GitHub connector access but no attached Linux/Windows desktop host or live Google Colab Free runtime, so those host/runtime checks cannot be performed here. GitHub-hosted Xvfb evidence explicitly disables WebKit sandboxing in the child process and is not a substitute.
 - Installer/upgrade/uninstall behavior and safe manual journal export/retention before the 256-record / 1 MiB cap also remain open.
 - Restore remains disabled and is not wired to Wails, GUI, CLI or startup recovery. `main` was not modified; no merge, force-push or destructive cleanup occurred.
+
+
+## 2026-11-18 — scheduled follow-up: reconcile CI and prepare real-host qualification
+
+### Repository and workflow inspection
+- Read `.planning/.active_plan`, `task_plan.md`, `progress.md`, `findings.md`, `RESTORE_LIFECYCLE.md`, `RESTORE_RECOVERY_EXECUTOR.md`, `SYSTEM_ARCHITECTURE.md`, `DESKTOP_BUILD.md`, both Restore executors, the Wails composition root, AppService and all four workflow definitions.
+- Branch head: `a8aa38899d01f7f7b057964f1e5bd646e419e7f2`. Main: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`. Compare: 965 ahead / 0 behind. No open PRs or active workflows.
+- Since the previously reported `82b8251`, the branch has only two documentation commits changing the task plan and progress log. The production-code/test head remains `f009035`; the docs/tooling head with Root CI evidence is `0a542ec`.
+
+### CI verification and failure diagnosis
+- Latest workflow run is Root CI [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) on `0a542ec`: 2/2 jobs succeeded.
+- Windows job `133880500823`: all required steps passed; Linux-only race step was skipped as expected. Logs confirm Python 22/22, architecture check passed and 48 Markdown files checked.
+- Ubuntu job `133880501164`: all required steps passed, including `go test -race ./...`; logs confirm Python 22/22 and 48 Markdown files checked.
+- Inspected failed Windows job `133878912582` from run [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961). `go vet`, Go tests and build passed. Python had two portability assertion failures: an 8.3 temporary root did not compare equal to resolved long-path entries, and diagnostics used Windows backslashes. The fix in `0a542ec` resolves the root and emits POSIX relative paths; exact-head rerun succeeded. No source-code or test failure remains from that run.
+- Rechecked the production-code workflow matrix on `f009035`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8; all 16 jobs are completed successfully. These results are not attributed to later docs-only commits.
+
+### Next-step preparation
+- Confirmed Restore executors and application service remain unwired to Wails, GUI, CLI and startup; the ordinary startup path still opens the normal Store directly.
+- Added real-host acceptance commands to `docs/architecture/DESKTOP_BUILD.md`. Linux instructions use a disposable profile nested under the actual state directory, run the desktop app twice in a logged-in session with `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS` removed from the child environment, collect WebKit process namespace/seccomp evidence, and run Restore/Journal/no-replace Go tests with `TMPDIR` on the actual state filesystem.
+- Added Windows instructions to verify local NTFS and inherited ACL, run the executable twice with a disposable `APPDATA` profile, and run the same Go test selection with `TEMP`/`TMP` under that NTFS state directory.
+- Updated Root CI path filters to include `**/*.md`, so future documentation changes actually trigger the Markdown link checker.
+- No attached Linux or Windows desktop host is available in this execution. Host tests were not run and are not claimed. The new procedures are ready for execution by a real desktop session.
+- No Restore wiring, no changes to the Restore safety contract, no changes to `main`, no merge, no force-push and no destructive cleanup.
+
+### Verification boundary and resumption
+- No local shell checkout was available; CI evidence above is from actual GitHub Actions job logs.
+- The next required evidence is the Linux desktop run with WebKit sandbox enabled and the Windows desktop run with WebView2 on fixed local NTFS. After those, review the actual filesystem test output and then proceed to packaging/uninstall and safe Journal export/retention design.
+- The target date 2026-11-16 was missed. Do not label the project release-ready based on green CI alone.

@@ -6,7 +6,9 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current production-code/test head:** `f0090357767bfad20ffa452ba1289e9d47556dfa` on `foundation/bootstrap`. The branch tip may be newer because planning/documentation commits are added after code verification; the latest docs/tooling head rechecked on 2026-11-17 was `0a542ec3511d3c722b4b51ef449873e0f0ad177a`.
+**Current branch tip:** `a8aa38899d01f7f7b057964f1e5bd646e419e7f2` on `foundation/bootstrap` (planning/progress documentation only).
+
+**Current production-code/test head:** `f0090357767bfad20ffa452ba1289e9d47556dfa`. **Latest docs/tooling head with exact CI:** `0a542ec3511d3c722b4b51ef449873e0f0ad177a`.
 
 **Current exact-head CI:**
 - Root CI [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984): 2/2 Ubuntu/Windows on `0a542ec`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks, and local Markdown link validation across 48 files. Ubuntu also passed `go test -race ./...`.
@@ -17,7 +19,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
   - Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8.
 - The first docs-check attempt [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) failed only in two Windows-specific test assertions: the temporary root was not canonicalized (8.3 path versus long path), and diagnostic paths used native backslashes. The test now resolves its temporary root and diagnostics use POSIX relative paths. Exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed both platforms. No failure is hidden.
 
-**Repository state:** `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; `foundation/bootstrap` is 962 commits ahead and 0 behind. No open PRs and no active workflows. No merge was performed.
+**Repository state:** `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; `foundation/bootstrap` is 965 commits ahead and 0 behind. No open PRs and no active workflows. No merge was performed.
 
 **Completed in this run:** added `scripts/docs_check.py`, the `python scripts/dev.py docs-check` command, six focused unit tests, and a Root CI step. It checks local Markdown path targets, reference links and HTML `href`/`src` attributes across 48 repository Markdown files. It deliberately does not fetch external URLs or validate heading fragments. Updated Restore lifecycle and desktop-build docs to distinguish implemented executors/service from still-open host, sandbox, packaging, retention and power-loss gates.
 
@@ -42,6 +44,20 @@ Older dated sections below are historical checkpoints. This current status super
 - Re-reviewed StoreController, its 16 tests, Wails composition root, AppService, CLI backup composition and archive publication lease test. This integration stage is complete; no duplicate code was added.
 - The next gate is real-host qualification (Linux WebKit sandbox enabled, Windows WebView2, actual state-directory filesystem/provider), plus packaging/uninstall and bounded-ledger export/retention. This GitHub-only execution has no attached desktop host or live Colab Free runtime, so those checks remain open and are not inferred from CI.
 - No production code changed and no CI was launched in this follow-up. Restore remains disabled and unwired; `main` remains untouched.
+
+### 2026-11-18 scheduled follow-up
+
+- Re-read the active plan pointer, full task plan/progress, Restore lifecycle/executor architecture, desktop build contract, transaction/recovery executors, Wails composition root, AppService, CI workflow definitions and current branch tree.
+- Current branch tip is `a8aa38899d01f7f7b057964f1e5bd646e419e7f2`; comparing it with the previous recorded tip `82b8251efcac05297e293814b308b773113b1f0b` shows only two documentation commits touching `task_plan.md` and `progress.md`. No production-code change followed `f009035`.
+- `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; the current comparison is 965 commits ahead, 0 behind. There are no open PRs and no active Actions jobs.
+- Latest Root CI run [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) targets `0a542ec` and completed 2/2. Inspected both job summaries and logs: Ubuntu passed Go vet/tests/race/build, Python 22/22, frontend syntax, architecture and 48-file local Markdown link checks; Windows passed the same except the Linux-only race step was skipped.
+- Inspected the failed Windows job in [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961). Its only failing step was Python tests: the temp root used an 8.3 path while discovered files used the resolved long path, and one diagnostic assertion expected POSIX separators. The fix is present in `0a542ec`; the exact-head rerun passed on both OSes. No failure is being hidden.
+- Re-fetched the production-code matrix on `f009035`: Root CI 2/2 [43975095320](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095320), SQLite drivers 4/4 [43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316), Wails 2/2 [43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477), Linux distributions 8/8 [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377). All 16 actual jobs are completed successfully. This matrix is attributed to `f009035`, not the later documentation-only commits.
+- Confirmed Restore remains isolated: `desktop-src/main.go.tmpl` opens the ordinary Store and registers AppService; it does not instantiate or register Restore transaction/recovery services. No Restore GUI, CLI or startup hook is present.
+- Added reproducible manual host-qualification procedures to `DESKTOP_BUILD.md`. They use a disposable profile under the real application-state directory, run the native bridge twice in a normal desktop session, and direct the Restore/no-replace Go tests' temp files onto the actual state-directory filesystem. The Linux procedure explicitly removes the dangerous WebKit sandbox-disable variable from the child process and collects WebKit namespace/seccomp evidence. A Windows procedure checks local NTFS and captures the inherited ACL before exercising WebView2 and the filesystem tests.
+- Updated Root CI path filters to include Markdown files. The local-link checker previously ran only when code/tooling paths changed, so ordinary documentation edits could bypass the new check.
+- No real desktop host is attached to this GitHub-only execution. Therefore no Linux WebKit sandbox or Windows WebView2 host result is claimed. The new procedures prepare the next run; they do not substitute for it.
+- Restore remains disabled/unwired, and `main` remains untouched. The 2026-11-16 target was missed; release readiness is still blocked on real-host/provider evidence, packaging/uninstall, bounded-ledger export/retention and live Colab/model/SSE policy revalidation.
 
 ### Historical CI evidence
 
