@@ -2258,3 +2258,26 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - The production task-plan link remains `../../docs/architecture/DESKTOP_BUILD.md`. The Markdown checker itself is unchanged.
 - Exact-head CI for this correction is pending; do not close the regression until Ubuntu and Windows tests and the final docs-check step pass.
 - Restore remains disabled/unwired; no application or Restore executor source changed, and `main` was not modified.
+
+
+
+## 2026-11-19 — exact-head CI closure after documentation-link regression
+
+### Repair sequence
+- [`4413768`](https://github.com/SoufianoDev/OhMyFreeAI/commit/44137688c57d061ebc36c8a3c21c880cb70d2d0b) updated the plan/progress state. Root CI [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) failed Ubuntu and Windows only at the Markdown link check: the nested task plan used `../docs/...` instead of `../../docs/...`.
+- [`ce63777`](https://github.com/SoufianoDev/OhMyFreeAI/commit/ce63777893000160b69a2ff7f6fff550877c6620) corrected the link and added a nested-planning-path regression test. Root CI [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) then failed both platforms in Python because the fixture was authored with literal backslash-`n` text, placing both links on one physical line.
+- [`3be3630`](https://github.com/SoufianoDev/OhMyFreeAI/commit/3be36304c468b23ba431f9b798148b7da1c4fe15) attempted to correct the Python escape, but the generated source still contained two backslashes. Root CI [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) repeated the same one-line fixture failure on both platforms. Both job logs were inspected.
+- [`e41d41f`](https://github.com/SoufianoDev/OhMyFreeAI/commit/e41d41fcfc4c5cd227d5f7901f1c790a2db92f38) replaced nested escape sequences with `chr(10)` to construct the fixture's two physical lines unambiguously.
+
+### Exact-head verification
+- Root CI [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) on `e41d41f` completed successfully: **2/2 jobs**.
+- Windows job `135392243606`: Go vet/tests/build passed; race detector skipped because it is Linux-only; Python 23/23; frontend syntax, architecture and local Markdown link checks passed (48 files).
+- Ubuntu job `135392244060`: Go vet/tests/race/build passed; Python 23/23; frontend syntax, architecture and local Markdown link checks passed (48 files).
+- Downloaded and inspected both complete job logs and step summaries. No failed steps remain on the verified head.
+- The new regression test verifies the correct two-level relative path and rejects the one-level path. The checker implementation was not changed because it correctly reported the broken link.
+
+### Remaining gate
+- The branch is 973 commits ahead / 0 behind `main` at `e41d41f`; no open PRs or active workflows were found.
+- No application or Restore executor source changed in this repair sequence. Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery.
+- The next required evidence remains real-host Linux WebKit sandbox and actual state-filesystem qualification, followed by real Windows WebView2 and fixed-local-NTFS/ACL qualification. No such desktop host is attached to this execution.
+- No merge, force-push, Restore enablement or destructive cleanup occurred.

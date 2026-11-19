@@ -6,24 +6,25 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Verified repository state before the third test-fixture correction — 2026-11-19:**
-- Branch: `foundation/bootstrap`, inspected at [`3be3630`](https://github.com/SoufianoDev/OhMyFreeAI/commit/3be36304c468b23ba431f9b798148b7da1c4fe15).
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison before this correction was **972 commits ahead / 0 behind**.
-- No open PRs or active Actions runs remain after the failed test run.
-- Latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`; no application or Restore executor source changed in the documentation/test-tooling follow-ups.
+**Verified repository state — 2026-11-19:**
+- Branch: `foundation/bootstrap`; latest verified implementation/test head: [`e41d41f`](https://github.com/SoufianoDev/OhMyFreeAI/commit/e41d41fcfc4c5cd227d5f7901f1c790a2db92f38).
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; at the verified head the branch was **973 commits ahead / 0 behind**.
+- No open PRs and no active Actions runs were returned.
+- Latest application/Restore implementation head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`. The later changes add documentation-link tooling/tests and update planning/runbooks; no application or Restore executor source changed.
 
-**Latest CI and failure diagnosis:**
-- Root CI [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) on `3be3630`: **0/2 jobs successful**. Ubuntu and Windows both failed only at `Run Python tests`.
-- Both job logs confirm the nested-planning-path regression test still wrote the fixture as one physical line. The attempted correction retained two backslashes in the generated Python source, so the test wrote a literal backslash-`n` rather than a newline.
-- The test fixture is now changed to build line breaks with `chr(10)`, avoiding another escaping layer. The test still asserts that the correct `../../docs/architecture/DESKTOP_BUILD.md` target resolves and the too-shallow `../docs/architecture/DESKTOP_BUILD.md` target is rejected on line 2.
-- The production Markdown link remains corrected to `../../docs/architecture/DESKTOP_BUILD.md`.
-- All other steps passed in `44474211192`: Go vet/tests/build, Ubuntu race detection, frontend syntax and architecture checks. Python reported 23 tests with one failing regression assertion.
-- The earlier link-path failure [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) was diagnosed and corrected; exact-head CI for the current fixture correction is pending.
+**Latest exact-head CI:**
+- Root CI [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) on `e41d41f`: **2/2 jobs successful**.
+- Ubuntu job `135392244060`: Go vet/tests/race/build passed; Python **23/23**; frontend syntax, architecture checks and the 48-file local Markdown link check passed.
+- Windows job `135392243606`: Go vet/tests/build passed; Python **23/23**; frontend syntax, architecture checks and the 48-file local Markdown link check passed. The Linux-only race step was skipped as intended.
+- Both job step lists and logs were inspected; no failed steps remain on this exact head.
+- The regression test now proves nested planning-document relative-link resolution and rejects the too-shallow path. The production link is `../../docs/architecture/DESKTOP_BUILD.md`.
 
-**Previously verified evidence:**
-- Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346) on `a6bc860`: 2/2 successful.
-- The four-workflow application-code matrix on `f009035` passed 16/16: Root 2/2, SQLite driver evaluation 4/4, Wails 2/2 and Linux distributions 8/8. These results belong to `f009035`, not later docs/test-tooling commits.
-- The historical Windows Markdown-check failure [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) was fixed in `0a542ec`; exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed 2/2.
+**Failure history and closure:**
+- [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) failed 2/2 because the new task-plan link used one parent-directory segment instead of two. Corrected.
+- [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) and [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) failed 2/2 because the added regression fixture used literal backslash-`n` text, so the expected second Markdown line did not exist. Replaced the fixture line breaks with `chr(10)`.
+- Exact-head rerun [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) passed 2/2. These failures are recorded; none is hidden.
+- Earlier Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346) on `a6bc860` also passed 2/2.
+- The four-workflow application-code matrix on `f009035` passed 16/16: Root 2/2, SQLite driver evaluation 4/4, Wails 2/2 and Linux distributions 8/8. This matrix is attributed to `f009035`, not to later docs/test-tooling commits.
 
 **Current gate — real-host qualification:**
 1. Run the Linux desktop executable in a normal logged-in desktop session with WebKit sandboxing enabled; collect WebKit process, namespace and Seccomp evidence.
@@ -40,12 +41,13 @@ The exact procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_B
 - The 2026-11-16 target was missed. The repository is not a real-world testable release; green CI is not release readiness.
 - Do not merge the development branch wholesale into `main`.
 
-### 2026-11-19 scheduled follow-up and test-fixture correction
+### 2026-11-19 scheduled follow-up — exact-head CI closure
 
-- Inspected both job logs for Root CI `44474211192`. The only failure on Ubuntu and Windows was `test_resolves_links_from_nested_planning_documents`; both logs show the fixture link on line 1 rather than line 2.
-- The previous source correction still emitted two backslashes before `n` because of nested JavaScript/Python escaping. Replaced newline escapes in the fixture with `chr(10)` so the test data is unambiguous.
-- The production Markdown checker and the corrected task-plan link are unchanged by this third correction.
-- Exact-head CI is pending. No application or Restore source changed. Restore remains disabled/unwired; `main` remains untouched.
+- Re-read the active plan, progress log, system/security architecture, Restore lifecycle/executor contracts, desktop build/host runbook, Wails composition root, AppService, StoreController and all workflow definitions.
+- Inspected the three failed exact-head runs from the documentation/test-tooling repair sequence: `44473206705` (incorrect relative link), `44473684482` and `44474211192` (regression fixture line-break escaping). Root causes were corrected and retained in the progress log.
+- Verified exact-head Root CI [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299): Ubuntu and Windows **2/2 successful**. Both logs confirm Python 23/23, architecture checks, and 48 Markdown files checked; Ubuntu race detection passed and Windows skipped only the Linux-only race step.
+- Confirmed branch comparison at `e41d41f` is 973 ahead / 0 behind `main`; no open PRs or active workflows remain.
+- No application or Restore executor source changed. Restore remains disabled/unwired. No desktop host is attached, so real-host/provider qualification remains the immediate blocker.
 
 
 Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.
