@@ -7,50 +7,59 @@ Establish the verified architectural, repository, developer-tooling, and applica
 ## Next Step
 
 **Verified repository state — 2026-11-19, latest GitHub check:**
-- Development branch: `foundation/bootstrap`; current branch tip: [`eb9b10e`](https://github.com/SoufianoDev/OhMyFreeAI/commit/eb9b10e7710cea8490fa68e49bd2c320fa5ad9f8).
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; branch comparison is **974 commits ahead / 0 behind**.
-- No open PRs and no active or queued Actions runs were returned.
-- Latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`. The 14 commits after it affect planning/progress, the desktop host runbook, Restore lifecycle documentation, CI path filters, and Markdown-link tooling/tests. No application or Restore executor source changed.
-- The current branch tip `eb9b10e` is a documentation/progress checkpoint, not a new application-code release.
+- Development branch: foundation/bootstrap; current tip: [2bac200](https://github.com/SoufianoDev/OhMyFreeAI/commit/2bac200f6fa79f2cefe316157f924a0e42579d81).
+- main: a1b12fbe5dd854c4619463eb1c7cccc0bd951941; branch comparison: **975 commits ahead / 0 behind**.
+- No open pull requests and no active or queued Actions runs at the time of the check.
+- Latest application/Restore implementation and test head remains [f009035](https://github.com/SoufianoDev/OhMyFreeAI/commit/f0090357767bfad20ffa452ba1289e9d47556dfa). The 15 commits after it affect CI configuration, planning/progress, desktop/Restore documentation, Markdown-link tooling and its tests; no application Go source or Restore executor source changed.
+
+**Requested historical CI:**
+- Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on f5396ee: completed successfully.
+- Ubuntu job 128543483467 and Windows job 128543483323: both completed successfully with all 18 steps successful. Their full logs were inspected. This is historical evidence for f5396ee, not current-head evidence.
 
 **Latest exact-head CI:**
-- Root CI [44475265849](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44475265849) on `eb9b10e`: **2/2 jobs successful**.
-- Ubuntu job `135394161960`: Go vet/tests/race/build passed; Python **23/23**; frontend syntax, architecture checks, and the 48-file local Markdown link check passed.
-- Windows job `135394162431`: Go vet/tests/build passed; Python **23/23**; frontend syntax, architecture checks, and the 48-file local Markdown link check passed. The Linux-only race step was skipped as intended.
-- Both complete job logs and step summaries were inspected. The latest run has no failed steps.
-- The nested-planning-link regression verifies that the correct two-level relative path resolves and the too-shallow path is rejected. The fixture now uses `chr(10)` to create physical line breaks unambiguously.
+- Root CI [44476660119](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44476660119) on 2bac200: **2/2 jobs successful**.
+- Ubuntu job 135398744461: Go vet/tests/race/build passed; Python **23/23**; frontend syntax, architecture checks and repository-local Markdown links passed (48 files).
+- Windows job 135398744684: Go vet/tests/build passed; Python **23/23**; frontend syntax, architecture checks and repository-local Markdown links passed (48 files). The Linux-only race step was skipped as intended.
+- Both complete logs and step summaries were inspected. No active workflow remains.
+- The four-workflow application-code matrix on f009035 passed **16/16**: Root CI 2/2, SQLite driver evaluation 4/4, Wails platform proof 2/2 and Linux distributions 8/8. Do not attribute this matrix to the later documentation-only commits.
 
-**Failure history and closure:**
-- [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) failed 2/2 because the task-plan link used one parent-directory segment instead of two. Corrected to `../../docs/architecture/DESKTOP_BUILD.md`.
-- [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) and [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) failed 2/2 because the regression fixture contained literal backslash-`n` text, leaving both Markdown links on one physical line. The final test fix in [e41d41f](https://github.com/SoufianoDev/OhMyFreeAI/commit/e41d41fcfc4c5cd227d5f7901f1c790a2db92f38) uses `chr(10)`.
-- Exact-head Root CI [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) on `e41d41f` passed 2/2; the subsequent docs/progress head [44475265849](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44475265849) on `eb9b10e` also passed 2/2. All three earlier failures remain documented; none is hidden.
-- The four-workflow application-code matrix on `f009035` passed 16/16: Root CI 2/2, SQLite driver evaluation 4/4, Wails 2/2, and Linux distributions 8/8. This matrix is attributed to `f009035`, not the later docs/tooling commits.
+**Recent CI failures and closure:**
+- [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) failed on both platforms because the nested task plan used ../docs/architecture/DESKTOP_BUILD.md instead of ../../docs/architecture/DESKTOP_BUILD.md.
+- [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) and [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) failed on both platforms because the regression fixture contained literal backslash-n, not a physical line break. The final test uses chr(10).
+- The repairs are verified by [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) on e41d41f (2/2), [44475265849](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44475265849) on eb9b10e (2/2), and latest [44476660119](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44476660119) on 2bac200 (2/2). All failures remain documented.
+
+**StoreController integration — complete:**
+- Re-reviewed store_controller.go and all **16** tests in store_controller_test.go.
+- Wails composition root creates one Controller after opening/migrating Store, passes it to configuration and AppService, and closes through Controller.
+- AppService retains Controller; configuration Load/Save uses the Controller-backed ConfigRepository.
+- Wails and CLI backup export use CreateWithStoreController; the shared lease spans archive creation and publication. TestManagerCreateWithStoreControllerDrainsBeforeClose verifies the close/publication barrier.
+- No duplicate integration work is needed. Backup inspection is read-only; Restore is not registered or exposed by Wails/AppService.
 
 **Current gate — real-host qualification:**
-1. Run the Linux desktop executable in a normal logged-in desktop session with WebKit sandboxing enabled; collect WebKit process, namespace, and Seccomp evidence.
-2. Run Restore/Journal/no-replace tests with temporary files on the actual Linux application-state filesystem.
-3. On a real Windows desktop, qualify WebView2 and the state directory on fixed local NTFS with persistent ACLs; run the filesystem tests on that volume.
+1. Run the Linux desktop executable in a normal logged-in desktop session with WebKit sandboxing enabled; collect WebKit process, namespace and Seccomp evidence.
+2. Run Journal/no-replace and recovery tests on the actual Linux application-state filesystem.
+3. On a real Windows desktop, qualify WebView2 and the state directory on fixed local NTFS with persistent ACLs; run filesystem tests on that volume.
 4. Only after host/provider evidence, proceed to installer/upgrade/uninstall design and explicit Journal export/retention before the 256-record / 1 MiB fail-closed cap.
 5. Revalidate the live Colab/model/SSE path and current Colab Free policy before enabling remote inference.
 
 The exact procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.md). This GitHub-only execution has no attached Linux or Windows desktop session or self-hosted runner, so host checks cannot be performed here. CI/Xvfb cannot substitute for Linux sandbox qualification because the CI smoke disables WebKit sandboxing inside its child process.
 
 **Safety and release status:**
-- Restore transaction/recovery executors and the application service remain isolated and unwired to Wails, GUI, CLI, and startup recovery.
+- Restore transaction/recovery components and the application service remain isolated and unwired to Wails, GUI, CLI and startup recovery.
 - Restore remains disabled. Do not add startup recovery or user-facing Restore until the full Linux/Windows safety matrix and host/provider gates are closed.
 - The 2026-11-16 target was missed. The repository is not a real-world testable release; green CI is not release readiness.
-- Do not merge the development branch wholesale into `main`.
+- Do not merge the development branch wholesale into main.
 
-### 2026-11-19 scheduled follow-up — exact-head CI closure
+### 2026-11-19 scheduled follow-up — exact branch-head CI and StoreController review
 
-- Re-read the active plan, progress log, system/security architecture, Restore lifecycle/executor contracts, desktop build/host runbook, Wails composition root, AppService, StoreController and all workflow definitions.
-- Inspected the three failed exact-head runs from the documentation/test-tooling repair sequence: `44473206705` (incorrect relative link), `44473684482` and `44474211192` (regression fixture line-break escaping). Root causes were corrected and retained in the progress log.
-- Verified exact-head Root CI [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299): Ubuntu and Windows **2/2 successful**. Both logs confirm Python 23/23, architecture checks, and 48 Markdown files checked; Ubuntu race detection passed and Windows skipped only the Linux-only race step.
-- Confirmed branch comparison at `e41d41f` is 973 ahead / 0 behind `main`; no open PRs or active workflows remain.
-- No application or Restore executor source changed. Restore remains disabled/unwired. No desktop host is attached, so real-host/provider qualification remains the immediate blocker.
+- Rechecked the requested historical workflow and inspected both Ubuntu/Windows job logs and step summaries.
+- Rechecked the current branch ref, main ref, latest Root CI runs, active workflow statuses, and open pull requests.
+- Diagnosed the three failed documentation-tooling CI runs and confirmed their fixes on three subsequent successful exact-head runs.
+- Re-read StoreController, all 16 controller tests, Wails composition root, AppService, configuration repository, backup implementation and archive publication/drain test.
+- Confirmed the only remaining immediate blocker is real Linux/Windows host qualification. No host result is inferred from GitHub CI.
+- No production code changed; Restore remains disabled/unwired; no merge, force-push or main modification occurred.
 
-
-Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.
+Older dated sections below are historical checkpoints. This current status supersedes earlier statements that StoreController integration or the transaction/recovery executors were still missing.
 
 ### 2026-11-17 scheduled follow-up
 

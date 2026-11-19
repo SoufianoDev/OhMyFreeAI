@@ -2305,3 +2305,36 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Next action remains real-host qualification: Linux WebKit sandbox and application-state filesystem first, then Windows WebView2 and fixed-local-NTFS/ACL. Installer/upgrade/uninstall, manual Journal export/retention, and live Colab/model/SSE policy revalidation remain subsequent gates.
 - No application code changed, Restore remains disabled/unwired, and `main` remains untouched. This checkpoint updates only the plan and progress evidence.
 
+## 2026-11-19 14:46 UTC — scheduled CI and StoreController recheck
+
+### Requested historical workflow
+- Rechecked Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) through the GitHub connector. It is completed / success on commit f5396ee592b9b9756779f67aeabd6d7167520c40, branch foundation/bootstrap.
+- Both jobs completed successfully: Ubuntu job 128543483467 and Windows job 128543483323. Each job has 18 successful steps; no failed step is present in either step list or log.
+- This historical result is kept separate from current-head evidence.
+
+### Current branch and exact-head CI
+- Current branch tip at the start of this checkpoint: [2bac200](https://github.com/SoufianoDev/OhMyFreeAI/commit/2bac200f6fa79f2cefe316157f924a0e42579d81).
+- Root CI [#44476660119](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44476660119) targets that exact SHA and completed success, 2/2:
+  - Ubuntu job 135398744461: Go vet/tests/race/build passed; Python 23/23; frontend syntax, architecture checks and repository-local Markdown checks passed (48 files).
+  - Windows job 135398744684: Go vet/tests/build passed; Python 23/23; frontend syntax, architecture checks and repository-local Markdown checks passed (48 files). The Linux-only race step was skipped as expected.
+- Both complete job logs and step summaries were inspected. There are no active or queued workflow runs on the branch and no open pull requests at the time of this check.
+- The full four-workflow matrix remains attributed to application/test head [f009035](https://github.com/SoufianoDev/OhMyFreeAI/commit/f0090357767bfad20ffa452ba1289e9d47556dfa): Root 2/2, SQLite driver evaluation 4/4, Wails platform proof 2/2 and Linux distributions 8/8. The 15 commits from f009035 to 2bac200 affect CI configuration, planning/progress, desktop/Restore documentation, Markdown-link tooling and its tests; no application Go source or Restore executor source changed.
+
+### Failed CI runs diagnosed and closed
+- Root CI [#44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) failed on Ubuntu and Windows only at the local Markdown link check. The nested task plan used ../docs/architecture/DESKTOP_BUILD.md; from that directory it must use ../../docs/architecture/DESKTOP_BUILD.md. The job logs show this exact path error.
+- Root CI [#44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) and [#44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) failed on both platforms in test_resolves_links_from_nested_planning_documents. The fixture encoded literal backslash-n text, so both links appeared on line 1 while the test expected line 2. The final regression fixture uses chr(10) to create physical line breaks without another escaping layer.
+- The repair is verified: [#44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) on e41d41f passed 2/2, [#44475265849](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44475265849) on eb9b10e passed 2/2, and current-head [#44476660119](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44476660119) on 2bac200 passed 2/2. No failed run was re-labelled or omitted.
+
+### StoreController and composition-root review
+- Re-read internal/infrastructure/sqlite/store_controller.go and enumerated all 16 tests in store_controller_test.go: shared/exclusive drain, writer preference, cancellation, nil Store rejection, exclusive replacement, close/drain, verified rollback Store publication, fail-closed nil/panic handling, shared-lease release on panic, concurrency stress, config round-trip, and config Load/Save drain.
+- Re-read desktop-src/main.go.tmpl: Wails opens and migrates the Store before creating one Controller, passes that Controller to configuration and AppService, and closes through Controller with a bounded context. CLI backup opens only an existing database, wraps it in a Controller, and closes through the same boundary.
+- Re-read desktop-src/app_service.go.tmpl and internal/application/config/service.go: AppService retains the Controller; configuration goes through ports.ConfigRepository, implemented by Controller Load/Save under shared leases.
+- Re-read internal/infrastructure/backup/archive.go and archive_controller_test.go: CreateWithStoreController retains one shared lease across archive creation and publication. TestManagerCreateWithStoreControllerDrainsBeforeClose verifies Close cannot finish while publication is held, then succeeds after release.
+- The requested StoreController integration phase is already complete. No duplicate implementation was added. Backup inspection remains read-only; no Restore entry point is registered in the Wails composition root or AppService.
+
+### Current gate and actions
+- Compared foundation/bootstrap with main: 975 ahead / 0 behind. Main SHA remains a1b12fbe5dd854c4619463eb1c7cccc0bd951941; there are no open PRs.
+- No application code or Restore executor source changed in this run. Only this progress/plan checkpoint is being recorded.
+- The next real gate is still host qualification: Linux desktop WebKit sandbox enabled in a normal logged-in session plus the actual application-state filesystem; then Windows WebView2 on fixed local NTFS with persistent ACLs and filesystem tests on that volume. This execution has no attached Linux/Windows desktop session or self-hosted runner, so none of those host results is claimed. GitHub/Xvfb CI is not a substitute.
+- After host qualification, continue installer/upgrade/uninstall safety and explicit manual journal export/retention before the 256-record / 1 MiB fail-closed cap, then revalidate the live Colab Free/model/SSE path.
+- Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery. Existing transaction/recovery components remain isolated; no Restore UI or activation was added. No merge, force-push or main modification occurred.
