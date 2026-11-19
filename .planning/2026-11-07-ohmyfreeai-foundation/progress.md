@@ -2187,3 +2187,30 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Real-host Linux WebKit sandbox evidence, Windows WebView2 + fixed-local-NTFS/ACL evidence, and actual state-filesystem qualification remain outstanding. No desktop host or live Google Colab Free runtime is attached here. GitHub Xvfb smoke tests disable the WebKit sandbox and cannot close that gate; Colab Free is not a desktop GUI host.
 - After real-host qualification, proceed with installer/upgrade/uninstall safety and explicit journal export/retention before the 256-record / 1 MiB cap. Automatic pruning remains prohibited.
 - Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery. No merge, force-push or main change occurred.
+
+
+
+## 2026-11-19 — scheduled follow-up: reconcile branch state and exact-head CI
+
+### Starting state and repository review
+- Read `.planning/.active_plan`, the current task plan and progress log, `SYSTEM_ARCHITECTURE.md`, `SECURITY_AND_RECOVERY.md`, `RESTORE_LIFECYCLE.md`, `RESTORE_RECOVERY_EXECUTOR.md`, `DESKTOP_BUILD.md`, `desktop-src/main.go.tmpl`, `desktop-src/app_service.go.tmpl`, `store_controller.go`, both Restore executors, and all four workflow definitions.
+- Confirmed the branch ref is `foundation/bootstrap` at [`a6bc860`](https://github.com/SoufianoDev/OhMyFreeAI/commit/a6bc86022289a73a57b9ecbba85a472796734698).
+- `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; compare is 969 ahead / 0 behind. GitHub returned no open PRs and no active/queued Actions runs.
+- The latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`. Comparing it with `a6bc860` shows nine subsequent commits affecting CI, planning/docs, and developer documentation-check tooling; no application or Restore executor source changed.
+
+### Exact-head workflow verification
+- Latest Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346) targets `a6bc860` and completed successfully: Ubuntu + Windows **2/2**.
+- Windows job `134882000179`: Go vet/tests/build passed; Python discovery passed 22 tests; frontend syntax, architecture checks and the 48-file local Markdown link check passed. The Linux-only race detector was skipped as intended.
+- Ubuntu job `134882000609`: Go vet/tests/build and `go test -race ./...` passed; Python discovery passed 22 tests; frontend syntax, architecture checks and the 48-file local Markdown link check passed.
+- Downloaded and inspected both job logs; no failed steps were present.
+- Run [44327300037](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327300037) on `387de2f` was cancelled during job setup after the subsequent push superseded it. Both jobs stopped before validation; it is not a test failure.
+- Reconfirmed the production-code matrix on exact head `f009035`: Root 2/2, SQLite driver evaluation 4/4, Wails 2/2, Linux distributions 8/8 (**16/16**). These results are not attributed to later docs/tooling commits.
+- The previous Windows Markdown-check regression [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) was already fixed in `0a542ec`; exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed 2/2.
+
+### Safety review and next gate
+- Confirmed the ordinary Wails composition root opens the normal Store and registers AppService; it does not instantiate or register Restore transaction/recovery executors.
+- Restore remains disabled and unwired to startup, GUI and CLI. No overwrite-capable move fallback was added; no Restore safety rule was relaxed.
+- The immediate next step remains real-host qualification: Linux WebKit sandbox and the actual application-state filesystem, then Windows WebView2 plus fixed-local-NTFS/ACL qualification. The current execution has no attached desktop host, so no host result is claimed.
+- After host/provider qualification, proceed to installer/upgrade/uninstall safety and explicit manual Journal export/retention before the 256-record / 1 MiB cap. Revalidate the live Colab/model/SSE flow and current Colab Free policy before enabling remote inference.
+- Corrected the stale current-status block in `task_plan.md` from the previously recorded `78cfcfc` to the verified `a6bc860`, and synchronized exact CI/ahead-count evidence.
+- No application code changed, no local desktop test was run, no merge or force-push occurred, and `main` was not modified.

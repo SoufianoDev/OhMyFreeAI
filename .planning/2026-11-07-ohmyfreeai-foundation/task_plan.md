@@ -6,36 +6,55 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Current verified branch tip:** `78cfcfc620f6a74aeef785223652d9edf930972c` on `foundation/bootstrap` (documentation/progress update after the host-qualification runbook).
+**Verified repository state — 2026-11-19:**
+- Current branch: `foundation/bootstrap`.
+- Current branch tip: [`a6bc860`](https://github.com/SoufianoDev/OhMyFreeAI/commit/a6bc86022289a73a57b9ecbba85a472796734698), `docs(progress): record current CI and StoreController recheck`.
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison is **969 commits ahead / 0 behind**.
+- No open PRs and no queued, in-progress, waiting or pending Actions runs were returned.
+- The latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`. The nine commits after it change CI/documentation/developer tooling and add the local Markdown checker; they do not change the application or Restore executor source.
+- The current branch tip is documentation/progress-only after the docs-check tooling. Do not confuse the latest branch tip with the latest application-code head.
 
-**Current production-code/test head:** `f0090357767bfad20ffa452ba1289e9d47556dfa`. **Latest docs/tooling head with exact CI:** `78cfcfc620f6a74aeef785223652d9edf930972c`.
+**Latest exact-head CI:**
+- Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346) on `a6bc860`: **2/2 jobs successful**.
+- Ubuntu job `134882000609`: Go vet, Go tests, race detector, Go build, Python tests, frontend syntax, architecture checks and local Markdown link validation all passed.
+- Windows job `134882000179`: Go vet/tests/build, Python tests, frontend syntax, architecture checks and local Markdown link validation all passed; only the Linux-specific race step was skipped.
+- Both job logs report the local Markdown link check passing for 48 files. Python discovery completed successfully (22 tests on each OS).
+- Run [44327300037](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327300037) on parent `387de2f` was cancelled during job setup when the next push superseded it. Both jobs were cancelled before validation steps; this is not a test failure.
+- The historical Windows docs-check failure [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) remains fixed by `0a542ec`; its exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed 2/2.
 
-**Current exact-head CI:**
-- Root CI [44252721602](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252721602): 2/2 Ubuntu/Windows on `78cfcfc`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks and the 48-file local Markdown link check. Ubuntu passed the race detector; Windows skipped only that Linux-specific step.
-- Root CI [44252184579](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44252184579): 2/2 Ubuntu/Windows on `549006b`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks and the expanded 48-file local Markdown link check. Ubuntu also passed `go test -race ./...`.
-- Root CI [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984): 2/2 Ubuntu/Windows on `0a542ec`. Both passed Go vet/tests/build, Python 22/22, frontend syntax, architecture checks, and local Markdown link validation across 48 files. Ubuntu also passed `go test -race ./...`.
-- The full production-code matrix on parent code/test head `f009035` passed 16/16:
+**Application-code matrix (exact head attribution):**
+- The four-workflow matrix on `f009035` passed **16/16**:
   - Root CI [43975095320](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095320): 2/2.
-  - SQLite driver evaluation [43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316): 4/4 modernc/ncruces × Ubuntu/Windows.
+  - SQLite driver evaluation [43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316): 4/4.
   - Wails platform proof [43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477): 2/2.
   - Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8.
-- The first docs-check attempt [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) failed only in two Windows-specific test assertions: the temporary root was not canonicalized (8.3 path versus long path), and diagnostic paths used native backslashes. The test now resolves its temporary root and diagnostics use POSIX relative paths. Exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed both platforms. No failure is hidden.
+- This 16/16 result belongs to `f009035`, not to later documentation-only commits.
 
-**Repository state (2026-11-18 verification):** `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; `foundation/bootstrap` is 967 commits ahead and 0 behind. The current branch tip `78cfcfc` is one documentation-only commit after `549006b`. No open PRs were returned by GitHub search. No merge was performed.
+**Current gate — real-host qualification:**
+1. Run the Linux desktop executable in a normal logged-in desktop session with WebKit sandboxing enabled; collect WebKit process, namespace and Seccomp evidence.
+2. Run Restore/Journal/no-replace tests with temporary files on the actual Linux application-state filesystem.
+3. On a real Windows desktop, qualify WebView2 and the state directory on fixed local NTFS with persistent ACLs; run the filesystem tests on that volume.
+4. Only after host/provider evidence, proceed to installer/upgrade/uninstall design and explicit Journal export/retention before the 256-record / 1 MiB fail-closed cap.
+5. Revalidate the live Colab/model/SSE path and current Colab Free policy before enabling remote inference.
 
-**Completed in this run:** added `scripts/docs_check.py`, the `python scripts/dev.py docs-check` command, six focused unit tests, and a Root CI step. It checks local Markdown path targets, reference links and HTML `href`/`src` attributes across 48 repository Markdown files. It deliberately does not fetch external URLs or validate heading fragments. Updated Restore lifecycle and desktop-build docs to distinguish implemented executors/service from still-open host, sandbox, packaging, retention and power-loss gates.
+The exact procedures are in [DESKTOP_BUILD.md](../docs/architecture/DESKTOP_BUILD.md). This execution has GitHub access but no attached Linux or Windows desktop session, so these host checks cannot be performed here. CI/Xvfb cannot substitute for the Linux sandbox test because the CI smoke disables WebKit sandboxing inside its child process.
 
-**Current gate:** real-host qualification, not another CI-only code change:
-1. Run the Linux desktop binary from a normal logged-in session with WebKit sandboxing enabled; CI cannot prove this because its Xvfb subprocess sets `WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS=1`.
-2. Qualify no-replace behavior on the actual Linux application-state filesystem and on a real Windows host using fixed local NTFS and persistent ACLs. GitHub CI covers its runner filesystem, tmpfs, and Windows CI; it does not qualify every user's provider.
-3. Exercise the Windows WebView2 runtime on a real desktop. Current Windows CI builds the executable and tests CLI dispatch; it does not launch the WebView2 UI.
-4. Define and test installer, upgrade and clean-uninstall behavior without deleting user data or Restore evidence.
-5. Design explicit safe journal export/retention before the 256-record / 1 MiB cap; automatic pruning remains forbidden.
-6. Revalidate the live Colab/model/SSE flow and current Colab Free policy before enabling remote inference.
+**Safety and release status:**
+- Restore transaction/recovery executors and the application service remain isolated and unwired to Wails, GUI, CLI and startup recovery.
+- Restore remains disabled. Do not add startup recovery or user-facing Restore until the full Linux/Windows safety matrix and host/provider gates are closed.
+- The 2026-11-16 target was missed. The repository is not a real-world testable release; green CI is not release readiness.
+- Do not merge the development branch wholesale into `main`.
 
-The isolated Restore service and transaction/recovery executors remain unwired to Wails, GUI, CLI and startup. Restore remains disabled. Do not add the startup coordinator or user-facing Restore until the complete safety matrix and real-host/provider gates are closed.
+### 2026-11-19 scheduled follow-up
 
-The 2026-11-16 first-testable target was missed. The repository is not yet a real-world testable release. CI green is not release readiness, and no wholesale merge to `main` is authorized.
+- Re-read the active plan pointer, task plan, progress log, system/security architecture, Restore lifecycle/executor contracts, desktop host runbook, Wails composition root, AppService, StoreController, both Restore executors and all four workflow definitions.
+- Verified the branch ref directly at `a6bc860`, compared it with `main` (969 ahead / 0 behind), and checked current Actions runs and open PRs. No active runs or open PRs exist.
+- Inspected the latest Root CI run `44327310346`, both job summaries and both complete job logs. Ubuntu and Windows passed; the Windows-only skip was the Linux race detector. Both Python suites passed 22 tests, architecture checks passed, and the Markdown checker passed 48 files.
+- Inspected cancelled run `44327300037`; both jobs were cancelled during setup after a newer push superseded that run. No validation step failed.
+- Reconfirmed the 16/16 production-code matrix is tied to `f009035`. No application or Restore executor source changed in the nine commits after that code/test head.
+- The active plan was stale at `78cfcfc`; this update synchronizes its branch tip and exact-head CI evidence with `a6bc860`.
+- No desktop host is attached to this execution. Linux WebKit sandbox and actual-state-filesystem qualification, plus Windows WebView2/NTFS/ACL qualification, remain the immediate blocker. Do not skip this gate or substitute CI.
+- Restore remains disabled/unwired; `main` remains untouched.
 
 Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.
 
