@@ -2214,3 +2214,21 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - After host/provider qualification, proceed to installer/upgrade/uninstall safety and explicit manual Journal export/retention before the 256-record / 1 MiB cap. Revalidate the live Colab/model/SSE flow and current Colab Free policy before enabling remote inference.
 - Corrected the stale current-status block in `task_plan.md` from the previously recorded `78cfcfc` to the verified `a6bc860`, and synchronized exact CI/ahead-count evidence.
 - No application code changed, no local desktop test was run, no merge or force-push occurred, and `main` was not modified.
+
+
+
+## 2026-11-19 — diagnose and repair task-plan Markdown link regression
+
+### Failure evidence
+- Repair-predecessor commit: [`4413768`](https://github.com/SoufianoDev/OhMyFreeAI/commit/44137688c57d061ebc36c8a3c21c880cb70d2d0b).
+- Root CI [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) completed with **0/2 jobs successful**. Ubuntu job `135387413759` and Windows job `135387413589` both failed at the same final step, `Check repository-local Markdown links`.
+- Downloaded both job logs and inspected step summaries. Both report: `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md:40` points to `../docs/architecture/DESKTOP_BUILD.md`, which does not exist.
+- Root cause is the relative path depth: `task_plan.md` is nested under `.planning/2026-11-07-ohmyfreeai-foundation`; one `..` reaches `.planning`, not the repository root. The correct link is `../../docs/architecture/DESKTOP_BUILD.md`.
+- All earlier validation steps passed on both platforms: Go vet/tests/build, Python 22/22, frontend syntax and architecture checks; Ubuntu race detection also passed. The Markdown check was the only failed step.
+
+### Repair
+- Corrected the task-plan link to `../../docs/architecture/DESKTOP_BUILD.md`.
+- Added a focused regression test to `tests/test_docs_check.py` that checks both a valid root-relative target and rejection of the same target with one parent-directory segment missing.
+- No change was made to the Markdown checker because its path resolution behaved correctly and exposed the documentation error.
+- Exact-head CI for the repair is pending; record success only after Ubuntu and Windows jobs and logs complete.
+- Restore remains disabled/unwired. No application or Restore executor code changed, and `main` was not modified.

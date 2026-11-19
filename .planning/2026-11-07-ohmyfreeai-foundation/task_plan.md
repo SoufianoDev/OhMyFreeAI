@@ -6,21 +6,20 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Verified repository state — 2026-11-19:**
-- Current branch: `foundation/bootstrap`.
-- Current branch tip: [`a6bc860`](https://github.com/SoufianoDev/OhMyFreeAI/commit/a6bc86022289a73a57b9ecbba85a472796734698), `docs(progress): record current CI and StoreController recheck`.
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison is **969 commits ahead / 0 behind**.
-- No open PRs and no queued, in-progress, waiting or pending Actions runs were returned.
-- The latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`. The nine commits after it change CI/documentation/developer tooling and add the local Markdown checker; they do not change the application or Restore executor source.
-- The current branch tip is documentation/progress-only after the docs-check tooling. Do not confuse the latest branch tip with the latest application-code head.
+**Verified repository state before this repair — 2026-11-19:**
+- Branch: `foundation/bootstrap`, inspected at [`4413768`](https://github.com/SoufianoDev/OhMyFreeAI/commit/44137688c57d061ebc36c8a3c21c880cb70d2d0b).
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison before this repair was **970 commits ahead / 0 behind**.
+- No open PRs or active Actions runs remain after the failed documentation check.
+- Latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`. The commits after it affect CI, planning/docs and developer documentation-check tooling; they do not change application or Restore executor source.
 
-**Latest exact-head CI:**
-- Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346) on `a6bc860`: **2/2 jobs successful**.
-- Ubuntu job `134882000609`: Go vet, Go tests, race detector, Go build, Python tests, frontend syntax, architecture checks and local Markdown link validation all passed.
-- Windows job `134882000179`: Go vet/tests/build, Python tests, frontend syntax, architecture checks and local Markdown link validation all passed; only the Linux-specific race step was skipped.
-- Both job logs report the local Markdown link check passing for 48 files. Python discovery completed successfully (22 tests on each OS).
-- Run [44327300037](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327300037) on parent `387de2f` was cancelled during job setup when the next push superseded it. Both jobs were cancelled before validation steps; this is not a test failure.
-- The historical Windows docs-check failure [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) remains fixed by `0a542ec`; its exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed 2/2.
+**Latest exact-head CI and regression diagnosis:**
+- Root CI [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) on `4413768`: **0/2 jobs successful**. Ubuntu and Windows both failed only at `Check repository-local Markdown links`.
+- Both job logs identify the same bad target at `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md:40`: `../docs/architecture/DESKTOP_BUILD.md`.
+- Root cause: the Markdown file is two directories below the repository root, so `../docs` resolves inside `.planning`. The correct relative path is `../../docs/architecture/DESKTOP_BUILD.md`.
+- All preceding steps passed on both platforms: Go vet/tests/build, Python 22/22, frontend syntax and architecture checks; Ubuntu race detection also passed.
+- The repair changes that link and adds a focused nested-planning-path regression test. Exact-head CI for the repair is pending.
+- The preceding head `a6bc860` passed Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346), 2/2. Run [44327300037](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327300037) was cancelled during setup after a newer push superseded it; it was not a test failure.
+- The historical Windows Markdown-check issue [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) was fixed in `0a542ec`; exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed 2/2.
 
 **Application-code matrix (exact head attribution):**
 - The four-workflow matrix on `f009035` passed **16/16**:
@@ -28,7 +27,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
   - SQLite driver evaluation [43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316): 4/4.
   - Wails platform proof [43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477): 2/2.
   - Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8.
-- This 16/16 result belongs to `f009035`, not to later documentation-only commits.
+- This matrix belongs to `f009035`, not to later documentation/tooling commits.
 
 **Current gate — real-host qualification:**
 1. Run the Linux desktop executable in a normal logged-in desktop session with WebKit sandboxing enabled; collect WebKit process, namespace and Seccomp evidence.
@@ -37,7 +36,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 4. Only after host/provider evidence, proceed to installer/upgrade/uninstall design and explicit Journal export/retention before the 256-record / 1 MiB fail-closed cap.
 5. Revalidate the live Colab/model/SSE path and current Colab Free policy before enabling remote inference.
 
-The exact procedures are in [DESKTOP_BUILD.md](../docs/architecture/DESKTOP_BUILD.md). This execution has GitHub access but no attached Linux or Windows desktop session, so these host checks cannot be performed here. CI/Xvfb cannot substitute for the Linux sandbox test because the CI smoke disables WebKit sandboxing inside its child process.
+The exact procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.md). This execution has GitHub access but no attached Linux or Windows desktop session, so host checks cannot be performed here. CI/Xvfb cannot substitute for Linux sandbox qualification because the CI smoke disables WebKit sandboxing inside its child process.
 
 **Safety and release status:**
 - Restore transaction/recovery executors and the application service remain isolated and unwired to Wails, GUI, CLI and startup recovery.
@@ -45,16 +44,16 @@ The exact procedures are in [DESKTOP_BUILD.md](../docs/architecture/DESKTOP_BUIL
 - The 2026-11-16 target was missed. The repository is not a real-world testable release; green CI is not release readiness.
 - Do not merge the development branch wholesale into `main`.
 
-### 2026-11-19 scheduled follow-up
+### 2026-11-19 scheduled follow-up and CI repair
 
 - Re-read the active plan pointer, task plan, progress log, system/security architecture, Restore lifecycle/executor contracts, desktop host runbook, Wails composition root, AppService, StoreController, both Restore executors and all four workflow definitions.
-- Verified the branch ref directly at `a6bc860`, compared it with `main` (969 ahead / 0 behind), and checked current Actions runs and open PRs. No active runs or open PRs exist.
-- Inspected the latest Root CI run `44327310346`, both job summaries and both complete job logs. Ubuntu and Windows passed; the Windows-only skip was the Linux race detector. Both Python suites passed 22 tests, architecture checks passed, and the Markdown checker passed 48 files.
-- Inspected cancelled run `44327300037`; both jobs were cancelled during setup after a newer push superseded that run. No validation step failed.
-- Reconfirmed the 16/16 production-code matrix is tied to `f009035`. No application or Restore executor source changed in the nine commits after that code/test head.
-- The active plan was stale at `78cfcfc`; this update synchronizes its branch tip and exact-head CI evidence with `a6bc860`.
-- No desktop host is attached to this execution. Linux WebKit sandbox and actual-state-filesystem qualification, plus Windows WebView2/NTFS/ACL qualification, remain the immediate blocker. Do not skip this gate or substitute CI.
+- Verified the branch at `4413768`, compared it with `main` (970 ahead / 0 behind), and checked Actions and open PRs. No concurrent workflow or PR remained when this repair began.
+- Inspected both failed jobs and logs from `44473206705`. The only failing step on Ubuntu and Windows was the local Markdown link check; both logs report the same incorrect relative link at task-plan line 40.
+- Corrected the relative link to `../../docs/architecture/DESKTOP_BUILD.md` and added a regression test for relative-link resolution from a nested `.planning` document. The checker itself was correct; no production-code change is required.
+- Exact-head CI for the repair is pending. Do not mark it green until both OS jobs and their logs complete successfully.
+- The immediate project gate remains real-host Linux/Windows qualification. No desktop host is attached to this execution; do not substitute CI for the sandbox/provider tests.
 - Restore remains disabled/unwired; `main` remains untouched.
+
 
 Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.
 

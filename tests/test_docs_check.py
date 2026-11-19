@@ -32,6 +32,20 @@ class MarkdownLinkCheckTests(unittest.TestCase):
 
         self.assertEqual(find_broken_local_links(self.root), [])
 
+    def test_resolves_links_from_nested_planning_documents(self) -> None:
+        self.write("docs/architecture/DESKTOP_BUILD.md", "# Desktop build\\n")
+        self.write(
+            ".planning/2026-11-07-ohmyfreeai-foundation/task_plan.md",
+            "[valid](../../docs/architecture/DESKTOP_BUILD.md)\\n"
+            "[too-shallow](../docs/architecture/DESKTOP_BUILD.md)\\n",
+        )
+
+        errors = find_broken_local_links(self.root)
+
+        self.assertEqual(len(errors), 1)
+        self.assertIn(".planning/2026-11-07-ohmyfreeai-foundation/task_plan.md:2", errors[0])
+        self.assertIn("../docs/architecture/DESKTOP_BUILD.md", errors[0])
+
     def test_reports_missing_local_target_with_source_line(self) -> None:
         self.write("docs/guide.md", "# Guide\n\n[missing](not-here.md)\n")
 
