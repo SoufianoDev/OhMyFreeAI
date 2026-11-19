@@ -6,28 +6,24 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Verified repository state before this repair — 2026-11-19:**
-- Branch: `foundation/bootstrap`, inspected at [`4413768`](https://github.com/SoufianoDev/OhMyFreeAI/commit/44137688c57d061ebc36c8a3c21c880cb70d2d0b).
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison before this repair was **970 commits ahead / 0 behind**.
-- No open PRs or active Actions runs remain after the failed documentation check.
-- Latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`. The commits after it affect CI, planning/docs and developer documentation-check tooling; they do not change application or Restore executor source.
+**Verified repository state before the second CI correction — 2026-11-19:**
+- Branch: `foundation/bootstrap`, inspected at [`ce63777`](https://github.com/SoufianoDev/OhMyFreeAI/commit/ce63777893000160b69a2ff7f6fff550877c6620).
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison before this correction was **971 commits ahead / 0 behind**.
+- No open PRs or active Actions runs remain after the failed test run.
+- Latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`; no application or Restore executor source changed in the documentation/test-tooling follow-ups.
 
-**Latest exact-head CI and regression diagnosis:**
-- Root CI [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) on `4413768`: **0/2 jobs successful**. Ubuntu and Windows both failed only at `Check repository-local Markdown links`.
-- Both job logs identify the same bad target at `.planning/2026-11-07-ohmyfreeai-foundation/task_plan.md:40`: `../docs/architecture/DESKTOP_BUILD.md`.
-- Root cause: the Markdown file is two directories below the repository root, so `../docs` resolves inside `.planning`. The correct relative path is `../../docs/architecture/DESKTOP_BUILD.md`.
-- All preceding steps passed on both platforms: Go vet/tests/build, Python 22/22, frontend syntax and architecture checks; Ubuntu race detection also passed.
-- The repair changes that link and adds a focused nested-planning-path regression test. Exact-head CI for the repair is pending.
-- The preceding head `a6bc860` passed Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346), 2/2. Run [44327300037](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327300037) was cancelled during setup after a newer push superseded it; it was not a test failure.
-- The historical Windows Markdown-check issue [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) was fixed in `0a542ec`; exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed 2/2.
+**Latest CI and failure diagnosis:**
+- Root CI [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) on `ce63777`: **0/2 jobs successful**. Ubuntu and Windows both failed only at `Run Python tests`.
+- The new nested-planning-link regression test used Python source strings containing a literal escaped backslash-plus-`n` (`\\n`) instead of the newline escape (`\n`). The fixture therefore became one physical Markdown line, while the assertion expected the invalid second link on line 2.
+- The test source is corrected to use one backslash newline escape. The production link remains corrected to `../../docs/architecture/DESKTOP_BUILD.md`.
+- All Go vet/tests/build steps, Ubuntu race detection, frontend syntax and architecture checks passed in run `44473684482`. The Python suite reported 23 tests with exactly one failing assertion.
+- The preceding Root CI [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) failed both platforms only at the Markdown link check because the plan link was one directory too shallow. Both job logs were inspected; the root cause was corrected in `ce63777`.
+- Exact-head CI for the newline-fixture correction is pending. Do not mark it green until both OS jobs and logs complete.
 
-**Application-code matrix (exact head attribution):**
-- The four-workflow matrix on `f009035` passed **16/16**:
-  - Root CI [43975095320](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095320): 2/2.
-  - SQLite driver evaluation [43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316): 4/4.
-  - Wails platform proof [43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477): 2/2.
-  - Linux distribution compatibility [43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377): 8/8.
-- This matrix belongs to `f009035`, not to later documentation/tooling commits.
+**Previously verified evidence:**
+- Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346) on `a6bc860`: 2/2 successful.
+- The four-workflow application-code matrix on `f009035` passed 16/16: Root 2/2, SQLite driver evaluation 4/4, Wails 2/2 and Linux distributions 8/8. These results belong to `f009035`, not later docs/test-tooling commits.
+- The historical Windows Markdown-check failure [44036002961](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036002961) was fixed in `0a542ec`; exact-head rerun [44036490984](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44036490984) passed 2/2.
 
 **Current gate — real-host qualification:**
 1. Run the Linux desktop executable in a normal logged-in desktop session with WebKit sandboxing enabled; collect WebKit process, namespace and Seccomp evidence.
@@ -44,15 +40,13 @@ The exact procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_B
 - The 2026-11-16 target was missed. The repository is not a real-world testable release; green CI is not release readiness.
 - Do not merge the development branch wholesale into `main`.
 
-### 2026-11-19 scheduled follow-up and CI repair
+### 2026-11-19 scheduled follow-up and second CI correction
 
-- Re-read the active plan pointer, task plan, progress log, system/security architecture, Restore lifecycle/executor contracts, desktop host runbook, Wails composition root, AppService, StoreController, both Restore executors and all four workflow definitions.
-- Verified the branch at `4413768`, compared it with `main` (970 ahead / 0 behind), and checked Actions and open PRs. No concurrent workflow or PR remained when this repair began.
-- Inspected both failed jobs and logs from `44473206705`. The only failing step on Ubuntu and Windows was the local Markdown link check; both logs report the same incorrect relative link at task-plan line 40.
-- Corrected the relative link to `../../docs/architecture/DESKTOP_BUILD.md` and added a regression test for relative-link resolution from a nested `.planning` document. The checker itself was correct; no production-code change is required.
-- Exact-head CI for the repair is pending. Do not mark it green until both OS jobs and their logs complete successfully.
-- The immediate project gate remains real-host Linux/Windows qualification. No desktop host is attached to this execution; do not substitute CI for the sandbox/provider tests.
-- Restore remains disabled/unwired; `main` remains untouched.
+- Re-read the active plan, progress log, architecture/Restore contracts, host runbook, Wails composition and current workflow definitions.
+- Inspected both job logs for `44473684482`. The sole failure was the newly added regression test's line-number assertion; both platforms reported the invalid link on line 1 because the fixture contained literal backslash-`n` characters.
+- Corrected the Python test source to use newline escapes so the two Markdown links occupy separate lines. The production Markdown checker and its path resolution are unchanged.
+- The previous link-path failure in `44473206705` is fixed; the corrected link is now `../../docs/architecture/DESKTOP_BUILD.md`.
+- The exact-head rerun is pending. No Restore code or production application code changed; Restore remains disabled/unwired and `main` remains untouched.
 
 
 Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.

@@ -2232,3 +2232,16 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - No change was made to the Markdown checker because its path resolution behaved correctly and exposed the documentation error.
 - Exact-head CI for the repair is pending; record success only after Ubuntu and Windows jobs and logs complete.
 - Restore remains disabled/unwired. No application or Restore executor code changed, and `main` was not modified.
+
+
+
+## 2026-11-19 — second CI diagnosis: regression fixture newline escaping
+
+- Exact predecessor commit: [`ce63777`](https://github.com/SoufianoDev/OhMyFreeAI/commit/ce63777893000160b69a2ff7f6fff550877c6620).
+- Root CI [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) completed with **0/2 jobs successful**. Ubuntu job `135388984468` and Windows job `135388984182` both failed in `Run Python tests`.
+- Inspected both job logs. Each reports the new `test_resolves_links_from_nested_planning_documents` failing because it expected the bad link at line 2, but the fixture was written as one line.
+- Root cause: the generated Python test source contained two backslashes before `n`, producing a literal backslash-`n` in the fixture instead of a newline. This was a test-authoring error, not a Markdown-checker defect.
+- Corrected the test source to use Python's newline escape (one backslash in source). The regression still verifies that `../../docs/architecture/DESKTOP_BUILD.md` resolves and `../docs/architecture/DESKTOP_BUILD.md` is rejected on the next line.
+- The production link correction from the previous repair remains in place. No checker or application implementation change was made.
+- Exact-head CI for this correction is pending; both OS jobs and logs must pass before closing the regression.
+- Restore remains disabled/unwired; `main` was not modified.
