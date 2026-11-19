@@ -2281,3 +2281,27 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - No application or Restore executor source changed in this repair sequence. Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery.
 - The next required evidence remains real-host Linux WebKit sandbox and actual state-filesystem qualification, followed by real Windows WebView2 and fixed-local-NTFS/ACL qualification. No such desktop host is attached to this execution.
 - No merge, force-push, Restore enablement or destructive cleanup occurred.
+
+## 2026-11-19 — follow-up: reconcile current branch head and close documentation CI regressions
+
+### Starting state and review
+- Resolved `.planning/.active_plan` to `2026-11-07-ohmyfreeai-foundation`; re-read its `task_plan.md` and `progress.md`.
+- Rechecked the `foundation/bootstrap` branch at [`eb9b10e`](https://github.com/SoufianoDev/OhMyFreeAI/commit/eb9b10e7710cea8490fa68e49bd2c320fa5ad9f8), `main` at `a1b12fbe5dd854c4619463eb1c7cccc0bd951941), and the compare result: **974 ahead / 0 behind**.
+- GitHub returned no open PRs and no active or queued Actions runs before this checkpoint.
+- Re-read `SYSTEM_ARCHITECTURE.md`, `SECURITY_ARCHITECTURE.md`, `RESTORE_LIFECYCLE.md`, `RESTORE_RECOVERY_EXECUTOR.md`, `DESKTOP_BUILD.md`, `desktop-src/main.go.tmpl`, `desktop-src/app_service.go.tmpl`, and `.github/workflows/ci.yml`.
+- Compared `f009035` with `eb9b10e`: 14 commits / 8 changed files, limited to CI, planning/progress, desktop/Restore documentation, and Markdown-link tooling/tests. No application Go source or Restore executor source changed.
+
+### CI failure diagnosis and closure
+- Opened the failed Ubuntu and Windows job logs for [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705). Both failed only in the repository-local Markdown link check because the nested task plan used `../docs/architecture/DESKTOP_BUILD.md` instead of `../../docs/architecture/DESKTOP_BUILD.md`.
+- Opened both job logs for [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) and [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192). Both runs failed in the new Python regression test because the fixture encoded literal backslash-`n` text instead of two physical Markdown lines. The final test correction in `e41d41f` constructs line breaks with `chr(10)`.
+- Verified [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) on `e41d41f`: Ubuntu and Windows **2/2 successful**.
+- Verified the current branch-head run [44475265849](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44475265849) on `eb9b10e`: Ubuntu job `135394161960` and Windows job `135394162431` both succeeded (**2/2**). Both logs show Python **23/23**, architecture checks, and 48 Markdown files checked. Ubuntu race detection passed; Windows skipped only the Linux-specific race step.
+- The failures are retained in this log with their causes and closure; no failing run was re-labelled as successful.
+
+### Restore and release gate
+- Confirmed `desktop-src/main.go.tmpl` and `desktop-src/app_service.go.tmpl` do not register or expose Restore. The transaction/recovery executors and application Restore service remain isolated; no GUI, CLI, or startup recovery path was added.
+- Rechecked the documented no-replace/no-follow, post-move identity verification, rollback/quarantine retention, Linux directory-sync boundary, and Windows fixed-local-NTFS/persistent-ACL restriction. No Restore safety condition was relaxed.
+- The runbook requires ordinary logged-in desktop sessions. This execution has no attached Linux/Windows desktop or self-hosted runner, so no real-host WebKit sandbox, WebView2, actual state-filesystem, or ACL result is claimed. Xvfb/container CI is not a substitute.
+- Next action remains real-host qualification: Linux WebKit sandbox and application-state filesystem first, then Windows WebView2 and fixed-local-NTFS/ACL. Installer/upgrade/uninstall, manual Journal export/retention, and live Colab/model/SSE policy revalidation remain subsequent gates.
+- No application code changed, Restore remains disabled/unwired, and `main` remains untouched. This checkpoint updates only the plan and progress evidence.
+
