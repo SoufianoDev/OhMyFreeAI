@@ -2245,3 +2245,16 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - The production link correction from the previous repair remains in place. No checker or application implementation change was made.
 - Exact-head CI for this correction is pending; both OS jobs and logs must pass before closing the regression.
 - Restore remains disabled/unwired; `main` was not modified.
+
+
+
+## 2026-11-19 — third CI diagnosis: make nested-link fixture line breaks unambiguous
+
+- Exact predecessor commit: [`3be3630`](https://github.com/SoufianoDev/OhMyFreeAI/commit/3be36304c468b23ba431f9b798148b7da1c4fe15).
+- Root CI [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) completed with **0/2 jobs successful**. Ubuntu job `135390699982` and Windows job `135390700486` both failed in `Run Python tests`.
+- Downloaded and inspected both job logs. The sole failing test was `test_resolves_links_from_nested_planning_documents`; both logs show the intentionally invalid link reported on line 1, while the test expected line 2.
+- Root cause: a second escaping layer left two backslashes before `n` in the generated Python source, so the fixture contained literal backslash-`n` text rather than a line break.
+- Replaced the fixture's newline construction with `chr(10)`. This avoids nested string-escaping ambiguity while retaining the valid-path and too-shallow-path assertions.
+- The production task-plan link remains `../../docs/architecture/DESKTOP_BUILD.md`. The Markdown checker itself is unchanged.
+- Exact-head CI for this correction is pending; do not close the regression until Ubuntu and Windows tests and the final docs-check step pass.
+- Restore remains disabled/unwired; no application or Restore executor source changed, and `main` was not modified.

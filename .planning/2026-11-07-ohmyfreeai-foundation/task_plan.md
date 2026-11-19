@@ -6,19 +6,19 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Verified repository state before the second CI correction — 2026-11-19:**
-- Branch: `foundation/bootstrap`, inspected at [`ce63777`](https://github.com/SoufianoDev/OhMyFreeAI/commit/ce63777893000160b69a2ff7f6fff550877c6620).
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison before this correction was **971 commits ahead / 0 behind**.
+**Verified repository state before the third test-fixture correction — 2026-11-19:**
+- Branch: `foundation/bootstrap`, inspected at [`3be3630`](https://github.com/SoufianoDev/OhMyFreeAI/commit/3be36304c468b23ba431f9b798148b7da1c4fe15).
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison before this correction was **972 commits ahead / 0 behind**.
 - No open PRs or active Actions runs remain after the failed test run.
 - Latest application/Restore implementation and test head remains `f0090357767bfad20ffa452ba1289e9d47556dfa`; no application or Restore executor source changed in the documentation/test-tooling follow-ups.
 
 **Latest CI and failure diagnosis:**
-- Root CI [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) on `ce63777`: **0/2 jobs successful**. Ubuntu and Windows both failed only at `Run Python tests`.
-- The new nested-planning-link regression test used Python source strings containing a literal escaped backslash-plus-`n` (`\\n`) instead of the newline escape (`\n`). The fixture therefore became one physical Markdown line, while the assertion expected the invalid second link on line 2.
-- The test source is corrected to use one backslash newline escape. The production link remains corrected to `../../docs/architecture/DESKTOP_BUILD.md`.
-- All Go vet/tests/build steps, Ubuntu race detection, frontend syntax and architecture checks passed in run `44473684482`. The Python suite reported 23 tests with exactly one failing assertion.
-- The preceding Root CI [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) failed both platforms only at the Markdown link check because the plan link was one directory too shallow. Both job logs were inspected; the root cause was corrected in `ce63777`.
-- Exact-head CI for the newline-fixture correction is pending. Do not mark it green until both OS jobs and logs complete.
+- Root CI [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) on `3be3630`: **0/2 jobs successful**. Ubuntu and Windows both failed only at `Run Python tests`.
+- Both job logs confirm the nested-planning-path regression test still wrote the fixture as one physical line. The attempted correction retained two backslashes in the generated Python source, so the test wrote a literal backslash-`n` rather than a newline.
+- The test fixture is now changed to build line breaks with `chr(10)`, avoiding another escaping layer. The test still asserts that the correct `../../docs/architecture/DESKTOP_BUILD.md` target resolves and the too-shallow `../docs/architecture/DESKTOP_BUILD.md` target is rejected on line 2.
+- The production Markdown link remains corrected to `../../docs/architecture/DESKTOP_BUILD.md`.
+- All other steps passed in `44474211192`: Go vet/tests/build, Ubuntu race detection, frontend syntax and architecture checks. Python reported 23 tests with one failing regression assertion.
+- The earlier link-path failure [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) was diagnosed and corrected; exact-head CI for the current fixture correction is pending.
 
 **Previously verified evidence:**
 - Root CI [44327310346](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44327310346) on `a6bc860`: 2/2 successful.
@@ -40,13 +40,12 @@ The exact procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_B
 - The 2026-11-16 target was missed. The repository is not a real-world testable release; green CI is not release readiness.
 - Do not merge the development branch wholesale into `main`.
 
-### 2026-11-19 scheduled follow-up and second CI correction
+### 2026-11-19 scheduled follow-up and test-fixture correction
 
-- Re-read the active plan, progress log, architecture/Restore contracts, host runbook, Wails composition and current workflow definitions.
-- Inspected both job logs for `44473684482`. The sole failure was the newly added regression test's line-number assertion; both platforms reported the invalid link on line 1 because the fixture contained literal backslash-`n` characters.
-- Corrected the Python test source to use newline escapes so the two Markdown links occupy separate lines. The production Markdown checker and its path resolution are unchanged.
-- The previous link-path failure in `44473206705` is fixed; the corrected link is now `../../docs/architecture/DESKTOP_BUILD.md`.
-- The exact-head rerun is pending. No Restore code or production application code changed; Restore remains disabled/unwired and `main` remains untouched.
+- Inspected both job logs for Root CI `44474211192`. The only failure on Ubuntu and Windows was `test_resolves_links_from_nested_planning_documents`; both logs show the fixture link on line 1 rather than line 2.
+- The previous source correction still emitted two backslashes before `n` because of nested JavaScript/Python escaping. Replaced newline escapes in the fixture with `chr(10)` so the test data is unambiguous.
+- The production Markdown checker and the corrected task-plan link are unchanged by this third correction.
+- Exact-head CI is pending. No application or Restore source changed. Restore remains disabled/unwired; `main` remains untouched.
 
 
 Older dated sections below are historical checkpoints. This current status supersedes earlier statements that the transaction/recovery executors, hard-link identity checks or application-level service were missing.

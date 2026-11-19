@@ -33,11 +33,13 @@ class MarkdownLinkCheckTests(unittest.TestCase):
         self.assertEqual(find_broken_local_links(self.root), [])
 
     def test_resolves_links_from_nested_planning_documents(self) -> None:
-        self.write("docs/architecture/DESKTOP_BUILD.md", "# Desktop build\\n")
+        self.write("docs/architecture/DESKTOP_BUILD.md", "# Desktop build" + chr(10))
         self.write(
             ".planning/2026-11-07-ohmyfreeai-foundation/task_plan.md",
-            "[valid](../../docs/architecture/DESKTOP_BUILD.md)\\n"
-            "[too-shallow](../docs/architecture/DESKTOP_BUILD.md)\\n",
+            "[valid](../../docs/architecture/DESKTOP_BUILD.md)"
+            + chr(10)
+            + "[too-shallow](../docs/architecture/DESKTOP_BUILD.md)"
+            + chr(10),
         )
 
         errors = find_broken_local_links(self.root)
