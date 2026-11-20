@@ -6,12 +6,14 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Verified repository state — 2026-11-20:**
-- Development branch: `foundation/bootstrap`; latest verified runbook/test head: [`c74ebe3`](https://github.com/SoufianoDev/OhMyFreeAI/commit/c74ebe328363435cb73c90ebe57c7f023da8ced2). The planning checkpoint below is documentation-only.
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison at `c74ebe3`: **978 commits ahead / 0 behind**.
-- No open pull requests or active/queued Actions runs at this check.
-- Exact-head Root CI [44688176145](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44688176145) on `c74ebe3`: **2/2 jobs successful**. Ubuntu job `136127408311` passed Go vet/tests/race/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. Windows job `136127408635` passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check; only the Linux-only race step was skipped as intended. Both complete logs and step summaries were inspected.
-- The full four-workflow application/Restore matrix remains attributed to source/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8 (16/16). Comparing `f009035` to `c74ebe3` shows 18 commits across CI, planning/progress, desktop/Restore documentation and Markdown/host-runbook tests; no application Go source or Restore executor source changed. Do not attribute the 16/16 matrix to `47ae9ce`.
+**Verified repository state — 2026-11-20 14:10 UTC:**
+- Development branch: `foundation/bootstrap`; current HEAD: [`3fbe081`](https://github.com/SoufianoDev/OhMyFreeAI/commit/3fbe081b6ccaecb742dca15306fb5536b9ddf2e2). This is a planning/progress-only checkpoint; the latest host-runbook/test code head remains `47ae9ce`.
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison: **979 commits ahead / 0 behind**.
+- No open pull requests or active/queued Actions runs were present at this check.
+- Requested historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee`: completed **2/2**. Ubuntu job `128543483467` and Windows job `128543483323` passed all 18 reported steps; both logs were fetched and inspected.
+- Previously pending Root CI [#44548049922](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44548049922) on `8bf53b3` has now completed **2/2** successfully; Ubuntu race passed and Windows skipped only the Linux-only race step.
+- Exact-head Root CI [#44688671452](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44688671452) on `3fbe081`: **2/2 jobs successful**. Ubuntu job `136128970519` passed Go vet/tests/race/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. Windows job `136128971797` passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check; only the Linux-only race step was skipped. Both complete logs and step summaries were inspected.
+- The full four-workflow application/Restore matrix remains attributed to source/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`: Root 2/2, SQLite driver evaluation 4/4, Wails 2/2, Linux distributions 8/8 (**16/16**). Comparing `f009035` to `3fbe081` shows 19 commits across CI, planning/progress, desktop/Restore documentation, Markdown tooling and host-runbook tests; no application Go source or Restore-executor source changed.
 
 **Current release gate — real-host qualification:**
 1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; collect process, namespace and Seccomp evidence.
@@ -26,6 +28,16 @@ The procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.m
 - Restore remains disabled. Do not add startup recovery or user-facing Restore before the full Linux/Windows safety matrix and host/provider gates are closed.
 - The 2026-11-16 target was missed. Green CI is not release readiness; the repository is not yet a real-world testable release.
 - Do not merge the development branch wholesale into `main`.
+
+### 2026-11-20 scheduled follow-up — historical CI and StoreController recheck
+
+- Rechecked historical Root CI `42419106009` on `f5396ee`: Ubuntu and Windows both completed successfully; all 18 steps per job passed and both logs were inspected.
+- Confirmed the previously pending run `44548049922` later completed successfully on Ubuntu and Windows.
+- Verified exact branch-head Root CI `44688671452` on `3fbe081`: 2/2 jobs passed; Python 27/27 on both; Ubuntu race passed; Windows skipped only the Linux-specific race step. Both full logs and job step lists were inspected.
+- Re-reviewed StoreController and all 16 tests, Wails composition root, AppService, configuration repository, backup lease and archive-publication drain test. The requested integration stage is complete; no duplicate implementation was added.
+- No application source changed. Current branch is 979 ahead / 0 behind `main`; no open PRs or active Actions runs were present at the check.
+- Real Linux WebKit sandbox and Windows WebView2/NTFS/ACL host qualification remains blocked because no desktop hosts are attached. No live Colab Free runtime is attached either. No result is inferred from GitHub CI.
+- Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery. No merge, force-push or main modification occurred.
 
 ### 2026-11-20 scheduled follow-up — host runbook safety correction verified
 

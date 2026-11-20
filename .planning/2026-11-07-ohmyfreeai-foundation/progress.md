@@ -2373,3 +2373,38 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Windows passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file Markdown link check; only the Linux-only race step was skipped.
 - Both complete logs and step summaries were inspected. No active workflow remained after completion.
 - `c74ebe3` itself changed only the active plan/progress records; the host runbook and regression tests were already verified on `47ae9ce`.
+
+
+## 2026-11-20 14:10 UTC — exact-head CI and StoreController continuation
+
+### Requested historical workflow
+- Rechecked Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) through the GitHub connector. It is completed with conclusion `success` on `f5396ee592b9b9756779f67aeabd6d7167520c40`, branch `foundation/bootstrap`.
+- Ubuntu job `128543483467` and Windows job `128543483323` both completed successfully. Every one of the 18 reported steps succeeded on each job. Both job logs were fetched; Go vet/tests/build and Python **15/15** passed, with no failure markers.
+- This historical result is not being used as evidence for later commits.
+
+### Previously pending run resolved
+- The run previously reported as pending, [#44548049922](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44548049922) on `8bf53b3`, is now completed successfully.
+- Ubuntu job `135643895678` and Windows job `135643894904` both succeeded. Ubuntu race detection passed; Windows skipped only the Linux-specific race step. Both logs and step summaries were inspected.
+
+### Current branch-head CI
+- Current branch head: [`3fbe081`](https://github.com/SoufianoDev/OhMyFreeAI/commit/3fbe081b6ccaecb742dca15306fb5536b9ddf2e2).
+- Exact-head Root CI [#44688671452](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44688671452) targets that exact SHA and completed successfully, **2/2**:
+  - Ubuntu job `136128970519`: Go vet/tests/build and `go test -race ./...` passed; Python **27/27**; frontend syntax, architecture checks and the 48-file repository-local Markdown check passed.
+  - Windows job `136128971797`: Go vet/tests/build passed; Python **27/27**; frontend syntax, architecture checks and the 48-file repository-local Markdown check passed. The Linux-only race step was skipped as intended.
+- Both full job logs and step summaries were fetched. No failed step or error marker was found. No active/queued run appeared in the latest branch run list.
+- GitHub reports no open pull requests. `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; compare reports `foundation/bootstrap` **979 ahead / 0 behind**.
+
+### StoreController and integration review
+- Re-read `internal/infrastructure/sqlite/store_controller.go` and enumerated all **16** tests in `store_controller_test.go`: shared/exclusive drain, writer preference, cancellation, nil Store rejection, exclusive replacement, close/drain, verified replacement on error, fail-closed nil/panic handling, lease release on panic, concurrency stress, config round-trip and config Load/Save drain.
+- Re-read `desktop-src/main.go.tmpl`: Wails opens and migrates the Store before creating one Controller, passes that Controller to configuration and AppService, and closes through Controller with a bounded context. CLI backup opens only an existing database, wraps it in a Controller and closes through the same boundary.
+- Re-read `desktop-src/app_service.go.tmpl` and `internal/application/config/service.go`: AppService retains the Controller; configuration uses `ports.ConfigRepository`, implemented by Controller Load/Save under shared leases.
+- Re-read `internal/infrastructure/backup/archive.go` and `archive_controller_test.go`: `CreateWithStoreController` keeps one shared lease around archive creation and publication. `TestManagerCreateWithStoreControllerDrainsBeforeClose` verifies Close cannot finish while publication is blocked, then completes after release.
+- The requested StoreController integration phase is complete. No duplicate implementation was added.
+
+### Current gate and limitations
+- The latest code/test host-runbook commit remains `47ae9ce`; `3fbe081` is a planning/progress-only checkpoint. Comparing `f009035` to `3fbe081` shows 19 commits and no application Go or Restore-executor source changes; the intervening files are CI, planning, desktop/Restore documentation, Markdown tooling and host-runbook tests.
+- The corrected runbook and its four static regression tests are covered by the exact-head CI result above. This is not a real-host qualification.
+- This execution has no attached logged-in Linux desktop with WebKit sandbox enabled, no Windows desktop with WebView2/NTFS ACL access, and no live Google Colab Free runtime. No host/provider or live Colab result is claimed. Xvfb/container CI is not a substitute for WebKit sandbox qualification; Colab is not a desktop-host substitute.
+- Next action remains running the Linux host procedure on the actual GNOME/Wayland session and application-state filesystem, then Windows WebView2 on fixed local NTFS with persistent ACL evidence. Only after those gates should installer/upgrade/uninstall and explicit journal export/retention be continued, followed by live Colab/model/SSE/Free-policy revalidation.
+- Existing transaction/recovery components remain isolated. No new Restore wiring, startup recovery, GUI/CLI Restore entry point or Restore UI was added. Restore remains disabled. No application code changed in this checkpoint; no local tests were run.
+
