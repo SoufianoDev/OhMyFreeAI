@@ -2361,6 +2361,6 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Restore remains disabled/unwired. No production source, ACL/DACL rule, no-follow check, no-replace primitive or `main` file was changed.
 
 ### Verification status
-- Exact-head CI is pending for the runbook and regression-test change. Update this log with the completed Ubuntu/Windows job IDs and results after inspecting the new run.
+- Exact-head CI [44687796181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44687796181) on `47ae9ce` completed successfully: Ubuntu job `136126161265` and Windows job `136126160901` both passed (2/2). Both logs and step lists were inspected. Go vet/tests/build passed on both; Ubuntu race detection passed; Windows skipped only that Linux-specific step; Python tests passed **27/27** on both; frontend syntax, architecture checks and 48-file local Markdown checks passed.
 - No real Linux or Windows desktop is attached to this execution; no WebKit sandbox, WebView2, actual filesystem-provider or host Restore result is claimed.
 - Next action after CI: execute the corrected Linux runbook on the real logged-in desktop, preserve output and any failed test directory, then perform Windows qualification. Do not proceed to installer/retention or enable Restore before those host gates close.

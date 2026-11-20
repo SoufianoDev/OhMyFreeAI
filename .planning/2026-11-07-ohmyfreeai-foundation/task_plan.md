@@ -7,12 +7,11 @@ Establish the verified architectural, repository, developer-tooling, and applica
 ## Next Step
 
 **Verified repository state — 2026-11-20:**
-- Development branch: `foundation/bootstrap`; current tip: [`8bf53b3`](https://github.com/SoufianoDev/OhMyFreeAI/commit/8bf53b3c05c3980d38dee3d25f27b728271ec0e1).
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison: **976 commits ahead / 0 behind**.
-- No open pull requests and no active or queued Actions runs at this check.
-- Latest exact-head Root CI [44548049922](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44548049922) targets `8bf53b3`: **2/2 jobs successful**. Ubuntu job `135643895678` passed Go vet/tests/race/build, Python tests, frontend syntax, architecture checks and the 48-file local Markdown check. Windows job `135643894904` passed the same except the Linux-only race step, which was skipped as intended. Both complete job logs and step lists were inspected.
-- The latest application/Restore source and full four-workflow matrix remain at `f0090357767bfad20ffa452ba1289e9d47556dfa`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8. Comparing `f009035` to `8bf53b3` shows 16 commits affecting only CI, planning/progress, desktop/Restore documentation, Markdown-link tooling and its tests; no application Go source or Restore executor source changed. Do not attribute the 16/16 matrix to `8bf53b3`.
-- The branch-head commit `8bf53b3` is a planning/progress checkpoint; the application implementation has not advanced since `f009035`.
+- Development branch: `foundation/bootstrap`; current tip: [`47ae9ce`](https://github.com/SoufianoDev/OhMyFreeAI/commit/47ae9cebca56ff1ed953d2256c9008d7d7c77980).
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison: **977 commits ahead / 0 behind**.
+- No open pull requests or active/queued Actions runs at this check.
+- Exact-head Root CI [44687796181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44687796181) on `47ae9ce`: **2/2 jobs successful**. Ubuntu job `136126161265` passed Go vet/tests/race/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. Windows job `136126160901` passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check; only the Linux-only race step was skipped as intended. Both complete logs and step summaries were inspected.
+- The full four-workflow application/Restore matrix remains attributed to source/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8 (16/16). Comparing `f009035` to `47ae9ce` shows 17 commits across CI, planning/progress, desktop/Restore documentation and Markdown/host-runbook tests; no application Go source or Restore executor source changed. Do not attribute the 16/16 matrix to `47ae9ce`.
 
 **Current release gate — real-host qualification:**
 1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; collect process, namespace and Seccomp evidence.
@@ -28,14 +27,14 @@ The procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.m
 - The 2026-11-16 target was missed. Green CI is not release readiness; the repository is not yet a real-world testable release.
 - Do not merge the development branch wholesale into `main`.
 
-### 2026-11-20 scheduled follow-up — host runbook safety review
+### 2026-11-20 scheduled follow-up — host runbook safety correction verified
 
-- Rechecked the branch ref, main ref, latest Actions runs, current job statuses, open pull requests and exact branch comparison.
-- Re-read the active plan pointer, task plan, progress log, system architecture, Restore lifecycle/executor contracts, desktop build runbook, Wails composition root and AppService.
-- Found a safety defect in the manual host runbook: Linux used an unconditional EXIT trap and Windows used unconditional `finally` cleanup, so a failed or interrupted qualification could delete the disposable directory containing ambiguous Restore test artifacts. The Windows PowerShell block also did not inspect `$LASTEXITCODE` after `go test`, allowing a failed filesystem test command to be followed by GUI checks.
-- Corrected both platforms to preserve the test directory on failure/interruption, permit cleanup only after successful qualification, and make Windows abort immediately on a non-zero Go test exit code. Added static regression tests for these runbook contracts.
-- Exact-head CI for the resulting change is pending; do not claim the runbook fix verified until Ubuntu and Windows complete.
-- No real desktop host is attached to this execution. The next external action remains the Linux host runbook, followed by Windows host qualification. Restore remains disabled/unwired; no merge or main modification is authorized.
+- Corrected the Linux EXIT handler and Windows `finally` cleanup so failed/interrupted host qualification preserves the disposable directory and any remaining journal/rollback/quarantine evidence.
+- Added an explicit Windows `$LASTEXITCODE` check after the native Go filesystem tests, preventing GUI launch from proceeding after a failed test command.
+- Added four static regression tests in `tests/test_host_qualification.py` for failure preservation, explicit Linux evidence acknowledgement, and Windows native exit-code handling.
+- Exact-head CI [44687796181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44687796181) completed successfully on `47ae9ce`: Ubuntu and Windows **2/2**; Python **27/27** on both; Ubuntu race detector passed; Windows skipped only the Linux-only race step. Both full job logs and step lists were inspected.
+- The runbook fix is verified by CI only. No real desktop host is attached, so Linux WebKit sandbox, Windows WebView2, actual state-filesystem/provider and host Restore results remain outstanding.
+- Next action is to run the corrected Linux host procedure, then Windows host qualification. Restore remains disabled/unwired; no merge or main modification occurred.
 
 ### 2026-11-19 scheduled follow-up — exact branch-head CI and StoreController review
 
