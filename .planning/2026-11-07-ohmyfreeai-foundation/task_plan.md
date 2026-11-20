@@ -7,11 +7,11 @@ Establish the verified architectural, repository, developer-tooling, and applica
 ## Next Step
 
 **Verified repository state — 2026-11-20:**
-- Development branch: `foundation/bootstrap`; current tip: [`47ae9ce`](https://github.com/SoufianoDev/OhMyFreeAI/commit/47ae9cebca56ff1ed953d2256c9008d7d7c77980).
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison: **977 commits ahead / 0 behind**.
+- Development branch: `foundation/bootstrap`; latest verified runbook/test head: [`c74ebe3`](https://github.com/SoufianoDev/OhMyFreeAI/commit/c74ebe328363435cb73c90ebe57c7f023da8ced2). The planning checkpoint below is documentation-only.
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison at `c74ebe3`: **978 commits ahead / 0 behind**.
 - No open pull requests or active/queued Actions runs at this check.
-- Exact-head Root CI [44687796181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44687796181) on `47ae9ce`: **2/2 jobs successful**. Ubuntu job `136126161265` passed Go vet/tests/race/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. Windows job `136126160901` passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check; only the Linux-only race step was skipped as intended. Both complete logs and step summaries were inspected.
-- The full four-workflow application/Restore matrix remains attributed to source/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8 (16/16). Comparing `f009035` to `47ae9ce` shows 17 commits across CI, planning/progress, desktop/Restore documentation and Markdown/host-runbook tests; no application Go source or Restore executor source changed. Do not attribute the 16/16 matrix to `47ae9ce`.
+- Exact-head Root CI [44688176145](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44688176145) on `c74ebe3`: **2/2 jobs successful**. Ubuntu job `136127408311` passed Go vet/tests/race/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. Windows job `136127408635` passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check; only the Linux-only race step was skipped as intended. Both complete logs and step summaries were inspected.
+- The full four-workflow application/Restore matrix remains attributed to source/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8 (16/16). Comparing `f009035` to `c74ebe3` shows 18 commits across CI, planning/progress, desktop/Restore documentation and Markdown/host-runbook tests; no application Go source or Restore executor source changed. Do not attribute the 16/16 matrix to `47ae9ce`.
 
 **Current release gate — real-host qualification:**
 1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; collect process, namespace and Seccomp evidence.
@@ -33,6 +33,7 @@ The procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.m
 - Added an explicit Windows `$LASTEXITCODE` check after the native Go filesystem tests, preventing GUI launch from proceeding after a failed test command.
 - Added four static regression tests in `tests/test_host_qualification.py` for failure preservation, explicit Linux evidence acknowledgement, and Windows native exit-code handling.
 - Exact-head CI [44687796181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44687796181) completed successfully on `47ae9ce`: Ubuntu and Windows **2/2**; Python **27/27** on both; Ubuntu race detector passed; Windows skipped only the Linux-only race step. Both full job logs and step lists were inspected.
+- The subsequent documentation-only planning checkpoint `c74ebe3` also passed exact-head Root CI [44688176145](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44688176145): Ubuntu job `136127408311` and Windows job `136127408635` both succeeded (2/2). Python passed 27/27 on each; Ubuntu race detection passed; Windows skipped only the Linux-specific race step. Both full logs were inspected.
 - The runbook fix is verified by CI only. No real desktop host is attached, so Linux WebKit sandbox, Windows WebView2, actual state-filesystem/provider and host Restore results remain outstanding.
 - Next action is to run the corrected Linux host procedure, then Windows host qualification. Restore remains disabled/unwired; no merge or main modification occurred.
 

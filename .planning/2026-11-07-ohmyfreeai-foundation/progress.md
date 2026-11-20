@@ -2364,3 +2364,12 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Exact-head CI [44687796181](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44687796181) on `47ae9ce` completed successfully: Ubuntu job `136126161265` and Windows job `136126160901` both passed (2/2). Both logs and step lists were inspected. Go vet/tests/build passed on both; Ubuntu race detection passed; Windows skipped only that Linux-specific step; Python tests passed **27/27** on both; frontend syntax, architecture checks and 48-file local Markdown checks passed.
 - No real Linux or Windows desktop is attached to this execution; no WebKit sandbox, WebView2, actual filesystem-provider or host Restore result is claimed.
 - Next action after CI: execute the corrected Linux runbook on the real logged-in desktop, preserve output and any failed test directory, then perform Windows qualification. Do not proceed to installer/retention or enable Restore before those host gates close.
+
+
+### Exact-head planning checkpoint verification
+- After recording the first green runbook/test result on `47ae9ce`, the planning/progress checkpoint `c74ebe3` triggered a second exact-head Root CI run.
+- [Run 44688176145](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44688176145) completed successfully: Ubuntu job `136127408311` and Windows job `136127408635`, **2/2**.
+- Ubuntu passed Go vet/tests/race/build, Python **27/27**, frontend syntax, architecture checks and the 48-file Markdown link check.
+- Windows passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file Markdown link check; only the Linux-only race step was skipped.
+- Both complete logs and step summaries were inspected. No active workflow remained after completion.
+- `c74ebe3` itself changed only the active plan/progress records; the host runbook and regression tests were already verified on `47ae9ce`.
