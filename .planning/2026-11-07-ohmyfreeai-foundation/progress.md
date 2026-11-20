@@ -2338,3 +2338,29 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - The next real gate is still host qualification: Linux desktop WebKit sandbox enabled in a normal logged-in session plus the actual application-state filesystem; then Windows WebView2 on fixed local NTFS with persistent ACLs and filesystem tests on that volume. This execution has no attached Linux/Windows desktop session or self-hosted runner, so none of those host results is claimed. GitHub/Xvfb CI is not a substitute.
 - After host qualification, continue installer/upgrade/uninstall safety and explicit manual journal export/retention before the 256-record / 1 MiB fail-closed cap, then revalidate the live Colab Free/model/SSE path.
 - Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery. Existing transaction/recovery components remain isolated; no Restore UI or activation was added. No merge, force-push or main modification occurred.
+
+
+## 2026-11-20 — host qualification runbook safety correction
+
+### Repository and CI recheck
+- Verified branch `foundation/bootstrap` at `8bf53b3c05c3980d38dee3d25f27b728271ec0e1`; `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison is 976 ahead / 0 behind.
+- No open pull requests or active/queued Actions runs were present before editing.
+- Latest exact-head run [44548049922](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44548049922) completed successfully, 2/2. Ubuntu job `135643895678` passed all steps including race detection; Windows job `135643894904` passed all steps and skipped only the Linux-specific race detector. Both logs were fetched and inspected.
+- The full four-workflow code matrix remains historical evidence on `f009035`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8. The 16 commits from `f009035` to `8bf53b3` affect CI, planning/progress, desktop/Restore documentation and Markdown tooling/tests only; no application Go or Restore executor source changed.
+
+### Safety defect found in the host runbook
+- Linux installed `trap 'rm -rf -- "$test_root"' EXIT`, which removed the disposable profile on both success and failure. A failed or interrupted Restore/no-replace test could therefore lose the remaining journal, rollback or quarantine evidence.
+- Windows unconditionally removed `$testRoot` in `finally`, with the same evidence-loss risk.
+- The Windows PowerShell block ran `go test` without checking `$LASTEXITCODE`; PowerShell does not reliably turn a native non-zero exit into a terminating exception by default. The GUI loop could continue after failed filesystem tests.
+
+### Changes made
+- Linux now initializes `qualification_passed=0`; the EXIT handler removes the test root only when the shell exits successfully and the operator explicitly sets the flag to `1` after both launches and sandbox/process evidence have been reviewed. Failure or interruption prints and preserves the directory path.
+- Linux Go test and desktop launch failures explicitly exit non-zero, leaving the directory intact.
+- Windows now checks the native `go test` exit code and throws before GUI launch on failure. Its `finally` block restores the original environment but removes the test root only after both launches pass; otherwise it prints a warning and preserves artifacts.
+- Added `tests/test_host_qualification.py` with regression checks for Linux success-only cleanup, explicit evidence acknowledgement, Windows native exit-code handling and failure preservation.
+- Restore remains disabled/unwired. No production source, ACL/DACL rule, no-follow check, no-replace primitive or `main` file was changed.
+
+### Verification status
+- Exact-head CI is pending for the runbook and regression-test change. Update this log with the completed Ubuntu/Windows job IDs and results after inspecting the new run.
+- No real Linux or Windows desktop is attached to this execution; no WebKit sandbox, WebView2, actual filesystem-provider or host Restore result is claimed.
+- Next action after CI: execute the corrected Linux runbook on the real logged-in desktop, preserve output and any failed test directory, then perform Windows qualification. Do not proceed to installer/retention or enable Restore before those host gates close.

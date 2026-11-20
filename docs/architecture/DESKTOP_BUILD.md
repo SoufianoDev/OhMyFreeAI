@@ -94,7 +94,7 @@ The current build script emits `dist/OhMyFreeAI` or `dist/OhMyFreeAI.exe`; it do
 
 ## Reproducible real-host qualification
 
-These checks must run on ordinary logged-in desktop sessions. Do not run them in GitHub Actions, Xvfb, containers, SSH-only sessions or as root. They use a disposable application profile nested under the real application-state directory, so the live user database is not opened or migrated. The disposable directory is removed after the commands finish.
+These checks must run on ordinary logged-in desktop sessions. Do not run them in GitHub Actions, Xvfb, containers, SSH-only sessions or as root. They use a disposable application profile nested under the real application-state directory, so the live user database is not opened or migrated. The test directory is removed only after every qualification check succeeds; on failure or interruption, preserve it for inspection because it may contain ambiguous Restore evidence.
 
 ### Linux desktop (GTK/WebKitGTK)
 
@@ -111,7 +111,16 @@ Then run from the repository root in the logged-in desktop session:
     test_root="$(mktemp -d "$state_root/.host-qualification.XXXXXX")"
     chmod 700 "$test_root"
     marker="$test_root/bridge.marker"
-    trap 'rm -rf -- "$test_root"' EXIT
+    qualification_passed=0
+    cleanup() {
+      status=$?
+      if [ "$status" -eq 0 ] && [ "$qualification_passed" -eq 1 ]; then
+        rm -rf -- "$test_root"
+      else
+        printf 'Qualification failed or was interrupted; preserving test artifacts at %s\n' "$test_root" >&2
+      fi
+    }
+    trap cleanup EXIT
 
     printf 'State filesystem:\n'
     findmnt -T "$state_root" -o TARGET,FSTYPE,OPTIONS
@@ -126,15 +135,21 @@ Then run from the repository root in the logged-in desktop session:
     done
     bwrap --version
 
-    TMPDIR="$test_root" go test ./internal/infrastructure/sqlite -run 'Restore|Journal|NoReplace' -count=1 -v
+    if ! TMPDIR="$test_root" go test ./internal/infrastructure/sqlite -run 'Restore|Journal|NoReplace' -count=1 -v; then
+      printf 'Restore/Journal/NoReplace host tests failed; preserving test artifacts at %s\n' "$test_root" >&2
+      exit 1
+    fi
 
     for attempt in 1 2; do
       rm -f -- "$marker"
       printf 'Close the OhMyFreeAI window after the bridge becomes ready (launch %s/2).\n' "$attempt"
-      env -u WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS \
+      if ! env -u WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS \
         XDG_CONFIG_HOME="$test_root" \
         OMFAI_WEBVIEW_SMOKE_MARKER="$marker" \
-        ./dist/OhMyFreeAI
+        ./dist/OhMyFreeAI; then
+        printf 'Desktop launch failed; preserving test artifacts at %s\n' "$test_root" >&2
+        exit 1
+      fi
       actual="$(cat "$marker" 2>/dev/null || true)"
       if [ "$actual" != "GetSnapshot success count=2" ]; then
         printf 'Expected two native bridge calls; got: %s\n' "$actual" >&2
@@ -163,7 +178,7 @@ Set `app_pid` and `webkit_pid` to the matching PIDs from that output, then captu
       echo 'PASS: WebKit sandbox-disable variable is absent'
     fi
 
-Record the namespace IDs and seccomp values; do not infer sandbox success merely from `bwrap` being installed. Preserve the full process listing and WebKit diagnostics for review.
+Record the namespace IDs and seccomp values for both launches; do not infer sandbox success merely from `bwrap` being installed. Preserve the full process listing and WebKit diagnostics for review. Only after both launches and all process/sandbox evidence have been reviewed successfully, set `qualification_passed=1` in the same shell that created `test_root`, then exit that shell to remove the disposable directory. If any check fails or the run is interrupted, leave the flag at `0`; the EXIT trap preserves the entire directory and prints its path. Do not manually delete a failed qualification directory until its artifacts have been reviewed.
 
 ### Windows desktop (WebView2 / NTFS)
 
@@ -207,13 +222,15 @@ Run the following in PowerShell from the repository root. It refuses non-local/n
     $oldTemp = $env:TEMP
     $oldTmp = $env:TMP
     $oldMarker = $env:OMFAI_WEBVIEW_SMOKE_MARKER
+    $qualificationPassed = $false
     try {
       $env:APPDATA = $testRoot
       $env:TEMP = $testRoot
       $env:TMP = $testRoot
       $env:OMFAI_WEBVIEW_SMOKE_MARKER = Join-Path $testRoot 'bridge.marker'
 
-      go test ./internal/infrastructure/sqlite -run 'Restore|Journal|NoReplace' -count=1 -v
+      & go test ./internal/infrastructure/sqlite -run 'Restore|Journal|NoReplace' -count=1 -v
+      if ($LASTEXITCODE -ne 0) { throw "Restore/Journal/NoReplace host tests failed with code $LASTEXITCODE" }
 
       for ($attempt = 1; $attempt -le 2; $attempt++) {
         Remove-Item -LiteralPath $env:OMFAI_WEBVIEW_SMOKE_MARKER -ErrorAction SilentlyContinue
@@ -223,13 +240,19 @@ Run the following in PowerShell from the repository root. It refuses non-local/n
         $actual = (Get-Content -Raw -LiteralPath $env:OMFAI_WEBVIEW_SMOKE_MARKER).Trim()
         if ($actual -ne 'GetSnapshot success count=2') { throw "Expected two native bridge calls; got: $actual" }
       }
+      $qualificationPassed = $true
     }
     finally {
       $env:APPDATA = $oldAppData
       $env:TEMP = $oldTemp
       $env:TMP = $oldTmp
       $env:OMFAI_WEBVIEW_SMOKE_MARKER = $oldMarker
-      Remove-Item -LiteralPath $testRoot -Recurse -Force
+      if ($qualificationPassed) {
+        Remove-Item -LiteralPath $testRoot -Recurse -Force
+      }
+      else {
+        Write-Warning "Qualification failed or was interrupted; preserving test artifacts at $testRoot"
+      }
     }
 
 Also record the Windows build number and the installed Microsoft Edge WebView2 Runtime version. The native GUI launch and two-call marker must succeed on both launches. This test does not qualify ReFS, SMB, removable or unknown providers; Restore must continue to fail closed on them.

@@ -6,49 +6,36 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Verified repository state — 2026-11-19, latest GitHub check:**
-- Development branch: foundation/bootstrap; current tip: [2bac200](https://github.com/SoufianoDev/OhMyFreeAI/commit/2bac200f6fa79f2cefe316157f924a0e42579d81).
-- main: a1b12fbe5dd854c4619463eb1c7cccc0bd951941; branch comparison: **975 commits ahead / 0 behind**.
-- No open pull requests and no active or queued Actions runs at the time of the check.
-- Latest application/Restore implementation and test head remains [f009035](https://github.com/SoufianoDev/OhMyFreeAI/commit/f0090357767bfad20ffa452ba1289e9d47556dfa). The 15 commits after it affect CI configuration, planning/progress, desktop/Restore documentation, Markdown-link tooling and its tests; no application Go source or Restore executor source changed.
+**Verified repository state — 2026-11-20:**
+- Development branch: `foundation/bootstrap`; current tip: [`8bf53b3`](https://github.com/SoufianoDev/OhMyFreeAI/commit/8bf53b3c05c3980d38dee3d25f27b728271ec0e1).
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison: **976 commits ahead / 0 behind**.
+- No open pull requests and no active or queued Actions runs at this check.
+- Latest exact-head Root CI [44548049922](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44548049922) targets `8bf53b3`: **2/2 jobs successful**. Ubuntu job `135643895678` passed Go vet/tests/race/build, Python tests, frontend syntax, architecture checks and the 48-file local Markdown check. Windows job `135643894904` passed the same except the Linux-only race step, which was skipped as intended. Both complete job logs and step lists were inspected.
+- The latest application/Restore source and full four-workflow matrix remain at `f0090357767bfad20ffa452ba1289e9d47556dfa`: Root 2/2, SQLite 4/4, Wails 2/2, Linux distributions 8/8. Comparing `f009035` to `8bf53b3` shows 16 commits affecting only CI, planning/progress, desktop/Restore documentation, Markdown-link tooling and its tests; no application Go source or Restore executor source changed. Do not attribute the 16/16 matrix to `8bf53b3`.
+- The branch-head commit `8bf53b3` is a planning/progress checkpoint; the application implementation has not advanced since `f009035`.
 
-**Requested historical CI:**
-- Root CI [42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on f5396ee: completed successfully.
-- Ubuntu job 128543483467 and Windows job 128543483323: both completed successfully with all 18 steps successful. Their full logs were inspected. This is historical evidence for f5396ee, not current-head evidence.
+**Current release gate — real-host qualification:**
+1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; collect process, namespace and Seccomp evidence.
+2. Run Restore/Journal/no-replace tests with temporary files on the actual application-state filesystem.
+3. Run the Windows desktop build as a normal user; verify WebView2, then qualify fixed local NTFS and persistent ACLs on the actual state volume.
+4. Only after host/provider evidence, proceed to installer/upgrade/uninstall design, explicit Journal export/retention before the 256-record / 1 MiB cap, and live Colab/model/SSE/Free-policy revalidation.
 
-**Latest exact-head CI:**
-- Root CI [44476660119](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44476660119) on 2bac200: **2/2 jobs successful**.
-- Ubuntu job 135398744461: Go vet/tests/race/build passed; Python **23/23**; frontend syntax, architecture checks and repository-local Markdown links passed (48 files).
-- Windows job 135398744684: Go vet/tests/build passed; Python **23/23**; frontend syntax, architecture checks and repository-local Markdown links passed (48 files). The Linux-only race step was skipped as intended.
-- Both complete logs and step summaries were inspected. No active workflow remains.
-- The four-workflow application-code matrix on f009035 passed **16/16**: Root CI 2/2, SQLite driver evaluation 4/4, Wails platform proof 2/2 and Linux distributions 8/8. Do not attribute this matrix to the later documentation-only commits.
-
-**Recent CI failures and closure:**
-- [44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705) failed on both platforms because the nested task plan used ../docs/architecture/DESKTOP_BUILD.md instead of ../../docs/architecture/DESKTOP_BUILD.md.
-- [44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) and [44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192) failed on both platforms because the regression fixture contained literal backslash-n, not a physical line break. The final test uses chr(10).
-- The repairs are verified by [44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) on e41d41f (2/2), [44475265849](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44475265849) on eb9b10e (2/2), and latest [44476660119](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44476660119) on 2bac200 (2/2). All failures remain documented.
-
-**StoreController integration — complete:**
-- Re-reviewed store_controller.go and all **16** tests in store_controller_test.go.
-- Wails composition root creates one Controller after opening/migrating Store, passes it to configuration and AppService, and closes through Controller.
-- AppService retains Controller; configuration Load/Save uses the Controller-backed ConfigRepository.
-- Wails and CLI backup export use CreateWithStoreController; the shared lease spans archive creation and publication. TestManagerCreateWithStoreControllerDrainsBeforeClose verifies the close/publication barrier.
-- No duplicate integration work is needed. Backup inspection is read-only; Restore is not registered or exposed by Wails/AppService.
-
-**Current gate — real-host qualification:**
-1. Run the Linux desktop executable in a normal logged-in desktop session with WebKit sandboxing enabled; collect WebKit process, namespace and Seccomp evidence.
-2. Run Journal/no-replace and recovery tests on the actual Linux application-state filesystem.
-3. On a real Windows desktop, qualify WebView2 and the state directory on fixed local NTFS with persistent ACLs; run filesystem tests on that volume.
-4. Only after host/provider evidence, proceed to installer/upgrade/uninstall design and explicit Journal export/retention before the 256-record / 1 MiB fail-closed cap.
-5. Revalidate the live Colab/model/SSE path and current Colab Free policy before enabling remote inference.
-
-The exact procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.md). This GitHub-only execution has no attached Linux or Windows desktop session or self-hosted runner, so host checks cannot be performed here. CI/Xvfb cannot substitute for Linux sandbox qualification because the CI smoke disables WebKit sandboxing inside its child process.
+The procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.md). This GitHub-only execution has no attached Linux or Windows desktop session or self-hosted runner. Xvfb/container CI cannot certify the WebKit sandbox because the CI child process deliberately disables it.
 
 **Safety and release status:**
 - Restore transaction/recovery components and the application service remain isolated and unwired to Wails, GUI, CLI and startup recovery.
-- Restore remains disabled. Do not add startup recovery or user-facing Restore until the full Linux/Windows safety matrix and host/provider gates are closed.
-- The 2026-11-16 target was missed. The repository is not a real-world testable release; green CI is not release readiness.
-- Do not merge the development branch wholesale into main.
+- Restore remains disabled. Do not add startup recovery or user-facing Restore before the full Linux/Windows safety matrix and host/provider gates are closed.
+- The 2026-11-16 target was missed. Green CI is not release readiness; the repository is not yet a real-world testable release.
+- Do not merge the development branch wholesale into `main`.
+
+### 2026-11-20 scheduled follow-up — host runbook safety review
+
+- Rechecked the branch ref, main ref, latest Actions runs, current job statuses, open pull requests and exact branch comparison.
+- Re-read the active plan pointer, task plan, progress log, system architecture, Restore lifecycle/executor contracts, desktop build runbook, Wails composition root and AppService.
+- Found a safety defect in the manual host runbook: Linux used an unconditional EXIT trap and Windows used unconditional `finally` cleanup, so a failed or interrupted qualification could delete the disposable directory containing ambiguous Restore test artifacts. The Windows PowerShell block also did not inspect `$LASTEXITCODE` after `go test`, allowing a failed filesystem test command to be followed by GUI checks.
+- Corrected both platforms to preserve the test directory on failure/interruption, permit cleanup only after successful qualification, and make Windows abort immediately on a non-zero Go test exit code. Added static regression tests for these runbook contracts.
+- Exact-head CI for the resulting change is pending; do not claim the runbook fix verified until Ubuntu and Windows complete.
+- No real desktop host is attached to this execution. The next external action remains the Linux host runbook, followed by Windows host qualification. Restore remains disabled/unwired; no merge or main modification is authorized.
 
 ### 2026-11-19 scheduled follow-up — exact branch-head CI and StoreController review
 
