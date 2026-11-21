@@ -2431,3 +2431,14 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - This GitHub-only execution has no attached desktop session, self-hosted runner or live Colab Free runtime. Therefore no real-host sandbox, WebView2, filesystem-provider or live Colab result is claimed. Xvfb/container CI is not a substitute.
 - No production source changed and no host test was run. The 2026-11-16 target remains missed; no merge, force-push or `main` modification occurred.
 - Next action: execute the corrected Linux procedure in `docs/architecture/DESKTOP_BUILD.md` on the real host and preserve all output/artifacts on any failure; then qualify Windows. Do not proceed to installer/upgrade/uninstall, journal retention design, or Restore wiring before the host gates close.
+
+
+## 2026-11-21 06:47 UTC — exact-head planning checkpoint CI closure
+
+- The planning/progress reconciliation commit [`34fe0ed`](https://github.com/SoufianoDev/OhMyFreeAI/commit/34fe0ed56973569fc8c31284882e74cd88c0dc80) triggered Root CI [#44876953947](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44876953947), which completed successfully on the exact commit: **2/2 jobs**.
+- Ubuntu job `136763647496` passed all 20 reported steps: Go vet/tests, Linux race detector, Go build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check.
+- Windows job `136763647670` passed all applicable steps: Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. The Linux-only race step was skipped as intended. Both job logs and step lists were inspected; no failed step remains.
+- The Windows Go test step took approximately 99 seconds and completed successfully; no timeout or hidden failure occurred.
+- At completion, `foundation/bootstrap` was `34fe0ed`, **981 ahead / 0 behind** `main`; there were no open PRs or active/queued Actions runs.
+- This was a documentation-only checkpoint. No production source, Restore executor, GUI/CLI wiring or `main` content changed. Restore remains disabled and unwired.
+- The real-host gate remains blocked: no logged-in Linux GNOME/Wayland host, Windows WebView2/NTFS host or live Colab Free runtime is attached to this execution. The next action remains Linux host qualification followed by Windows host qualification; no installer or Restore wiring should proceed before those gates close.
