@@ -6,15 +6,18 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Verified repository state — 2026-11-20 14:10 UTC:**
-- Development branch: `foundation/bootstrap`; current HEAD: [`3fbe081`](https://github.com/SoufianoDev/OhMyFreeAI/commit/3fbe081b6ccaecb742dca15306fb5536b9ddf2e2). This is a planning/progress-only checkpoint; the latest host-runbook/test code head remains `47ae9ce`.
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison: **979 commits ahead / 0 behind**.
-- No open pull requests or active/queued Actions runs were present at this check.
-- Requested historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee`: completed **2/2**. Ubuntu job `128543483467` and Windows job `128543483323` passed all 18 reported steps; both logs were fetched and inspected.
-- Previously pending Root CI [#44548049922](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44548049922) on `8bf53b3` has now completed **2/2** successfully; Ubuntu race passed and Windows skipped only the Linux-only race step.
-- Exact-head Root CI [#44688671452](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44688671452) on `3fbe081`: **2/2 jobs successful**. Ubuntu job `136128970519` passed Go vet/tests/race/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. Windows job `136128971797` passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check; only the Linux-only race step was skipped. Both complete logs and step summaries were inspected.
-- The full four-workflow application/Restore matrix remains attributed to source/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`: Root 2/2, SQLite driver evaluation 4/4, Wails 2/2, Linux distributions 8/8 (**16/16**). Comparing `f009035` to `3fbe081` shows 19 commits across CI, planning/progress, desktop/Restore documentation, Markdown tooling and host-runbook tests; no application Go source or Restore-executor source changed.
-
+**Verified repository state — 2026-11-21 06:37 UTC:**
+- Development branch: `foundation/bootstrap`; current HEAD: [`82b32f2`](https://github.com/SoufianoDev/OhMyFreeAI/commit/82b32f28098ae614a67979159d4f3cb83f231764), parent `3fbe081`.
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison: **980 commits ahead / 0 behind**.
+- GitHub reports **0 open pull requests** and no queued/in-progress runs in the latest branch workflow history. This execution can inspect remote GitHub state only; it cannot inspect a developer's local uncommitted working tree.
+- Exact-head Root CI [#44751537167](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44751537167) targets `82b32f2` and completed **2/2 jobs successfully**:
+  - Ubuntu job `136340387872`: Go vet/tests/race/build passed; Python **27/27**; frontend syntax, architecture checks and repository-local Markdown checks (**48 files**) passed.
+  - Windows job `136340388421`: Go vet/tests/build passed; Python **27/27**; frontend syntax, architecture checks and repository-local Markdown checks (**48 files**) passed. The Linux-only race-detector step was skipped as intended.
+  - Both full job logs and step summaries were inspected; no failed step remains.
+- Latest other workflow-family evidence remains on production-code/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`: Wails platform proof [#43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477) **2/2**, SQLite driver evaluation [#43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316) **4/4**, and Linux distribution compatibility [#43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377) **8/8**. These are not being attributed to `82b32f2`.
+- Comparing `f009035` to `82b32f2` shows 20 intervening commits touching only workflow configuration, planning/progress, desktop/Restore documentation, Markdown-check tooling and host-runbook tests. No application Go source or Restore-executor source changed.
+- Historical Root CI failures on 2026-11-19 were inspected and already superseded: the Markdown checker used an incorrect relative path in [#44473206705](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473206705); the follow-up regression fixture used a literal escaped newline and asserted the wrong source line in [#44473684482](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44473684482) and [#44474211192](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474211192). The path and fixture were corrected; subsequent runs [#44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299) and [#44475265849](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44475265849) passed.
+ 
 **Current release gate — real-host qualification:**
 1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; collect process, namespace and Seccomp evidence.
 2. Run Restore/Journal/no-replace tests with temporary files on the actual application-state filesystem.

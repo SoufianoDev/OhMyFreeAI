@@ -2408,3 +2408,26 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Next action remains running the Linux host procedure on the actual GNOME/Wayland session and application-state filesystem, then Windows WebView2 on fixed local NTFS with persistent ACL evidence. Only after those gates should installer/upgrade/uninstall and explicit journal export/retention be continued, followed by live Colab/model/SSE/Free-policy revalidation.
 - Existing transaction/recovery components remain isolated. No new Restore wiring, startup recovery, GUI/CLI Restore entry point or Restore UI was added. Restore remains disabled. No application code changed in this checkpoint; no local tests were run.
 
+
+
+## 2026-11-21 06:37 UTC — exact branch-head, workflow and Restore safety recheck
+
+### Repository and workflow state
+- Re-read the active-plan pointer, task plan, progress log, system/security architecture, Restore lifecycle/recovery documentation, desktop build runbook, CI workflow definitions and the relevant Restore move/identity/executor source.
+- Remote branch `foundation/bootstrap` is `82b32f28098ae614a67979159d4f3cb83f231764` (parent `3fbe081`); `main` remains `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`. GitHub compare reports **980 ahead / 0 behind**. There are no open PRs or active/queued Actions runs.
+- Exact-head Root CI [#44751537167](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44751537167) completed **2/2** on `82b32f2`. Ubuntu job `136340387872` passed Go vet/tests/race/build, Python **27/27**, frontend syntax, architecture checks and the 48-file Markdown check. Windows job `136340388421` passed Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file Markdown check; only the Linux-specific race step was skipped. Both full logs and step lists were fetched and inspected.
+- Latest Wails proof, SQLite driver evaluation and Linux distribution workflows remain respectively **2/2**, **4/4** and **8/8** on `f009035`. The 20 commits from `f009035` to `82b32f2` touch only CI, planning/progress, desktop/Restore docs, Markdown tooling and host-runbook tests; no application Go or Restore-executor source changed.
+- Reopened the three latest historical failed Root runs from 2026-11-19. Run `44473206705` failed because the nested task-plan Markdown link resolved to the wrong relative path. Runs `44473684482` and `44474211192` failed because a regression fixture produced one line while the assertion expected line 2. The fixes are already present and later exact-head runs `44474684299`, `44475265849`, and `44751537167` passed. No unresolved failure remains.
+
+### Restore and host-qualification safety review
+- `desktop-src/main.go.tmpl` registers the ordinary AppService and StoreController only; no Restore service is composed. CLI dispatch contains no Restore command. The application Restore service itself has no GUI, CLI or startup hooks.
+- Linux move path uses pinned-directory `openat2`, rejects symlink traversal, uses `renameat2(RENAME_NOREPLACE)`, then syncs the pinned parent directory. No `os.Rename` fallback exists.
+- Windows executor path calls handle-bound `NtSetInformationFile(FileRenameInformationEx)` with the no-replace flag value (zero); the replacement-capable helper is separate and is not used by the executor. No `MoveFileExW` fallback exists.
+- The shared post-move verifier calls the platform identity reader before the executor can open SQLite. Linux hashes from an `O_NOFOLLOW` descriptor and checks file type, link count, inode/device, size and timestamps. Windows hashes from a retained non-reparse handle and checks volume/file identity, link count and size.
+- Restore remains disabled and unwired to Wails, GUI, CLI and startup recovery. The startup recovery coordinator and actual host/provider qualification are still outstanding. No security checks or implementation were weakened.
+
+### Blocker and resumption point
+- The plan's next step is still the real Linux host run in a logged-in GNOME/Wayland session, with WebKit sandbox enabled and the application-state filesystem used for the no-replace/Journal tests; Windows WebView2 and fixed-local-NTFS/ACL qualification follows.
+- This GitHub-only execution has no attached desktop session, self-hosted runner or live Colab Free runtime. Therefore no real-host sandbox, WebView2, filesystem-provider or live Colab result is claimed. Xvfb/container CI is not a substitute.
+- No production source changed and no host test was run. The 2026-11-16 target remains missed; no merge, force-push or `main` modification occurred.
+- Next action: execute the corrected Linux procedure in `docs/architecture/DESKTOP_BUILD.md` on the real host and preserve all output/artifacts on any failure; then qualify Windows. Do not proceed to installer/upgrade/uninstall, journal retention design, or Restore wiring before the host gates close.
