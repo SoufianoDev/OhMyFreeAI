@@ -6,17 +6,19 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Verified repository state — 2026-11-21 06:47 UTC:**
-- Development branch: `foundation/bootstrap`; last verified source/planning head: [`34fe0ed`](https://github.com/SoufianoDev/OhMyFreeAI/commit/34fe0ed56973569fc8c31284882e74cd88c0dc80).
-- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; comparison at this checkpoint: **981 commits ahead / 0 behind**.
-- GitHub reports **0 open pull requests** and no queued/in-progress Actions runs after the exact-head run completed.
-- Exact-head Root CI [#44876953947](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44876953947) targets `34fe0ed` and completed **2/2 jobs successfully**:
-  - Ubuntu job `136763647496`: Go vet/tests/race/build passed; Python **27/27**; frontend syntax, architecture checks and repository-local Markdown checks (**48 files**) passed.
-  - Windows job `136763647670`: Go vet/tests/build passed; Python **27/27**; frontend syntax, architecture checks and repository-local Markdown checks (**48 files**) passed. The Linux-only race-detector step was skipped as intended.
-  - Both complete job logs and step summaries were inspected; no failed step remains.
-- Latest other workflow-family evidence remains on production-code/test head `f0090357767bfad20ffa452ba1289e9d47556dfa`: Wails platform proof [#43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477) **2/2**, SQLite driver evaluation [#43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316) **4/4**, and Linux distribution compatibility [#43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377) **8/8**. These results are not being attributed to `34fe0ed`.
-- Comparing `f009035` to `34fe0ed` shows 21 intervening commits limited to CI configuration, planning/progress, desktop/Restore documentation, Markdown-check tooling and host-runbook tests. No application Go source or Restore-executor source changed.
-- The 2026-11-19 Markdown-check failures were diagnosed and fixed in subsequent commits; the later exact-head runs [#44474684299](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44474684299), [#44475265849](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44475265849), and [#44876953947](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44876953947) passed.
+**Verified repository state — 2026-11-21 14:24 UTC:**
+- Development branch: `foundation/bootstrap`; current HEAD: [`57474c3`](https://github.com/SoufianoDev/OhMyFreeAI/commit/57474c326f82de2449905085e5411a4440d0e453).
+- `main`: `a1b12fbe5dd854c4619463eb1c7cccc0bd951941`; GitHub compare reports **982 commits ahead / 0 behind**.
+- GitHub reports **0 open pull requests**, **0 queued runs** and **0 in-progress runs** for this branch at the time of verification.
+- Historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) targets `f5396ee592b9b9756779f67aeabd6d7167520c40` on this branch and completed successfully: **2/2 jobs**, Ubuntu and Windows each reporting **18/18 successful steps**. Both job logs were fetched; no failure/error lines were present.
+- Exact-head Root CI [#44877268781](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44877268781) targets `57474c3` and completed **2/2 jobs successfully**:
+  - Ubuntu job `136764616468`: all 20 steps passed, including Go vet/tests, `go test -race ./...`, Go build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check.
+  - Windows job `136764616678`: all applicable steps passed, including Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. The Linux-only race-detector step was skipped as intended.
+  - Both full logs and step summaries were inspected; no failed step remains.
+- The 22 commits from production-code/test head `f0090357767bfad20ffa452ba1289e9d47556dfa` to `57474c3` touch only CI configuration, planning/progress, desktop/Restore documentation, Markdown-check tooling and host-runbook tests. No Go application source, Wails composition template, StoreController, or Restore executor source changed in this range.
+- The separate workflow families remain green on `f009035`: Wails platform proof [#43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477) **2/2**, SQLite driver evaluation [#43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316) **4/4**, and Linux distribution compatibility [#43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377). These results are not being attributed to the later documentation-only head `57474c3`.
+- Re-reviewed `StoreController`, all **16** controller tests, Wails composition root, AppService, ConfigRepository and backup archive publication. The requested integration stage is complete: one retained controller, shared leases for full config/backup operations, controller-owned shutdown and drain/stale-Store coverage. No duplicate implementation was added.
+- No production source changed in this follow-up. No real-host test was run; the next gate remains Linux desktop/WebKit sandbox qualification, followed by Windows WebView2/NTFS/ACL qualification. Restore remains disabled and unwired. No merge, force-push or `main` modification occurred.
 
 **Current release gate — real-host qualification:**
 1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; collect process, namespace and Seccomp evidence.
