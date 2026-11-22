@@ -2466,3 +2466,33 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - GitHub compare at the tested checkpoint: `foundation/bootstrap` **983 ahead / 0 behind** `main`; **0** open PRs and no queued/in-progress runs. The 23 commits after `f009035` changed only CI/planning/docs/host-runbook tooling; no application Go, Wails composition, StoreController or Restore executor source changed.
 - The only next executable project gate is real-host qualification: Linux GNOME/Wayland with WebKit sandbox enabled and the actual state filesystem, then Windows WebView2 with fixed local NTFS and persistent ACLs. No desktop session or live Colab Free runtime is attached to this execution; no host qualification was run.
 - No production source changed. Restore remains disabled and unwired. No Durable Restore Journal/UI or startup recovery was started. No merge, force-push or `main` modification occurred.
+
+
+## 2026-11-22 14:05 UTC — scheduled CI and StoreController continuation
+
+### Requested historical Root CI
+- Rechecked Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) through the GitHub connector. The run metadata confirms branch `foundation/bootstrap`, SHA `f5396ee592b9b9756779f67aeabd6d7167520c40`, status `completed`, conclusion `success`.
+- Ubuntu job `128543483467` and Windows job `128543483323` both completed successfully. All 18 reported steps in each job succeeded.
+- Both complete job logs were fetched. Go vet, Go package tests and build passed; Python tests reported **15/15** on each platform; frontend JavaScript syntax and architecture checks passed. No GitHub error annotations or test failure markers were found.
+- This result is evidence for `f5396ee` only, not for later commits.
+
+### Latest code/test CI and current branch
+- The latest Root CI run in the branch run listing is [#44914081068](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44914081068), targeting exact SHA `15397e89629264d7e7ca49404d3ea13fb1575eaa`. Run metadata reports `completed/success`.
+- Ubuntu job `136875843182` and Windows job `136875843006` both passed. Ubuntu passed all 20 reported steps, including `go test -race ./...`; Windows passed all applicable steps and skipped only the Linux-specific race step. Both ran **27/27** Python tests. Both full logs and step summaries were fetched; no failed steps or error annotations were found.
+- The current branch HEAD is `09cd40a5d681234f1dae859d3a826a4a9722610c`, parent `15397e8`. The HEAD commit diff contains only `progress.md` and `task_plan.md`; it is documentation-only and does not invalidate the exact code/test CI result on `15397e8`.
+- Comparing production-code/test head `f0090357767bfad20ffa452ba1289e9d47556dfa` to `15397e8` returns 23 commits touching only CI configuration, planning/progress, desktop/Restore documentation, Markdown-check tooling and host-runbook tests. No application Go source, Wails composition template, StoreController or Restore executor source changed in that range.
+- Separate workflow-family evidence remains tied to `f009035`: Wails platform proof [#43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477) **2/2**, SQLite driver evaluation [#43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316) **4/4**, and Linux distribution compatibility [#43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377). These results are not attributed to the later documentation-only commits.
+- GitHub compare reports `foundation/bootstrap` **984 ahead / 0 behind** `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`). The open-PR search returned zero; the latest branch run listing contained no queued or in-progress runs.
+
+### StoreController and integration review
+- Re-read `internal/infrastructure/sqlite/store_controller.go` and enumerated all **16** tests in `store_controller_test.go`: shared/exclusive drain, writer preference, cancellation, nil Store rejection, exclusive replacement, close/drain, verified replacement after an operation error, fail-closed nil/panic handling, shared-lease release on panic, concurrent stress, configuration round-trip, and Load/Save drain.
+- Re-read `desktop-src/main.go.tmpl`: Wails opens and migrates the Store before creating one Controller, passes the Controller to configuration and AppService, and closes through the Controller with a bounded context. CLI backup opens only an existing database, wraps it in a Controller, and closes through the same boundary.
+- Re-read `desktop-src/app_service.go.tmpl` and `internal/application/config/service.go`: AppService retains the Controller; configuration uses `ports.ConfigRepository`, implemented by Controller Load/Save under shared leases.
+- Re-read `internal/infrastructure/backup/archive.go` and `archive_controller_test.go`: `CreateWithStoreController` holds one shared lease around the complete archive creation and publication. `TestManagerCreateWithStoreControllerDrainsBeforeClose` blocks publication, confirms Close cannot drain while the export lease is held, then confirms export and close complete after release.
+- The requested StoreController integration stage is complete. No duplicate implementation or production-code change was made.
+
+### Current gate and limitations
+- The next executable gate remains real-host qualification: run the corrected Linux procedure in a logged-in GNOME/Wayland session with WebKit sandbox enabled and the actual application-state filesystem; collect process namespace and Seccomp evidence. Then run the Windows procedure with WebView2, fixed local NTFS and persistent ACL evidence.
+- This GitHub-connector execution has no attached Linux or Windows desktop session, self-hosted runner, or live Google Colab Free runtime. No real-host, filesystem-provider, WebView2/WebKit sandbox, or live Colab/model/SSE result is claimed. Xvfb/container CI is not a substitute for production WebKit sandbox qualification.
+- Do not proceed to installer/upgrade/uninstall, journal export/retention, startup recovery or Restore user entry points before the host/provider gates close. Existing transaction/recovery components remain isolated and unwired. Restore remains disabled.
+- No local tests were run in this checkpoint. No production source changed. No merge, force-push or `main` modification occurred.
