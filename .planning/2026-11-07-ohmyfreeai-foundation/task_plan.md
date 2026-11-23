@@ -7,8 +7,8 @@ Establish the verified architectural, repository, developer-tooling, and applica
 ## Next Step
 
 **Latest verified repository checkpoint — 2026-11-23 15:28 UTC:**
-- Current branch HEAD: [`a651360`](https://github.com/SoufianoDev/OhMyFreeAI/commit/a6513600e01a0a4ad175c54f2b25550a2fc19a8a), parent `2e51b04`. The latest three commits after tested code/test checkpoint `15397e8` change only `.planning/2026-11-07-ohmyfreeai-foundation/progress.md` and `task_plan.md`; no production or test source changed. The latest HEAD commit is documentation-only and carries `[skip ci]`.
-- GitHub compare reports `foundation/bootstrap` **986 commits ahead / 0 behind** `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`). There are **0 open PRs**, **0 queued runs**, and **0 in-progress runs**.
+- Branch checkpoint before this documentation reconciliation: [`a8bc506`](https://github.com/SoufianoDev/OhMyFreeAI/commit/a8bc506a078f4a0853a537f85e19066f900bf114), parent `1e5b5e9`. At that point, GitHub compare reported `foundation/bootstrap` **988 commits ahead / 0 behind** `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`). This task-plan refresh is documentation-only and does not change the code/test checkpoint.
+- The five commits after exact code/test checkpoint `15397e8` change only `.planning/2026-11-07-ohmyfreeai-foundation/progress.md` and `task_plan.md`; no application, Wails composition, StoreController, backup, configuration, or Restore executor source changed. The latest preceding docs commits use `[skip ci]`.
 - Historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee592b9b9756779f67aeabd6d7167520c40` completed successfully: Ubuntu and Windows **2/2**; each job reported **18/18 successful steps**. Both complete logs were fetched and inspected; no failure/error markers were found.
 - Latest exact code/test Root CI [#44914081068](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44914081068) on `15397e89629264d7e7ca49404d3ea13fb1575eaa` completed successfully: **2/2 jobs**.
   - Ubuntu job `136875843182`: all 20 reported steps passed, including Go vet/tests, `go test -race ./...`, build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check.
@@ -17,6 +17,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 - Re-read `StoreController` and all **16** tests, Wails composition root, AppService, ConfigRepository, backup shared-lease scope and archive-publication drain test. The requested integration stage is complete: Wails retains one controller, configuration and backup operations hold shared leases for their complete operations, shutdown closes through the controller, and drain/stale-Store behavior is covered. No duplicate implementation was added.
 - No production code changed. Existing Restore journal/transaction/recovery infrastructure remains isolated and unwired. Restore remains disabled and is not exposed through Wails, GUI, CLI or startup recovery.
 - No real-host result is claimed. This GitHub-only execution has no attached logged-in Linux desktop with WebKit sandbox enabled, Windows desktop with WebView2/NTFS ACL access, self-hosted runner, or live Google Colab Free runtime.
+- Open PRs: **0**. Queued Actions runs: **0**. In-progress Actions runs: **0**.
 
 **Current release gate — real-host qualification:**
 1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; collect process, namespace and Seccomp evidence.
