@@ -6,35 +6,34 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Latest verified repository checkpoint — 2026-11-22 14:05 UTC:**
-- Current branch HEAD: [`09cd40a`](https://github.com/SoufianoDev/OhMyFreeAI/commit/09cd40a5d681234f1dae859d3a826a4a9722610c), parent `15397e8`. The current HEAD is documentation-only and changes only this plan and `progress.md`; the latest tested code/test checkpoint remains `15397e8`.
-- GitHub compare reports `foundation/bootstrap` **984 commits ahead / 0 behind** `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`). The open-PR search returned zero, and the latest branch run listing had no queued or in-progress runs.
-- Historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee592b9b9756779f67aeabd6d7167520c40` completed successfully: **2/2 jobs**. Ubuntu and Windows each reported **18/18 successful steps**; both full logs were fetched, Go vet/tests/build passed, Python reported **15/15** on each platform, and no failure markers were found.
-- Latest exact code/test Root CI [#44914081068](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44914081068) on `15397e8` completed successfully: **2/2 jobs**.
+**Latest verified repository checkpoint — 2026-11-23 15:28 UTC:**
+- Current branch HEAD: [`a651360`](https://github.com/SoufianoDev/OhMyFreeAI/commit/a6513600e01a0a4ad175c54f2b25550a2fc19a8a), parent `2e51b04`. The latest three commits after tested code/test checkpoint `15397e8` change only `.planning/2026-11-07-ohmyfreeai-foundation/progress.md` and `task_plan.md`; no production or test source changed. The latest HEAD commit is documentation-only and carries `[skip ci]`.
+- GitHub compare reports `foundation/bootstrap` **986 commits ahead / 0 behind** `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`). There are **0 open PRs**, **0 queued runs**, and **0 in-progress runs**.
+- Historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee592b9b9756779f67aeabd6d7167520c40` completed successfully: Ubuntu and Windows **2/2**; each job reported **18/18 successful steps**. Both complete logs were fetched and inspected; no failure/error markers were found.
+- Latest exact code/test Root CI [#44914081068](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44914081068) on `15397e89629264d7e7ca49404d3ea13fb1575eaa` completed successfully: **2/2 jobs**.
   - Ubuntu job `136875843182`: all 20 reported steps passed, including Go vet/tests, `go test -race ./...`, build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check.
   - Windows job `136875843006`: all applicable steps passed, including Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. The Linux-only race-detector step was skipped as intended.
   - Both full logs and step summaries were fetched and inspected; no failed steps or error annotations were found.
-- Comparing production-code/test head `f0090357767bfad20ffa452ba1289e9d47556dfa` to `15397e8` shows **23 commits** touching only CI configuration, planning/progress, desktop/Restore documentation, Markdown-check tooling and host-runbook tests. No application Go source, Wails composition template, StoreController or Restore executor source changed in this range.
-- Separate workflow-family evidence remains on `f009035`: Wails platform proof [#43975095477](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095477) **2/2**, SQLite driver evaluation [#43975095316](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095316) **4/4**, and Linux distribution compatibility [#43975095377](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/43975095377). These results are not attributed to the later documentation-only checkpoint.
-- Re-reviewed `StoreController`, all **16** tests, Wails composition root, AppService, ConfigRepository, full backup shared-lease scope and archive-publication drain test. The requested integration stage is complete; no duplicate implementation was added.
-- No production code changed. The next gate remains real-host qualification: Linux GNOME/Wayland with WebKit sandbox enabled and the actual state filesystem, followed by Windows WebView2 on fixed local NTFS with persistent ACL evidence. This GitHub-only execution has no attached desktop sessions, self-hosted runner or live Google Colab Free runtime; no host/provider or live Colab test is claimed.
-- Existing transaction/recovery components remain isolated and unwired. Restore remains disabled and is not exposed through Wails, GUI, CLI or startup recovery. No new journal/UI work was started. No merge, force-push or `main` modification occurred.
+- Re-read `StoreController` and all **16** tests, Wails composition root, AppService, ConfigRepository, backup shared-lease scope and archive-publication drain test. The requested integration stage is complete: Wails retains one controller, configuration and backup operations hold shared leases for their complete operations, shutdown closes through the controller, and drain/stale-Store behavior is covered. No duplicate implementation was added.
+- No production code changed. Existing Restore journal/transaction/recovery infrastructure remains isolated and unwired. Restore remains disabled and is not exposed through Wails, GUI, CLI or startup recovery.
+- No real-host result is claimed. This GitHub-only execution has no attached logged-in Linux desktop with WebKit sandbox enabled, Windows desktop with WebView2/NTFS ACL access, self-hosted runner, or live Google Colab Free runtime.
 
 **Current release gate — real-host qualification:**
 1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; collect process, namespace and Seccomp evidence.
-2. Run Restore/Journal/no-replace tests with temporary files on the actual application-state filesystem.
+2. Run the no-replace, journal and recovery filesystem tests with temporary files on the actual application-state filesystem; preserve artifacts on failure.
 3. Run the Windows desktop build as a normal user; verify WebView2, then qualify fixed local NTFS and persistent ACLs on the actual state volume.
 4. Only after host/provider evidence, proceed to installer/upgrade/uninstall design, explicit Journal export/retention before the 256-record / 1 MiB cap, and live Colab/model/SSE/Free-policy revalidation.
 
-The procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.md). This GitHub-only execution has no attached Linux or Windows desktop session or self-hosted runner. Xvfb/container CI cannot certify the WebKit sandbox because the CI child process deliberately disables it.
+The procedures are in [DESKTOP_BUILD.md](../../docs/architecture/DESKTOP_BUILD.md). This GitHub-only execution has no attached Linux or Windows desktop session or self-hosted runner. Xvfb/container CI cannot certify the WebKit sandbox because the CI child process deliberately disables it. Google Colab Free is not a substitute for either desktop host.
 
 **Safety and release status:**
-- Restore transaction/recovery components and the application service remain isolated and unwired to Wails, GUI, CLI and startup recovery.
-- Restore remains disabled. Do not add startup recovery or user-facing Restore before the full Linux/Windows safety matrix and host/provider gates are closed.
-- The 2026-11-16 target was missed. Green CI is not release readiness; the repository is not yet a real-world testable release.
+- The StoreController integration prerequisite is complete and has green Ubuntu/Windows CI evidence on the exact code/test checkpoint.
+- Do not wire existing Restore journal/transaction/recovery components into startup, Wails, GUI or CLI until the real-host/provider safety gates and the remaining failure/restart matrix are closed.
+- Restore remains disabled. Do not add a Restore UI or enable startup recovery at this checkpoint.
+- Green CI is not release readiness; the repository is not yet a real-world testable release.
 - Do not merge the development branch wholesale into `main`.
 
-### 2026-11-20 scheduled follow-up — historical CI and StoreController recheck
+## 2026-11-20 scheduled follow-up — historical CI and StoreController recheck
 
 - Rechecked historical Root CI `42419106009` on `f5396ee`: Ubuntu and Windows both completed successfully; all 18 steps per job passed and both logs were inspected.
 - Confirmed the previously pending run `44548049922` later completed successfully on Ubuntu and Windows.
