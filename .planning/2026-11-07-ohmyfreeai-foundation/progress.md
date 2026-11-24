@@ -2558,3 +2558,11 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - This GitHub-connector execution has no attached Linux or Windows desktop session, self-hosted runner, or live Google Colab Free runtime. No local tests, host tests, WebKit sandbox test, WebView2 test, actual filesystem-provider test, or live Colab/model/SSE test was run or claimed. GitHub Actions/Xvfb is not a substitute for the required real-host sandbox check.
 - Existing Restore journal/transaction/recovery code remains isolated and unwired. No new Restore journal integration, startup recovery, Wails/GUI/CLI Restore entry point or Restore UI was started. Restore remains disabled.
 - No merge, force-push, or `main` modification occurred.
+
+
+### 2026-11-24 Root CI closure for planning checkpoint
+- Root CI [#45413656706](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/45413656706) on exact commit `8b498f4d62ee14af5569ccde2aabba1bee20ed68` completed successfully: Ubuntu and Windows **2/2**.
+- Ubuntu job `138513900926`: all 20 reported steps passed, including Go vet/tests, `go test -race ./...`, Go build, Python **27/27**, frontend syntax, architecture checks and local Markdown validation.
+- Windows job `138513900229`: all applicable steps passed, including Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and local Markdown validation. The Linux-only race step was skipped as intended.
+- Fetched both complete logs (38,137 and 36,961 characters). Neither contained GitHub error annotations, failing tests, or non-zero process-exit markers. SQLite package tests completed in 26.865 seconds on Ubuntu and 83.759 seconds on Windows.
+- This exact-head run verifies the planning checkpoint commit `8b498f4`; it does not provide real-host WebKit/WebView2 or filesystem-provider qualification. No production source changed.

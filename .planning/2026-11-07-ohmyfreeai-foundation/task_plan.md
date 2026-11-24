@@ -6,17 +6,17 @@ Establish the verified architectural, repository, developer-tooling, and applica
 
 ## Next Step
 
-**Latest verified repository checkpoint — 2026-11-24 14:14 UTC:**
-- Current branch HEAD before this planning update: [`0b10e338`](https://github.com/SoufianoDev/OhMyFreeAI/commit/0b10e33898724a7bff3d66f12ac9fa96e4939188). GitHub compare reports `foundation/bootstrap` **989 commits ahead / 0 behind** `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`). Open PRs: **0**; queued and in-progress Actions runs: **0**.
-- Historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee592b9b9756779f67aeabd6d7167520c40` completed successfully: Ubuntu and Windows **2/2**, with **18/18** successful reported steps per job. Both complete logs were fetched; each ran Python **15/15**, and neither contained error annotations or failing exit markers.
-- Latest exact code/test Root CI [#44914081068](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/44914081068) on `15397e89629264d7e7ca49404d3ea13fb1575eaa` completed successfully: **2/2 jobs**.
-  - Ubuntu job `136875843182`: all 20 reported steps passed, including Go vet/tests, `go test -race ./...`, build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check.
-  - Windows job `136875843006`: all applicable steps passed, including Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and the 48-file local Markdown check. The Linux-only race step was skipped as intended.
-  - Both full logs and job step summaries were fetched and inspected; no error annotations or failing exit markers were found.
-- Six commits after `15397e8` change only `.planning/2026-11-07-ohmyfreeai-foundation/progress.md` and `task_plan.md`; the current branch HEAD is documentation-only and uses `[skip ci]`. No CI result is claimed for `0b10e338` or this subsequent planning update.
-- The 23 commits from production-code checkpoint `f009035` to `15397e8` touched CI configuration, planning, desktop/Restore documentation, Markdown tooling and host-runbook tests only. No application Go source, Wails composition, StoreController, backup, configuration or Restore executor source changed.
+**Latest verified repository checkpoint — 2026-11-24 14:27 UTC:**
+- Branch HEAD before this final planning-only follow-up: [`8b498f4`](https://github.com/SoufianoDev/OhMyFreeAI/commit/8b498f4d62ee14af5569ccde2aabba1bee20ed68). GitHub compare reports `foundation/bootstrap` **990 commits ahead / 0 behind** `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`). This final planning update is documentation-only and will leave the branch **991 ahead / 0 behind**. Open PRs: **0**.
+- Historical Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) on `f5396ee592b9b9756779f67aeabd6d7167520c40` completed successfully: Ubuntu and Windows **2/2**, with **18/18** successful reported steps per job. Both complete logs were fetched; each ran Python **15/15**, with no error annotations or failing exit markers.
+- Latest exact-head Root CI [#45413656706](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/45413656706) on `8b498f4d62ee14af5569ccde2aabba1bee20ed68` completed successfully: **2/2 jobs**.
+  - Ubuntu job `138513900926`: all 20 reported steps passed, including Go vet/tests, `go test -race ./...`, build, Python **27/27**, frontend syntax, architecture checks and local Markdown validation.
+  - Windows job `138513900229`: all applicable steps passed, including Go vet/tests/build, Python **27/27**, frontend syntax, architecture checks and local Markdown validation. The Linux-only race step was skipped as intended.
+  - Both full logs and job step summaries were fetched and inspected; no error annotations, failing tests or non-zero process-exit markers were found.
+- The commits after production-code checkpoint `f009035` changed CI configuration, planning, desktop/Restore documentation, Markdown tooling and host-runbook tests only. No application Go source, Wails composition, StoreController, backup, configuration or Restore executor source changed. The current Root CI includes the updated tooling/tests.
 - Re-read the current StoreController, all **16** tests, Wails composition root, AppService, ConfigRepository, backup shared-lease scope and archive-publication drain test. The requested integration stage is complete: Wails retains one controller, configuration and backup operations hold shared leases for their complete operations, shutdown closes through the controller, and drain/stale-Store behavior is covered. No duplicate implementation was added.
 - No production code changed. Existing Restore journal/transaction/recovery infrastructure remains isolated and unwired. Restore remains disabled and is not exposed through Wails, GUI, CLI or startup recovery.
+- No queued or in-progress Actions runs remain at this checkpoint.
 
 **Current release gate — real-host qualification:**
 1. Run the Linux desktop build in a normal logged-in GNOME/Wayland session with WebKit sandbox enabled; capture process, namespace and Seccomp evidence.
@@ -27,7 +27,7 @@ Establish the verified architectural, repository, developer-tooling, and applica
 The procedures are in [`DESKTOP_BUILD.md`](../../docs/architecture/DESKTOP_BUILD.md). This GitHub-only execution has no attached Linux or Windows desktop session or self-hosted runner. Xvfb/container CI cannot certify the WebKit sandbox because the CI child process deliberately disables it. Google Colab Free is not a substitute for either desktop host.
 
 **Safety and release status:**
-- The StoreController integration prerequisite is complete and has green Ubuntu/Windows CI evidence on the exact code/test checkpoint.
+- The StoreController integration prerequisite is complete and has green Ubuntu/Windows CI evidence on exact commit `8b498f4`.
 - Do not wire existing Restore journal/transaction/recovery components into startup, Wails, GUI or CLI until the real-host/provider safety gates and remaining failure/restart matrix are closed.
 - Restore remains disabled. Do not add a Restore UI or enable startup recovery at this checkpoint.
 - Green CI is not release readiness; the repository is not yet a real-world testable release.
