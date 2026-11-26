@@ -2580,3 +2580,29 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - No production code changed and no new CI run was triggered in this execution. Existing Restore journal/transaction/recovery code remains isolated and unwired; Restore remains disabled. No startup recovery or Restore UI was added.
 - Real-host qualification remains blocked: this execution has no connected logged-in GNOME/Wayland desktop, Windows desktop/WebView2 host, self-hosted runner, or live Google Colab Free runtime. No local, WebKit sandbox, WebView2, real filesystem-provider, or live Colab/model/SSE tests were run or claimed. The existing `DESKTOP_BUILD.md` runbook remains the required procedure.
 - No `main` modification, merge, or force-push occurred.
+
+## 2026-11-26 14:33 UTC — historical CI recheck, exact code/test CI and StoreController
+
+### Requested historical Root CI
+- Rechecked [Root CI #42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009) through the GitHub connector. Both job payloads show `completed/success`: Ubuntu `128543483467`, Windows `128543483323`.
+- The job-steps endpoint returned **18 step objects per job**, all successful (step numbers 1–13 and 23–27). This corrects the Nov 25 entry that said 17; the actual count is 18.
+- Fetched both complete logs: Ubuntu 32,250 characters; Windows 33,346 characters. Both checkout logs identify `foundation/bootstrap` at `f5396ee592b9b9756779f67aeabd6d7167520c40`. Both report 15 Python tests and successful Go vet, Go tests and Go build. No `FAIL`, `##[error]` or non-zero exit markers were found.
+
+### Latest exact code/test Root CI recheck
+- Re-fetched [Root CI #45413656706](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/45413656706) on `8b498f4d62ee14af5569ccde2aabba1bee20ed68`. Ubuntu `138513900926` and Windows `138513900229` both completed successfully (2/2), with 20 reported steps each.
+- Fetched both complete logs (Ubuntu 38,137 characters; Windows 36,961 characters). Python passed 27/27 on both. Go package output was successful across the application packages; vet and build succeeded. Ubuntu `go test -race ./...` passed. Windows omits that Linux-only step. No error annotations, Go `FAIL` lines or non-zero exit markers were found.
+- Compare from the exact tested code head `8b498f4` to `foundation/bootstrap` reports three commits ahead / zero behind, with changes limited to `progress.md` and `task_plan.md`. Compare from the previously recorded `89e5c10` reports two planning-only commits ahead. No application source changed after the tested code head, so the existing CI evidence still covers the unchanged production/test tree. No CI was launched for this documentation-only update.
+- Compare against `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`) reports 993 commits ahead / zero behind; open PR search returned zero.
+
+### StoreController and integration re-review
+- Re-read StoreController blob `3d5fd9d2cfc7e22949799a776107debea7533acc` and all 16 test functions in blob `d105e4ee2a9dd6c91f6c5e69cbc719e1800df6cf`.
+- Confirmed shared/exclusive leases, writer preference, cancellation, nil Store rejection, exclusive replacement, controller-mediated stale Store rejection after replacement/close, verified rollback publication, fail-closed nil/panic handling, panic-safe lease release, concurrent stress, Config Load/Save and drain behavior.
+- Re-read Wails composition root, AppService, config service, backup archive and `TestManagerCreateWithStoreControllerDrainsBeforeClose`. The integration is complete: one application-lifetime Controller, AppService retains it, config operations run through Controller shared leases, backup retains its shared lease through archive creation/verification/publication, and shutdown drains/closes through Controller.
+- No production implementation or test file changed in this run.
+
+### Next gate and limitations
+- The next executable gate remains real-host qualification: Linux in a logged-in GNOME/Wayland session with WebKit sandbox enabled and the actual application-state filesystem; then Windows WebView2 as a normal user with fixed local NTFS and persistent ACL evidence. The reproducible procedures are in `docs/architecture/DESKTOP_BUILD.md`.
+- No Linux/Windows desktop host, self-hosted runner or live Google Colab Free runtime is attached to this execution. No local tests, WebKit sandbox test, WebView2 test, actual filesystem-provider test or live Colab/model/SSE test was run or claimed. GitHub Actions/Xvfb is not a substitute.
+- Existing Restore journal/transaction/recovery components remain isolated and unwired. No new Durable Restore Journal integration, startup recovery, Wails/GUI/CLI Restore entry point or Restore UI was started. Restore remains disabled.
+- No `main` modification, merge or force-push occurred.
+
