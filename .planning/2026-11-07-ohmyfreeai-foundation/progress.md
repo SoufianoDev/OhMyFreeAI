@@ -2606,3 +2606,37 @@ The exact code/test head is still not fully CI-verified. In particular, the main
 - Existing Restore journal/transaction/recovery components remain isolated and unwired. No new Durable Restore Journal integration, startup recovery, Wails/GUI/CLI Restore entry point or Restore UI was started. Restore remains disabled.
 - No `main` modification, merge or force-push occurred.
 
+
+
+## Scheduled continuation: 2026-11-27T14:22Z
+
+### Requested historical CI recheck
+
+- Re-fetched Root CI [#42419106009](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/42419106009). It is `completed/success` on `foundation/bootstrap`, commit `f5396ee592b9b9756779f67aeabd6d7167520c40`, run number 185.
+- Inspected both job records and complete decoded logs:
+  - Ubuntu job `128543483467`: completed/success; all 18 returned step objects succeeded.
+  - Windows job `128543483323`: completed/success; all 18 returned step objects succeeded.
+  - Ubuntu log: 32,250 characters; Windows log: 33,346 characters. Both show successful Go vet, Go tests and Go build, Python 15/15, JavaScript syntax and architecture checks. Neither log contains `FAIL`, `##[error]`, fatal markers or non-zero exit markers.
+- The historical run was already complete; no polling or retry was necessary.
+
+### Latest branch CI and exact-head comparison
+
+- Queried the branch-filtered Actions run collection. The latest Root CI run returned for `foundation/bootstrap` is [#45413656706](https://github.com/SoufianoDev/OhMyFreeAI/actions/runs/45413656706), on code/test head `8b498f4d62ee14af5569ccde2aabba1bee20ed68`, created 2026-11-24T14:24:02Z. It completed successfully.
+- Ubuntu job `138513900926` and Windows job `138513900229` both completed successfully. Each returned 20 step objects; Ubuntu passed `go vet ./...`, `go test ./...`, `go test -race ./...`, `go build ./...`, Python 27/27, JavaScript syntax, architecture checks and the 48-file local Markdown link check. Windows passed the corresponding checks and skipped only the Linux-specific race-detector step.
+- Fetched both complete logs (Ubuntu 38,137 characters; Windows 36,961 characters). No `FAIL`, `##[error]`, fatal or non-zero exit markers were found.
+- Current branch ref is `76534eafdf2008deffeeac4f1d149684b71ee4f2`. Comparing tested head `8b498f4` with the current branch shows 5 commits ahead / 0 behind; the only changed paths are this plan's `progress.md` and `task_plan.md`. No application, Wails, StoreController, config, backup or Restore source changed after the tested code head. Therefore the existing Root CI remains valid for the unchanged code/test tree; no redundant CI run was launched.
+- Read-only comparison against `main` (`a1b12fbe5dd854c4619463eb1c7cccc0bd951941`) reports 995 commits ahead / 0 behind. No write, merge or force-push was performed.
+
+### StoreController and integration review
+
+- Re-fetched current `store_controller.go` (blob `3d5fd9d2cfc7e22949799a776107debea7533acc`) and `store_controller_test.go` (blob `d105e4ee2a9dd6c91f6c5e69cbc719e1800df6cf`). All 16 controller test functions remain present. They cover shared/exclusive drain, writer preference, cancellation, nil Store rejection, replacement publication, close/drain and post-close rejection, verified replacement after an operation error, fail-closed nil/panic behavior, panic-safe shared release, concurrent stress, config round-trip and config Load/Save drain.
+- Re-fetched Wails composition root (blob `edceedbfcfc0c94ad6ccf70453adf95fc07c5728`), AppService (blob `88a3274d7b1a55dc9ddf1d5bfe6582e166b5ad81`), ConfigRepository (blob `3054e0fe76a6d7331e714215b0925e478a4da5c3`), config service (blob `89f7f71c25bc88d251721d535860ef36587d87ad`), backup archive (blob `1c76a0c7e6d6dcf20c9a74ae32a87a9a8aa859ed`) and archive drain test (blob `bf81900a22d4b3b6dc8ff968d368addaac19daba`).
+- Confirmed the requested integration is already complete: one application-lifetime Wails Controller, AppService retains the Controller, configuration Load/Save uses Controller-backed shared leases, backup retains its shared lease through archive creation/verification/publication, and shutdown drains/closes through the Controller. `TestManagerCreateWithStoreControllerDrainsBeforeClose` still verifies the archive-publication barrier.
+- No production code change or test execution was made in this continuation.
+
+### Next gate and safety
+
+- The next planned stage remains real-host qualification: Linux in an ordinary logged-in GNOME/Wayland session with WebKit sandbox enabled, then Windows as a normal user with WebView2 and fixed local NTFS/persistent ACLs. Use the reproducible procedure in `docs/architecture/DESKTOP_BUILD.md`.
+- This run has no attached logged-in Linux or Windows desktop, no self-hosted runner and no live Google Colab Free runtime. No real-host, filesystem-provider, WebKit sandbox, WebView2 or live Colab/model/SSE test was run or claimed. GitHub Actions/Xvfb/container tests do not replace these checks.
+- Existing journal/transaction/recovery components remain isolated and unwired. No startup recovery, Restore GUI/CLI entry point or Restore UI was enabled or added. Restore remains disabled until both host/provider gates pass.
+- No production files changed; no new CI run was started because this continuation only rechecked existing code and records.
